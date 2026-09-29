@@ -317,6 +317,15 @@ sudo swapoff /swapfile && sudo fallocate -l 4G /swapfile && sudo chmod 600 /swap
 Nginx стартовал раньше, чем бэкенд. Достаточно `docker compose up -d nginx`
 или `docker compose restart nginx` после того, как бэкенд поднялся.
 
+**`dependency failed to start: container crm-postgres is unhealthy`.**
+Смотрите `docker compose logs postgres --tail 30`. Если там текст
+`in 18+, these Docker images are configured to store database data ...` — том
+смонтирован по старому пути. В compose должно быть `pgdata:/var/lib/postgresql`
+(без `/data` на конце): начиная с Postgres 18 данные лежат в
+`/var/lib/postgresql/18/docker`, и образ отказывается стартовать со старой схемой.
+После правки: `docker compose down -v && docker compose up -d` (том пустой,
+терять нечего).
+
 **Бэкенд перезапускается по кругу.**
 `docker compose logs backend --tail 50`. Чаще всего: не заполнен `.env`
 (`SECRET_KEY`, `POSTGRES_PASSWORD`) или база ещё инициализируется — подождите минуту.
