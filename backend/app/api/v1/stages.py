@@ -2,7 +2,9 @@
 
 from __future__ import annotations
 
-from fastapi import APIRouter, status
+from typing import Annotated
+
+from fastapi import APIRouter, Query, status
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
@@ -48,19 +50,40 @@ async def owned_stage(session: AsyncSession, stage_id: int, user: User) -> Stage
 
 
 @router.get("", response_model=list[StageRead], summary="Этапы доски по порядку")
-async def list_stages(session: SessionDep, user: CurrentUser) -> list[Stage]:
-    # Первый заход сотрудника: доски ещё нет — создаём стандартную воронку.
-    await ensure_default_stages(session, user.id)
-    stmt = select(Stage).where(Stage.owner_id == user.id).order_by(Stage.sequence, Stage.id)
+async def list_stages(
+    session: SessionDep,
+    user: CurrentUser,
+    owner_id: Annotated[
+        int | None, Query(description="Чью доску открыть — только для администратора")
+    ] = None,
+) -> list[Stage]:
+    board_owner = user.id
+    if owner_id is not None and owner_id != user.id:
+        if user.role != Role.admin:
+            raise PermissionDeniedError("Чужую доску может открыть только администратор")
+        board_owner = owner_id
+
+    # Первый заход на доску: этапов ещё нет — создаём стандартную воронку.
+    await ensure_default_stages(session, board_owner)
+    stmt = select(Stage).where(Stage.owner_id == board_owner).order_by(Stage.sequence, Stage.id)
     return list((await session.execute(stmt)).scalars().all())
 
 
 @router.post(
     "", response_model=StageRead, status_code=status.HTTP_201_CREATED, summary="Создать этап"
 )
-async def create_stage(payload: StageCreate, session: SessionDep, user: CurrentUser) -> Stage:
-    # Этап всегда заводится на своей доске: чужую правит только перенос данных.
-    stage = Stage(**payload.model_dump(), owner_id=user.id)
+async def create_stage(
+    payload: StageCreate,
+    session: SessionDep,
+    user: CurrentUser,
+    owner_id: Annotated[int | None, Query(description="Доска сотрудника (админ)")] = None,
+) -> Stage:
+    board_owner = user.id
+    if owner_id is not None and owner_id != user.id:
+        if user.role != Role.admin:
+            raise PermissionDeniedError("Создавать этапы на чужой доске может только администратор")
+        board_owner = owner_id
+    stage = Stage(**payload.model_dump(), owner_id=board_owner)
     session.add(stage)
     await session.commit()
     await session.refresh(stage)

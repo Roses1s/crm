@@ -108,10 +108,15 @@ export function useCanManage(): boolean {
 }
 
 // --- справочники -------------------------------------------------------------
-export function useStages() {
+/**
+ * Этапы доски. `ownerId` передаёт только администратор, когда открывает
+ * доску сотрудника; свою доску запрашиваем без параметра.
+ */
+export function useStages(ownerId?: number | null) {
   return useQuery({
-    queryKey: keys.stages,
-    queryFn: () => api<Stage[]>("/crm/stages"),
+    queryKey: [...keys.stages, ownerId ?? "me"],
+    queryFn: () =>
+      api<Stage[]>(`/crm/stages${ownerId ? `?owner_id=${ownerId}` : ""}`),
   });
 }
 
@@ -139,8 +144,17 @@ export function useLauncherApps() {
 export function useCreateStage() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (name: string) =>
-      api<Stage>("/crm/stages", { method: "POST", body: { name } }),
+    mutationFn: ({
+      name,
+      ownerId,
+    }: {
+      name: string;
+      ownerId?: number | null;
+    }) =>
+      api<Stage>(`/crm/stages${ownerId ? `?owner_id=${ownerId}` : ""}`, {
+        method: "POST",
+        body: { name },
+      }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: keys.stages }),
   });
 }

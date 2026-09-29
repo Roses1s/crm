@@ -80,3 +80,31 @@ async def test_new_stage_belongs_to_its_author(
 
     names = [s["name"] for s in (await client.get("/api/v1/crm/stages", headers=headers)).json()]
     assert "Отказ" in names
+
+
+async def test_admin_opens_board_of_employee(
+    auth_client: AsyncClient, client: AsyncClient, seeded: dict[str, object]
+) -> None:
+    """Админ запрашивает доску сотрудника по номеру и получает его этапы."""
+    manager_id = seeded["manager"].id  # type: ignore[attr-defined]
+
+    board = await auth_client.get(f"/api/v1/crm/stages?owner_id={manager_id}")
+    assert board.status_code == 200
+    assert [s["name"] for s in board.json()] == DEFAULT_NAMES
+
+    # Своя доска админа остаётся прежней.
+    own = await auth_client.get("/api/v1/crm/stages")
+    assert "Переговоры" in [s["name"] for s in own.json()]
+
+
+async def test_manager_cannot_open_foreign_board(
+    client: AsyncClient, seeded: dict[str, object]
+) -> None:
+    admin_id = seeded["admin"].id  # type: ignore[attr-defined]
+    token = await manager_token(client)
+
+    response = await client.get(
+        f"/api/v1/crm/stages?owner_id={admin_id}",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 403

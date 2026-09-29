@@ -16,6 +16,7 @@ import { useEffect, useMemo, useState } from "react";
 import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { AppShell, ControlPanel } from "@/app/layout/AppShell";
+import { BoardSwitcher } from "@/features/crm/board/BoardSwitcher";
 import { Column } from "@/features/crm/board/Column";
 import { LeadCard } from "@/features/crm/board/LeadCard";
 import { LeadListView } from "@/features/crm/list/LeadListView";
@@ -33,7 +34,9 @@ import type { Lead } from "@/shared/types";
 const dropAnimation: DropAnimation = {
   duration: 160,
   easing: "ease-out",
-  sideEffects: defaultDropAnimationSideEffects({ styles: { active: { opacity: "0.3" } } }),
+  sideEffects: defaultDropAnimationSideEffects({
+    styles: { active: { opacity: "0.3" } },
+  }),
 };
 
 function Dropdown({
@@ -93,6 +96,8 @@ export function KanbanPage() {
   const priorityFilter = params.get("priority");
   const archived = params.get("is_archived") === "true";
   const assignedFilter = params.get("assigned_to");
+  // Админ может открыть доску сотрудника: номер лежит в адресе (?board=N).
+  const boardParam = params.get("board");
   const group = params.get("group") === "assigned" ? "assigned" : "stage";
   const view = params.get("view") === "list" ? "list" : "kanban";
 
@@ -100,7 +105,9 @@ export function KanbanPage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [folded, setFolded] = useState<number[]>(() => {
     try {
-      return JSON.parse(localStorage.getItem("crm-folded-stages") ?? "[]") as number[];
+      return JSON.parse(
+        localStorage.getItem("crm-folded-stages") ?? "[]",
+      ) as number[];
     } catch {
       return [];
     }
@@ -130,15 +137,18 @@ export function KanbanPage() {
   }, [searchInput, setParams]);
 
   const { data: me } = useMe();
+  const isAdmin = me?.role === "admin";
+  const boardUserId = isAdmin && boardParam ? Number(boardParam) : null;
   const { data: leads = [], isLoading } = useLeads({
     search,
     stage: stageFilter ? Number(stageFilter) : null,
     tag: tagFilter ? Number(tagFilter) : null,
     priority: priorityFilter ? Number(priorityFilter) : null,
-    assigned: assignedFilter ? Number(assignedFilter) : null,
+    // На чужой доске показываем лиды её владельца.
+    assigned: assignedFilter ? Number(assignedFilter) : boardUserId,
     archived,
   });
-  const { data: stages = [] } = useStages();
+  const { data: stages = [] } = useStages(boardUserId);
   const { data: tags = [] } = useTags();
   const moveLead = useMoveLead();
   const createStage = useCreateStage();
@@ -156,7 +166,9 @@ export function KanbanPage() {
 
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
-    useSensor(TouchSensor, { activationConstraint: { delay: 150, tolerance: 5 } }),
+    useSensor(TouchSensor, {
+      activationConstraint: { delay: 150, tolerance: 5 },
+    }),
   );
 
   function onDragStart(event: DragStartEvent) {
@@ -174,7 +186,9 @@ export function KanbanPage() {
     if (String(over.id).startsWith("stage-")) {
       stageId = Number(String(over.id).replace("stage-", ""));
     } else if (String(over.id).startsWith("lead-")) {
-      const target = leads.find((l) => l.id === Number(String(over.id).replace("lead-", "")));
+      const target = leads.find(
+        (l) => l.id === Number(String(over.id).replace("lead-", "")),
+      );
       stageId = target?.stage_id ?? null;
     }
 
@@ -186,10 +200,14 @@ export function KanbanPage() {
 
   const groupColumns = useMemo(
     () =>
-      Array.from(new Set(leads.map((l) => l.assigned_to_email || "Не назначен"))).map((email) => ({
+      Array.from(
+        new Set(leads.map((l) => l.assigned_to_email || "Не назначен")),
+      ).map((email) => ({
         key: email,
         title: email,
-        items: leads.filter((l) => (l.assigned_to_email || "Не назначен") === email),
+        items: leads.filter(
+          (l) => (l.assigned_to_email || "Не назначен") === email,
+        ),
       })),
     [leads],
   );
@@ -212,7 +230,12 @@ export function KanbanPage() {
               <button
                 type="button"
                 className={`block w-full px-3 py-1.5 text-left text-sm hover:bg-odoo-bg ${assignedFilter ? "font-medium text-odoo-action" : ""}`}
-                onClick={() => setFilter("assigned_to", assignedFilter ? "" : String(me?.id ?? ""))}
+                onClick={() =>
+                  setFilter(
+                    "assigned_to",
+                    assignedFilter ? "" : String(me?.id ?? ""),
+                  )
+                }
               >
                 {assignedFilter ? "Показать все" : "Мои лиды"}
               </button>
@@ -270,9 +293,13 @@ export function KanbanPage() {
                   className="block w-full px-3 py-1.5 text-left text-sm text-odoo-action hover:bg-odoo-bg"
                   onClick={() => {
                     const next = new URLSearchParams(params);
-                    ["priority", "stage", "tags", "is_archived", "assigned_to"].forEach((k) =>
-                      next.delete(k),
-                    );
+                    [
+                      "priority",
+                      "stage",
+                      "tags",
+                      "is_archived",
+                      "assigned_to",
+                    ].forEach((k) => next.delete(k));
                     setParams(next);
                   }}
                 >
@@ -300,6 +327,15 @@ export function KanbanPage() {
         )}
       </ControlPanel>
 
+      {isAdmin && (
+        <BoardSwitcher
+          boardUserId={boardUserId}
+          onChange={(userId) =>
+            setFilter("board", userId ? String(userId) : "")
+          }
+        />
+      )}
+
       {moveLead.isError && (
         <div
           role="alert"
@@ -311,13 +347,17 @@ export function KanbanPage() {
 
       {view !== "list" && !isLoading && leads.length === 0 && (
         <div className="px-4 pt-10 text-center text-sm text-odoo-text-muted">
-          Лиды не найдены. Нажмите <span className="font-medium text-odoo-text">Новый</span> или
-          «+ Добавить» в колонке.
+          Лиды не найдены. Нажмите{" "}
+          <span className="font-medium text-odoo-text">Новый</span> или «+
+          Добавить» в колонке.
         </div>
       )}
 
       {view === "list" && (
-        <LeadListView leads={leads} groupBy={group === "assigned" ? "assigned" : "stage"} />
+        <LeadListView
+          leads={leads}
+          groupBy={group === "assigned" ? "assigned" : "stage"}
+        />
       )}
 
       {view !== "list" && (
@@ -339,7 +379,9 @@ export function KanbanPage() {
                     folded={folded.includes(stage.id)}
                     onFold={() =>
                       setFolded((f) =>
-                        f.includes(stage.id) ? f.filter((x) => x !== stage.id) : [...f, stage.id],
+                        f.includes(stage.id)
+                          ? f.filter((x) => x !== stage.id)
+                          : [...f, stage.id],
                       )
                     }
                     allStages={stages}
@@ -352,7 +394,9 @@ export function KanbanPage() {
                   >
                     <div className="bg-odoo-column-head px-2.5 py-2 text-[13px] font-semibold">
                       {col.title}{" "}
-                      <span className="font-normal text-odoo-text-muted">{col.items.length}</span>
+                      <span className="font-normal text-odoo-text-muted">
+                        {col.items.length}
+                      </span>
                     </div>
                     <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain bg-odoo-surface [scrollbar-gutter:stable]">
                       {col.items.map((lead) => (
@@ -388,12 +432,17 @@ export function KanbanPage() {
                   value={stageName}
                   onChange={(e) => setStageName(e.target.value)}
                   onBlur={() => {
-                    if (stageName.trim()) createStage.mutate(stageName.trim());
+                    if (stageName.trim())
+                      createStage.mutate({
+                        name: stageName.trim(),
+                        ownerId: boardUserId,
+                      });
                     setNewStage(false);
                     setStageName("");
                   }}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                    if (e.key === "Enter")
+                      (e.target as HTMLInputElement).blur();
                     if (e.key === "Escape") {
                       setStageName("");
                       setNewStage(false);
