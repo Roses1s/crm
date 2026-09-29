@@ -19,7 +19,7 @@ import type {
   TimelineEntry,
   User,
 } from "@/shared/types";
-import { clearTokens, saveTokens } from "./auth";
+import { clearTokens, setAccessToken } from "./auth";
 import { api, apiBlob, apiUpload, type Page } from "./client";
 
 export interface LeadFilters {
@@ -65,25 +65,28 @@ export const keys = {
 };
 
 // --- авторизация -------------------------------------------------------------
-interface TokenPair {
+interface AccessTokenResponse {
   access_token: string;
-  refresh_token: string;
 }
 
 export function useLogin() {
   return useMutation({
     mutationFn: (credentials: { email: string; password: string }) =>
-      api<TokenPair>("/auth/login", {
+      api<AccessTokenResponse>("/auth/login", {
         method: "POST",
         body: credentials,
         auth: false,
       }),
-    onSuccess: (data) => saveTokens(data.access_token, data.refresh_token),
+    // Обновляющий токен сервер кладёт в куку сам, нам приходит только короткий.
+    onSuccess: (data) => setAccessToken(data.access_token),
   });
 }
 
 export function logout(): void {
-  clearTokens();
+  // Куку может стереть только сервер — она недоступна скриптам.
+  void fetch("/api/v1/auth/logout", { method: "POST" }).finally(() =>
+    clearTokens(),
+  );
 }
 
 export function useMe() {

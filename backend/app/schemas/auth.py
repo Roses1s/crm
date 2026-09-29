@@ -8,12 +8,14 @@ class LoginRequest(BaseModel):
     password: str = Field(min_length=1, max_length=128)
 
 
-class RefreshRequest(BaseModel):
-    refresh_token: str
+class AccessToken(BaseModel):
+    """Ответ входа и обновления.
 
+    Обновляющий токен в теле не возвращается: он уходит в куку HttpOnly,
+    недоступную скриптам страницы. Так украсть сессию через чужой скрипт
+    нельзя, а короткий токен доступа живёт только в памяти вкладки.
+    """
 
-class TokenPair(BaseModel):
     access_token: str
-    refresh_token: str
     token_type: str = "bearer"
     expires_in: int

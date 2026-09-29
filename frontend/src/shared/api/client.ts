@@ -6,7 +6,7 @@
  * Поэтому никаких абсолютных адресов и переменных окружения с хостом не нужно.
  */
 
-import { clearTokens, getAccessToken } from "./auth";
+import { clearTokens, getAccessToken, refreshSession } from "./auth";
 
 const BASE = "/api/v1";
 
@@ -23,7 +23,11 @@ export class ApiError extends Error {
 
 type Options = Omit<RequestInit, "body"> & { body?: unknown; auth?: boolean };
 
-export async function api<T>(path: string, options: Options = {}): Promise<T> {
+export async function api<T>(
+  path: string,
+  options: Options = {},
+  retry = true,
+): Promise<T> {
   const { body, auth = true, headers, ...rest } = options;
   const token = auth ? getAccessToken() : null;
 
@@ -38,7 +42,11 @@ export async function api<T>(path: string, options: Options = {}): Promise<T> {
   });
 
   if (response.status === 401 && auth) {
-    // Токен протух или отозван — выходим и уводим на страницу входа.
+    // Токен доступа живёт полчаса. Прежде чем выгонять человека на страницу
+    // входа, пробуем один раз продлить сессию по куке — работа не прервётся.
+    if (retry && (await refreshSession())) {
+      return api<T>(path, options, false);
+    }
     clearTokens();
     if (window.location.pathname !== "/login") window.location.assign("/login");
     throw new ApiError(401, "Сессия истекла, войдите заново", "unauthorized");
@@ -101,6 +109,7 @@ export async function apiBlob(path: string): Promise<Blob> {
   const response = await fetch(`${BASE}${path}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
-  if (!response.ok) throw new ApiError(response.status, "Не удалось получить файл");
+  if (!response.ok)
+    throw new ApiError(response.status, "Не удалось получить файл");
   return response.blob();
 }

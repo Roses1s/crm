@@ -1,51 +1,47 @@
 /**
- * Хранение токенов и состояние «вошёл / не вошёл».
+ * Состояние сессии на стороне браузера.
  *
- * Токены лежат в localStorage: приложение одностраничное, вкладок может быть
- * несколько, а перелогиниваться при каждом обновлении страницы неудобно.
+ * Токен доступа живёт только в памяти вкладки: в localStorage его прочитал бы
+ * любой скрипт, попавший на страницу. Долгоживущий токен обновления хранится
+ * в куке HttpOnly — она недоступна скриптам и уходит только на /api/v1/auth.
+ * Поэтому после перезагрузки страницы сессия восстанавливается тихим запросом
+ * к /auth/refresh, а не чтением хранилища.
  */
 
 import { useSyncExternalStore } from "react";
 
-const ACCESS_KEY = "crm-access-token";
-const REFRESH_KEY = "crm-refresh-token";
+let accessToken: string | null = null;
+// Пока не спросили сервер, мы не знаем, есть ли сессия: пускать на страницу
+// входа рано, иначе при каждом обновлении F5 мелькал бы логин.
+let restored = false;
 
 const listeners = new Set<() => void>();
 
-function read(key: string): string | null {
-  try {
-    return localStorage.getItem(key);
-  } catch {
-    return null;
-  }
+function notify(): void {
+  listeners.forEach((listener) => listener());
 }
 
 export function getAccessToken(): string | null {
-  return read(ACCESS_KEY);
+  return accessToken;
 }
 
-export function getRefreshToken(): string | null {
-  return read(REFRESH_KEY);
+export function setAccessToken(token: string | null): void {
+  accessToken = token;
+  notify();
 }
 
-export function saveTokens(access: string, refresh: string): void {
-  try {
-    localStorage.setItem(ACCESS_KEY, access);
-    localStorage.setItem(REFRESH_KEY, refresh);
-  } catch {
-    // приватный режим: токены проживут только до перезагрузки
-  }
-  listeners.forEach((l) => l());
+export function markRestored(): void {
+  restored = true;
+  notify();
+}
+
+export function isRestored(): boolean {
+  return restored;
 }
 
 export function clearTokens(): void {
-  try {
-    localStorage.removeItem(ACCESS_KEY);
-    localStorage.removeItem(REFRESH_KEY);
-  } catch {
-    // ignore
-  }
-  listeners.forEach((l) => l());
+  accessToken = null;
+  notify();
 }
 
 function subscribe(listener: () => void): () => void {
@@ -58,7 +54,32 @@ function subscribe(listener: () => void): () => void {
 export function useIsAuthenticated(): boolean {
   return useSyncExternalStore(
     subscribe,
-    () => getAccessToken() !== null,
+    () => accessToken !== null,
     () => false,
   );
+}
+
+/** Закончилась ли попытка восстановить сессию по куке. */
+export function useSessionRestored(): boolean {
+  return useSyncExternalStore(
+    subscribe,
+    () => restored,
+    () => false,
+  );
+}
+
+/**
+ * Тихое восстановление сессии при запуске приложения и после истечения
+ * короткого токена. Кука уходит автоматически, тело запроса не нужно.
+ */
+export async function refreshSession(): Promise<boolean> {
+  try {
+    const response = await fetch("/api/v1/auth/refresh", { method: "POST" });
+    if (!response.ok) return false;
+    const data = (await response.json()) as { access_token: string };
+    setAccessToken(data.access_token);
+    return true;
+  } catch {
+    return false;
+  }
 }

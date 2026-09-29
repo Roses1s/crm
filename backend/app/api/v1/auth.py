@@ -2,8 +2,10 @@
 
 from __future__ import annotations
 
+from typing import Annotated
+
 import jwt
-from fastapi import APIRouter, HTTPException, Request, status
+from fastapi import APIRouter, Cookie, HTTPException, Request, Response, status
 from sqlalchemy import select
 
 from app.api.deps import CurrentUser, SessionDep
@@ -18,24 +20,43 @@ from app.core.security import (
 )
 from app.models.security import LoginAttempt
 from app.models.user import User
-from app.schemas.auth import LoginRequest, RefreshRequest, TokenPair
+from app.schemas.auth import AccessToken, LoginRequest
 from app.schemas.user import UserRead
 
 router = APIRouter(prefix="/auth", tags=["auth"])
 log = get_logger(__name__)
 
 
-def _tokens(user: User) -> TokenPair:
-    return TokenPair(
+# Кука уходит только на ручки аутентификации: остальным запросам она не нужна,
+# а чем уже путь, тем меньше шансов утечь.
+REFRESH_COOKIE = "crm_refresh"
+COOKIE_PATH = "/api/v1/auth"
+
+
+def _issue(user: User, response: Response) -> AccessToken:
+    """Выдаёт короткий токен доступа и кладёт обновляющий в куку HttpOnly."""
+    response.set_cookie(
+        REFRESH_COOKIE,
+        create_refresh_token(user.id),
+        max_age=settings.refresh_token_ttl_days * 24 * 3600,
+        path=COOKIE_PATH,
+        httponly=True,
+        # В продакшене сайт только по HTTPS; в разработке без этого кука
+        # не сохранилась бы на http://localhost.
+        secure=settings.is_production,
+        samesite="lax",
+    )
+    return AccessToken(
         access_token=create_access_token(user.id),
-        refresh_token=create_refresh_token(user.id),
         expires_in=settings.access_token_ttl_minutes * 60,
     )
 
 
-@router.post("/login", response_model=TokenPair, summary="Вход по email и паролю")
+@router.post("/login", response_model=AccessToken, summary="Вход по email и паролю")
 @limiter.limit(settings.rate_limit_login)
-async def login(request: Request, payload: LoginRequest, session: SessionDep) -> TokenPair:
+async def login(
+    request: Request, response: Response, payload: LoginRequest, session: SessionDep
+) -> AccessToken:
     # request нужен slowapi для определения клиента — поэтому он в сигнатуре.
     user = (
         await session.execute(select(User).where(User.email == payload.email.lower()))
@@ -69,13 +90,20 @@ async def login(request: Request, payload: LoginRequest, session: SessionDep) ->
         )
 
     log.info("auth.login_ok", user_id=user.id, role=user.role.value)
-    return _tokens(user)
+    return _issue(user, response)
 
 
-@router.post("/refresh", response_model=TokenPair, summary="Обновить пару токенов")
-async def refresh(payload: RefreshRequest, session: SessionDep) -> TokenPair:
+@router.post("/refresh", response_model=AccessToken, summary="Обновить токен доступа")
+async def refresh(
+    response: Response,
+    session: SessionDep,
+    crm_refresh: Annotated[str | None, Cookie()] = None,
+) -> AccessToken:
+    """Продлевает сессию по куке — тело запроса не нужно."""
+    if not crm_refresh:
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Нет сессии")
     try:
-        data = decode_token(payload.refresh_token, "refresh")
+        data = decode_token(crm_refresh, "refresh")
         user_id = int(data["sub"])
     except (jwt.PyJWTError, KeyError, ValueError) as exc:
         raise HTTPException(
@@ -87,7 +115,13 @@ async def refresh(payload: RefreshRequest, session: SessionDep) -> TokenPair:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Пользователь недоступен"
         )
-    return _tokens(user)
+    return _issue(user, response)
+
+
+@router.post("/logout", status_code=status.HTTP_204_NO_CONTENT, summary="Выход")
+async def logout(response: Response) -> None:
+    """Стирает куку сессии: без неё продлить доступ уже нельзя."""
+    response.delete_cookie(REFRESH_COOKIE, path=COOKIE_PATH)
 
 
 @router.get("/me", response_model=UserRead, summary="Текущий пользователь")
