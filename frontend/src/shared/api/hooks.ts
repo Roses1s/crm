@@ -56,8 +56,11 @@ export const keys = {
   pager: (id: string | number) => ["pager", String(id)] as const,
   shipments: (status: string) => ["shipments", status] as const,
   shipment: (id: string | number) => ["shipment", String(id)] as const,
-  leadShipments: (id: string | number) => ["lead-shipments", String(id)] as const,
+  leadShipments: (id: string | number) =>
+    ["lead-shipments", String(id)] as const,
   attachments: (id: string | number) => ["attachments", String(id)] as const,
+  shipmentAttachments: (id: string | number) =>
+    ["shipment-attachments", String(id)] as const,
   activities: (id: string | number) => ["activities", String(id)] as const,
   myActivities: ["activities", "my"] as const,
   carriers: ["carriers"] as const,
@@ -76,7 +79,11 @@ interface TokenPair {
 export function useLogin() {
   return useMutation({
     mutationFn: (credentials: { email: string; password: string }) =>
-      api<TokenPair>("/auth/login", { method: "POST", body: credentials, auth: false }),
+      api<TokenPair>("/auth/login", {
+        method: "POST",
+        body: credentials,
+        auth: false,
+      }),
     onSuccess: (data) => saveTokens(data.access_token, data.refresh_token),
   });
 }
@@ -102,25 +109,38 @@ export function useCanManage(): boolean {
 
 // --- справочники -------------------------------------------------------------
 export function useStages() {
-  return useQuery({ queryKey: keys.stages, queryFn: () => api<Stage[]>("/crm/stages") });
+  return useQuery({
+    queryKey: keys.stages,
+    queryFn: () => api<Stage[]>("/crm/stages"),
+  });
 }
 
 export function useTags() {
-  return useQuery({ queryKey: keys.tags, queryFn: () => api<Tag[]>("/crm/tags") });
+  return useQuery({
+    queryKey: keys.tags,
+    queryFn: () => api<Tag[]>("/crm/tags"),
+  });
 }
 
 export function useCarriers() {
-  return useQuery({ queryKey: keys.carriers, queryFn: () => api<Carrier[]>("/carriers") });
+  return useQuery({
+    queryKey: keys.carriers,
+    queryFn: () => api<Carrier[]>("/carriers"),
+  });
 }
 
 export function useLauncherApps() {
-  return useQuery({ queryKey: keys.apps, queryFn: () => api<LauncherApp[]>("/launcher/apps") });
+  return useQuery({
+    queryKey: keys.apps,
+    queryFn: () => api<LauncherApp[]>("/launcher/apps"),
+  });
 }
 
 export function useCreateStage() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (name: string) => api<Stage>("/crm/stages", { method: "POST", body: { name } }),
+    mutationFn: (name: string) =>
+      api<Stage>("/crm/stages", { method: "POST", body: { name } }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: keys.stages }),
   });
 }
@@ -216,7 +236,8 @@ export interface LeadPayload {
 export function useCreateLead() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: LeadPayload) => api<Lead>("/crm/leads", { method: "POST", body }),
+    mutationFn: (body: LeadPayload) =>
+      api<Lead>("/crm/leads", { method: "POST", body }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["leads"] }),
   });
 }
@@ -270,7 +291,8 @@ export function useMoveLead() {
 export function useArchiveLead() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number | string) => api<void>(`/crm/leads/${id}`, { method: "DELETE" }),
+    mutationFn: (id: number | string) =>
+      api<void>(`/crm/leads/${id}`, { method: "DELETE" }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["leads"] }),
   });
 }
@@ -279,8 +301,12 @@ export function useAddNote(id: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: string) =>
-      api<TimelineEntry>(`/crm/leads/${id}/notes`, { method: "POST", body: { body } }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.timeline(id ?? "") }),
+      api<TimelineEntry>(`/crm/leads/${id}/notes`, {
+        method: "POST",
+        body: { body },
+      }),
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: keys.timeline(id ?? "") }),
   });
 }
 
@@ -307,7 +333,10 @@ export function useMyActivities() {
   });
 }
 
-function invalidateActivities(qc: ReturnType<typeof useQueryClient>, leadId?: string | number) {
+function invalidateActivities(
+  qc: ReturnType<typeof useQueryClient>,
+  leadId?: string | number,
+) {
   void qc.invalidateQueries({ queryKey: keys.activities(leadId ?? "") });
   void qc.invalidateQueries({ queryKey: keys.myActivities });
   // Часики на карточках канбана берут состояние из самого лида.
@@ -320,7 +349,10 @@ export function useCreateActivity(leadId: string | number | undefined) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: ActivityPayload) =>
-      api<Activity>(`/crm/leads/${leadId}/activities`, { method: "POST", body }),
+      api<Activity>(`/crm/leads/${leadId}/activities`, {
+        method: "POST",
+        body,
+      }),
     onSuccess: () => invalidateActivities(qc, leadId),
   });
 }
@@ -329,7 +361,10 @@ export function useCompleteActivity(leadId: string | number | undefined) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: number) =>
-      api<Activity>(`/crm/activities/${id}`, { method: "PATCH", body: { is_done: true } }),
+      api<Activity>(`/crm/activities/${id}`, {
+        method: "PATCH",
+        body: { is_done: true },
+      }),
     onSuccess: () => invalidateActivities(qc, leadId),
   });
 }
@@ -337,7 +372,8 @@ export function useCompleteActivity(leadId: string | number | undefined) {
 export function useDeleteActivity(leadId: string | number | undefined) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => api<void>(`/crm/activities/${id}`, { method: "DELETE" }),
+    mutationFn: (id: number) =>
+      api<void>(`/crm/activities/${id}`, { method: "DELETE" }),
     onSuccess: () => invalidateActivities(qc, leadId),
   });
 }
@@ -378,13 +414,55 @@ export function useDeleteAttachment(leadId: string | number | undefined) {
   });
 }
 
+/** Вложения заявки: отдельный список, в файлы лида они намеренно не попадают. */
+export function useShipmentAttachments(id: string | number | undefined) {
+  return useQuery({
+    queryKey: keys.shipmentAttachments(id ?? "new"),
+    queryFn: () => api<Attachment[]>(`/shipments/${id}/attachments`),
+    enabled: Boolean(id) && id !== "new",
+  });
+}
+
+export function useUploadShipmentAttachment(
+  shipmentId: string | number | undefined,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (file: File) =>
+      apiUpload<Attachment>(`/shipments/${shipmentId}/attachments`, file),
+    onSuccess: () => {
+      void qc.invalidateQueries({
+        queryKey: keys.shipmentAttachments(shipmentId ?? ""),
+      });
+    },
+  });
+}
+
+export function useDeleteShipmentAttachment(
+  shipmentId: string | number | undefined,
+) {
+  const qc = useQueryClient();
+  return useMutation({
+    // Удаление общее для всех вложений — ручка различает их по номеру файла.
+    mutationFn: (attachmentId: number) =>
+      api<void>(`/crm/attachments/${attachmentId}`, { method: "DELETE" }),
+    onSuccess: () => {
+      void qc.invalidateQueries({
+        queryKey: keys.shipmentAttachments(shipmentId ?? ""),
+      });
+    },
+  });
+}
+
 /** Содержимое файла — для миниатюр и предпросмотра. */
 export function attachmentBlob(attachmentId: number): Promise<Blob> {
   return apiBlob(`/crm/attachments/${attachmentId}`);
 }
 
 /** Скачивание: получаем файл с токеном и отдаём браузеру. */
-export async function downloadAttachment(attachment: Attachment): Promise<void> {
+export async function downloadAttachment(
+  attachment: Attachment,
+): Promise<void> {
   const blob = await attachmentBlob(attachment.id);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -399,7 +477,9 @@ export function useShipments(status = "") {
   return useQuery({
     queryKey: keys.shipments(status),
     queryFn: () =>
-      api<Page<Shipment>>(`/shipments?page_size=200${status ? `&status=${status}` : ""}`),
+      api<Page<Shipment>>(
+        `/shipments?page_size=200${status ? `&status=${status}` : ""}`,
+      ),
     select: (page) => page.results,
   });
 }
@@ -457,7 +537,10 @@ export function useSetShipmentStatus(id: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (status: string) =>
-      api<Shipment>(`/shipments/${id}/status`, { method: "PATCH", body: { status } }),
+      api<Shipment>(`/shipments/${id}/status`, {
+        method: "PATCH",
+        body: { status },
+      }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.shipment(id ?? "") });
       void qc.invalidateQueries({ queryKey: ["shipments"] });
@@ -467,7 +550,10 @@ export function useSetShipmentStatus(id: string | undefined) {
 
 // --- администрирование -------------------------------------------------------
 export function useUsers() {
-  return useQuery({ queryKey: keys.users, queryFn: () => api<User[]>("/admin/users") });
+  return useQuery({
+    queryKey: keys.users,
+    queryFn: () => api<User[]>("/admin/users"),
+  });
 }
 
 export interface UserPayload {
@@ -481,7 +567,8 @@ export interface UserPayload {
 export function useCreateUser() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: UserPayload) => api<User>("/admin/users", { method: "POST", body }),
+    mutationFn: (body: UserPayload) =>
+      api<User>("/admin/users", { method: "POST", body }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: keys.users }),
   });
 }
@@ -498,13 +585,17 @@ export function useUpdateUser() {
 export function useDeleteUser() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => api<void>(`/admin/users/${id}`, { method: "DELETE" }),
+    mutationFn: (id: number) =>
+      api<void>(`/admin/users/${id}`, { method: "DELETE" }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: keys.users }),
   });
 }
 
 export function useStats() {
-  return useQuery({ queryKey: keys.stats, queryFn: () => api<DashboardStats>("/admin/stats") });
+  return useQuery({
+    queryKey: keys.stats,
+    queryFn: () => api<DashboardStats>("/admin/stats"),
+  });
 }
 
 interface BackupsResponse {
@@ -525,10 +616,14 @@ export function useBackups() {
 export function useRunBackup() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => api<{ task_id: string }>("/admin/backup", { method: "POST" }),
+    mutationFn: () =>
+      api<{ task_id: string }>("/admin/backup", { method: "POST" }),
     onSuccess: () => {
       // Файл появится через несколько секунд — обновим список с задержкой.
-      setTimeout(() => void qc.invalidateQueries({ queryKey: keys.backups }), 4000);
+      setTimeout(
+        () => void qc.invalidateQueries({ queryKey: keys.backups }),
+        4000,
+      );
     },
   });
 }
@@ -537,8 +632,14 @@ export function useLoginAttempts() {
   return useQuery({
     queryKey: keys.loginAttempts,
     queryFn: () =>
-      api<{ id: number; username: string; ip_address: string; attempt_time: string; failures: number }[]>(
-        "/admin/login-attempts",
-      ),
+      api<
+        {
+          id: number;
+          username: string;
+          ip_address: string;
+          attempt_time: string;
+          failures: number;
+        }[]
+      >("/admin/login-attempts"),
   });
 }

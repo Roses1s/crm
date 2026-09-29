@@ -1,5 +1,10 @@
 import { useEffect, useState } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import {
+  Link,
+  useNavigate,
+  useParams,
+  useSearchParams,
+} from "react-router-dom";
 
 import { AppShell, Breadcrumb, Toolbar } from "@/app/layout/AppShell";
 import { ApiError } from "@/shared/api/client";
@@ -11,12 +16,18 @@ import {
   useShipment,
   type ShipmentPayload,
 } from "@/shared/api/hooks";
+import { ShipmentAttachments } from "@/features/shipments/ShipmentAttachments";
 import { Button } from "@/shared/ui/button";
-import { Chatter } from "@/shared/ui/chatter";
 import { FormSection } from "@/shared/ui/form-section";
 import { FormSkeleton } from "@/shared/ui/skeleton";
 
-const STATUSES = ["new", "in_progress", "in_transit", "delivered", "cancelled"] as const;
+const STATUSES = [
+  "new",
+  "in_progress",
+  "in_transit",
+  "delivered",
+  "cancelled",
+] as const;
 const STATUS_LABEL: Record<string, string> = {
   new: "Новая",
   in_progress: "В работе",
@@ -25,8 +36,10 @@ const STATUS_LABEL: Record<string, string> = {
   cancelled: "Отменена",
 };
 
-const inputCls = "w-full rounded-[4px] border border-odoo-border px-2.5 py-1.5 text-sm";
-const labelCls = "mb-1 block text-xs font-medium uppercase text-odoo-text-muted";
+const inputCls =
+  "w-full rounded-[4px] border border-odoo-border px-2.5 py-1.5 text-sm";
+const labelCls =
+  "mb-1 block text-xs font-medium uppercase text-odoo-text-muted";
 
 const emptyForm = {
   lead_id: 0,
@@ -70,7 +83,8 @@ function ShipmentForm({ id }: { id?: string }) {
   // Заявка из карточки лида приходит со ссылкой /shipments/new?lead=42.
   useEffect(() => {
     const leadParam = searchParams.get("lead");
-    if (isNew && leadParam) setForm((f) => ({ ...f, lead_id: Number(leadParam) }));
+    if (isNew && leadParam)
+      setForm((f) => ({ ...f, lead_id: Number(leadParam) }));
   }, [isNew, searchParams]);
 
   useEffect(() => {
@@ -109,9 +123,12 @@ function ShipmentForm({ id }: { id?: string }) {
       cargo_volume: form.cargo_volume || null,
     };
     save.mutate(payload, {
-      onSuccess: (saved) => navigate(`/shipments/${saved.id}`, { replace: true }),
+      onSuccess: (saved) =>
+        navigate(`/shipments/${saved.id}`, { replace: true }),
       onError: (err) =>
-        setError(err instanceof ApiError ? err.message : "Не удалось сохранить заявку"),
+        setError(
+          err instanceof ApiError ? err.message : "Не удалось сохранить заявку",
+        ),
     });
   }
 
@@ -128,7 +145,10 @@ function ShipmentForm({ id }: { id?: string }) {
           Назад
         </Button>
         {!isNew && selectedLead && (
-          <Link to={`/crm/leads/${selectedLead.id}`} className="text-sm text-odoo-action">
+          <Link
+            to={`/crm/leads/${selectedLead.id}`}
+            className="text-sm text-odoo-action"
+          >
             Лид: {selectedLead.name}
           </Link>
         )}
@@ -164,7 +184,9 @@ function ShipmentForm({ id }: { id?: string }) {
             <FormSkeleton />
           ) : (
             <div className="max-w-3xl">
-              {error && <p className="mb-3 text-sm text-odoo-danger">{error}</p>}
+              {error && (
+                <p className="mb-3 text-sm text-odoo-danger">{error}</p>
+              )}
 
               <FormSection title="Лид">
                 <label className="col-span-2">
@@ -225,7 +247,9 @@ function ShipmentForm({ id }: { id?: string }) {
                   <input
                     className={inputCls}
                     value={form.contact_loading_name}
-                    onChange={(e) => set("contact_loading_name", e.target.value)}
+                    onChange={(e) =>
+                      set("contact_loading_name", e.target.value)
+                    }
                   />
                 </label>
                 <label>
@@ -233,7 +257,9 @@ function ShipmentForm({ id }: { id?: string }) {
                   <input
                     className={inputCls}
                     value={form.contact_loading_phone}
-                    onChange={(e) => set("contact_loading_phone", e.target.value)}
+                    onChange={(e) =>
+                      set("contact_loading_phone", e.target.value)
+                    }
                   />
                 </label>
               </FormSection>
@@ -244,7 +270,9 @@ function ShipmentForm({ id }: { id?: string }) {
                   <input
                     className={inputCls}
                     value={form.contact_unloading_name}
-                    onChange={(e) => set("contact_unloading_name", e.target.value)}
+                    onChange={(e) =>
+                      set("contact_unloading_name", e.target.value)
+                    }
                   />
                 </label>
                 <label>
@@ -252,7 +280,9 @@ function ShipmentForm({ id }: { id?: string }) {
                   <input
                     className={inputCls}
                     value={form.contact_unloading_phone}
-                    onChange={(e) => set("contact_unloading_phone", e.target.value)}
+                    onChange={(e) =>
+                      set("contact_unloading_phone", e.target.value)
+                    }
                   />
                 </label>
               </FormSection>
@@ -270,7 +300,10 @@ function ShipmentForm({ id }: { id?: string }) {
                     className={inputCls}
                     value={form.carrier_id ?? ""}
                     onChange={(e) =>
-                      set("carrier_id", e.target.value ? Number(e.target.value) : null)
+                      set(
+                        "carrier_id",
+                        e.target.value ? Number(e.target.value) : null,
+                      )
                     }
                   >
                     <option value="">—</option>
@@ -328,9 +361,10 @@ function ShipmentForm({ id }: { id?: string }) {
           )}
         </div>
 
-        {!isNew && (
+        {!isNew && shipment && (
           <div className="w-full lg:w-[360px]">
-            <Chatter timeline={[]} />
+            {/* Ленты изменений у заявки нет, поэтому правая колонка — документы. */}
+            <ShipmentAttachments shipmentId={shipment.id} />
           </div>
         )}
       </div>
