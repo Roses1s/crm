@@ -65,7 +65,7 @@ class TimelineEntry(Base, TimestampMixin):
 
 
 class Attachment(Base, TimestampMixin):
-    """Файл, приложенный к лиду или к записи ленты."""
+    """Файл, приложенный к лиду, к записи ленты или к заявке на перевозку."""
 
     __tablename__ = "attachments"
 
@@ -76,6 +76,12 @@ class Attachment(Base, TimestampMixin):
     entry_id: Mapped[int | None] = mapped_column(
         ForeignKey("timeline_entries.id", ondelete="CASCADE"), index=True
     )
+    # Заявка всегда принадлежит лиду, поэтому lead_id остаётся заполненным и у
+    # файлов заявки: так работает и подсчёт объёма по лиду, и каскадное удаление.
+    shipment_id: Mapped[int | None] = mapped_column(
+        ForeignKey("shipments.id", ondelete="CASCADE"), index=True
+    )
+
     uploaded_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
 
     name: Mapped[str] = mapped_column(String(255), nullable=False)
