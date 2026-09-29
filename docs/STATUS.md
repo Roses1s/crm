@@ -5,15 +5,15 @@
 > последней сверки. Полный контекст — в [`PROJECT.md`](PROJECT.md).
 
 **Обновлено:** 29.09.2026
-**Последний учтённый коммит:** `fad3063` — *docs: мастер-промт и файл состояния*
+**Последний учтённый коммит:** `b5edeab` — *docs: запрет на смену веток в промте*
 **Ветка:** `arena/01a0eb16-crm`
 
 ## Что изменилось после этой отметки
 
 ```bash
 git fetch origin arena/01a0eb16-crm
-git log --oneline fad3063..FETCH_HEAD     # пусто = документация актуальна
-git diff --stat fad3063 FETCH_HEAD
+git log --oneline b5edeab..FETCH_HEAD     # пусто = документация актуальна
+git diff --stat b5edeab FETCH_HEAD
 ```
 
 Если список пуст — всё описанное ниже соответствует репозиторию.
