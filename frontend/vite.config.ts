@@ -7,6 +7,20 @@ export default defineConfig({
   // Tailwind v4 подключается плагином Vite — postcss.config и tailwind.config
   // больше не нужны, вся тема живёт в src/index.css.
   plugins: [react(), tailwindcss()],
+  build: {
+    rollupOptions: {
+      output: {
+        // Тяжёлые библиотеки выносим в отдельные файлы: браузер скачает их
+        // один раз и закеширует, а при правках приложения будет обновляться
+        // только небольшой основной файл.
+        manualChunks: {
+          react: ["react", "react-dom", "react-router-dom"],
+          dnd: ["@dnd-kit/core", "@dnd-kit/sortable", "@dnd-kit/utilities"],
+          query: ["@tanstack/react-query"],
+        },
+      },
+    },
+  },
   resolve: {
     alias: { "@": path.resolve(__dirname, "src") },
   },
