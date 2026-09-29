@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import shutil
 import subprocess
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
@@ -36,6 +37,10 @@ def backup_database() -> dict[str, Any]:
     stamp = datetime.now(tz=UTC).strftime("%Y-%m-%d-%H%M")
     target = BACKUP_DIR / f"crm-{stamp}.dump"
 
+    if shutil.which("pg_dump") is None:
+        log.error("backup.no_pg_dump")
+        return {"ok": False, "error": "pg_dump не установлен в образе"}
+
     result = subprocess.run(
         ["pg_dump", "--format=custom", "--no-owner", "--file", str(target), settings.alembic_dsn],
         capture_output=True,
@@ -43,8 +48,13 @@ def backup_database() -> dict[str, Any]:
         check=False,
     )
     if result.returncode != 0:
-        log.error("backup.failed", stderr=result.stderr.strip()[:500])
-        return {"ok": False, "error": result.stderr.strip()[:500]}
+        error = result.stderr.strip()[:500]
+        # Частый случай: клиент старее сервера — дамп снять нельзя.
+        if "server version" in error:
+            error += " | нужен postgresql-client той же мажорной версии, что и сервер"
+        log.error("backup.failed", stderr=error)
+        target.unlink(missing_ok=True)
+        return {"ok": False, "error": error}
 
     cutoff = datetime.now(tz=UTC) - timedelta(days=settings.backup_keep_days)
     removed = 0

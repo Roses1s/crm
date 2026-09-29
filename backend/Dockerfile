@@ -32,8 +32,19 @@ ENV PYTHONUNBUFFERED=1 \
     PATH="/opt/venv/bin:$PATH"
 
 # postgresql-client нужен задаче резервного копирования (pg_dump).
+# Ставим ИМЕННО 18-ю версию из официального репозитория PostgreSQL: pg_dump
+# отказывается снимать дамп с сервера более новой версии, а в Debian лежит 17.
 RUN apt-get update \
-    && apt-get install -y --no-install-recommends libpq5 postgresql-client curl \
+    && apt-get install -y --no-install-recommends ca-certificates curl gnupg \
+    && install -d /usr/share/postgresql-common/pgdg \
+    && curl -fsSL https://www.postgresql.org/media/keys/ACCC4CF8.asc \
+         -o /usr/share/postgresql-common/pgdg/apt.postgresql.org.asc \
+    && echo "deb [signed-by=/usr/share/postgresql-common/pgdg/apt.postgresql.org.asc] \
+https://apt.postgresql.org/pub/repos/apt $(. /etc/os-release && echo $VERSION_CODENAME)-pgdg main" \
+         > /etc/apt/sources.list.d/pgdg.list \
+    && apt-get update \
+    && apt-get install -y --no-install-recommends libpq5 postgresql-client-18 \
+    && apt-get purge -y gnupg && apt-get autoremove -y \
     && rm -rf /var/lib/apt/lists/* \
     && useradd --create-home --uid 1000 app
 
