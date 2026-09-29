@@ -92,6 +92,14 @@ services:
       VALKEY_URL: redis://valkey:6379/0
     # concurrency=1: на 2 ГБ памяти больше одного процесса держать незачем.
     command: celery -A app.worker.celery_app.celery worker -l info --concurrency 1
+    # Свой healthcheck: из образа бэкенда унаследовался бы HTTP-запрос к :8000,
+    # которого у воркера нет, и контейнер вечно висел бы «unhealthy».
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.worker.celery_app.celery inspect ping -d celery@$$HOSTNAME | grep -q pong"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 40s
     volumes:
       - backups:/var/backups/crm
     depends_on:
@@ -112,6 +120,10 @@ services:
       POSTGRES_HOST: postgres
       VALKEY_URL: redis://valkey:6379/0
     command: celery -A app.worker.celery_app.celery beat -l info
+    # У планировщика нет порта и очереди — проверять нечего, полагаемся
+    # на restart-политику.
+    healthcheck:
+      disable: true
     depends_on:
       worker:
         condition: service_started
