@@ -57,7 +57,7 @@ Vite проксирует `/api` на `http://127.0.0.1:8000` (`VITE_API_TARGET`
 
 ```bash
 cd backend && .venv/bin/ruff check . && .venv/bin/ruff format . \
-  && .venv/bin/mypy app && .venv/bin/python -m pytest      # 42 теста
+  && .venv/bin/mypy app && .venv/bin/python -m pytest      # 57 тестов
 cd frontend && npx tsc -b && npm run build
 ```
 

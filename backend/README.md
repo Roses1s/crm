@@ -71,37 +71,46 @@ backend/
 | Метод | Путь | Кто может |
 |---|---|---|
 | POST | `/api/v1/auth/login` | все (лимит 10/мин) |
-| POST | `/api/v1/auth/refresh` | все |
+| POST | `/api/v1/auth/refresh` | по куке `crm_refresh` (HttpOnly) |
+| POST | `/api/v1/auth/logout` | все (стирает куку) |
 | GET | `/api/v1/auth/me` | авторизованные |
 | GET | `/api/v1/launcher/apps` | авторизованные (фильтр по роли) |
-| GET/POST/PATCH/DELETE | `/api/v1/crm/stages` | чтение — все, изменение — manager+ |
-| GET/POST/DELETE | `/api/v1/crm/tags` | чтение — все, изменение — manager+ |
-| GET/POST | `/api/v1/crm/leads` | авторизованные |
-| GET/PATCH | `/api/v1/crm/leads/{id}` | авторизованные |
-| DELETE | `/api/v1/crm/leads/{id}` | manager+ (архивация) |
+| GET/POST/PATCH/DELETE | `/api/v1/crm/stages` | своя доска; `?owner_id=` — доска сотрудника (админ) |
+| GET/POST/DELETE | `/api/v1/crm/tags` | чтение — все, изменение — админ |
+| GET/POST | `/api/v1/crm/leads` | свои лиды; админ видит все |
+| GET/PATCH | `/api/v1/crm/leads/{id}` | свой лид; чужой — 404 |
+| DELETE | `/api/v1/crm/leads/{id}` | свой лид (архивация) |
 | GET | `/api/v1/crm/leads/{id}/timeline` | авторизованные |
 | POST | `/api/v1/crm/leads/{id}/notes` | авторизованные |
 | GET | `/api/v1/crm/leads/{id}/pager` | авторизованные |
-| GET/POST | `/api/v1/crm/leads/{id}/activities` | авторизованные |
-| PATCH/DELETE | `/api/v1/crm/activities/{id}` | исполнитель или manager+ |
-| GET | `/api/v1/crm/activities/my` | авторизованные |
 | GET/POST | `/api/v1/crm/leads/{id}/attachments` | авторизованные (до 25 МБ) |
-| GET/DELETE | `/api/v1/crm/attachments/{id}` | скачать — все; удалить — автор или manager+ |
+| GET/DELETE | `/api/v1/crm/attachments/{id}` | по доступу к лиду; удалить — автор или админ |
+| GET/POST | `/api/v1/shipments/{id}/attachments` | документы заявки |
 | GET/POST | `/api/v1/shipments` | авторизованные |
 | GET/PATCH | `/api/v1/shipments/{id}` | авторизованные |
 | PATCH | `/api/v1/shipments/{id}/status` | авторизованные |
 | GET | `/api/v1/leads/{id}/shipments` | авторизованные |
-| GET/POST/PATCH | `/api/v1/carriers` | чтение — все, изменение — manager+ |
-| GET | `/api/v1/admin/stats` | manager+ (кеш 60 с) |
-| GET | `/api/v1/admin/backups` · POST `/api/v1/admin/backup` | manager+ / admin |
+| GET/POST/PATCH | `/api/v1/carriers` | чтение и создание — все, правка — админ |
+| GET | `/api/v1/admin/backups` · POST `/api/v1/admin/backup` | admin |
 | GET | `/api/v1/admin/login-attempts` | admin |
 | GET/POST/PATCH/DELETE | `/api/v1/admin/users` | admin |
 | GET | `/health`, `/health/ready` | без авторизации |
 
 ## Решения, которые стоит знать
 
-**Роли.** Три роли (`admin` / `manager` / `operator`) проверяются зависимостью
+**Роли.** Две роли (`admin` / `manager`) проверяются зависимостью
 `require_roles(...)`, а не внутри обработчиков — права видно прямо в сигнатуре.
+
+**Личные доски.** Этап принадлежит сотруднику (`stages.owner_id`), лид —
+ответственному (`leads.assigned_to_id`). Менеджер видит только свои карточки:
+чужие отдаются как 404, чтобы по коду ответа нельзя было узнать об их
+существовании. Администратор видит все и может открыть доску любого сотрудника
+параметром `?owner_id=`. Стандартная воронка создаётся при первом обращении к
+`/crm/stages` (`ensure_default_stages`).
+
+**Сессия.** Обновляющий токен уходит в куку `HttpOnly` с путём `/api/v1/auth` —
+скрипты страницы его не прочитают. В теле ответа только короткий токен доступа
+(30 минут), фронтенд держит его в памяти вкладки.
 
 **Формат ответов.** Списки отдаются как `{count, next, previous, results}` —
 ровно то, что уже умеет читать фронтенд. Ошибки всегда `{detail, code, request_id}`.
@@ -127,20 +136,6 @@ backend/
 
 **bcrypt < 5.** passlib 1.7.4 несовместим с bcrypt 5.0 (падает при определении
 бэкенда), поэтому версия зафиксирована в зависимостях.
-
-## Активности
-
-Запланированное действие по лиду: звонок, встреча, задача или письмо со сроком
-и исполнителем. Устроено как в Odoo:
-
-- у лида отдаётся **состояние ближайшего незакрытого действия**
-  (`activity_state`: `overdue` / `today` / `planned`) — им подсвечиваются часики
-  на карточке канбана, поэтому по доске видно, где работа стоит;
-- связь `activities` грузится стратегией `selectin`: на страницу списка это один
-  дополнительный запрос, а не по запросу на карточку;
-- закрытие действия пишет запись в ленту чаттера (`type=activity`) — история
-  работы по лиду остаётся видимой;
-- `GET /crm/activities/my` — личный список дел по возрастанию срока.
 
 ## Celery
 
