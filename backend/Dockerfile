@@ -53,7 +53,16 @@ COPY --from=builder /opt/venv /opt/venv
 WORKDIR /app
 COPY --chown=app:app . .
 
-RUN mkdir -p /var/backups/crm && chown app:app /var/backups/crm
+# Важно: --chown у COPY меняет владельца скопированных файлов, но не самого
+# каталога /app — его создал WORKDIR от имени root. Без этого chown процесс
+# под пользователем app не может создать в /app новый файл, и celery beat
+# падает при попытке записать свою базу расписания.
+#
+# Каталог вложений создаём здесь же: docker переносит владельца из образа
+# на пустой именованный том при первом монтировании.
+RUN chown app:app /app \
+    && mkdir -p /var/backups/crm /var/lib/crm/attachments \
+    && chown -R app:app /var/backups/crm /var/lib/crm
 USER app
 
 EXPOSE 8000

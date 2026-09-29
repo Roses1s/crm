@@ -12,6 +12,9 @@ dist/
 __pycache__/
 *.py[cod]
 
+# артефакты сборки
+*.egg-info/
+
 # кеши инструментов
 .mypy_cache/
 .ruff_cache/
@@ -24,3 +27,4 @@ __pycache__/
 
 # сертификаты и данные, создаваемые на сервере
 certbot/
+tsconfig.tsbuildinfo

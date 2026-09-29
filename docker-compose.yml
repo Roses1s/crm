@@ -122,7 +122,11 @@ services:
     environment:
       POSTGRES_HOST: postgres
       VALKEY_URL: redis://valkey:6379/0
-    command: celery -A app.worker.celery_app.celery beat -l info
+    # --schedule в /tmp: планировщику нужно писать свою базу расписания,
+    # и он не должен зависеть от прав на рабочий каталог.
+    command: >
+      celery -A app.worker.celery_app.celery beat -l info
+      --schedule /tmp/celerybeat-schedule
     # У планировщика нет порта и очереди — проверять нечего, полагаемся
     # на restart-политику.
     healthcheck:
