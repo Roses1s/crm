@@ -59,7 +59,7 @@ backend/
 │   ├── api/
 │   │   ├── deps.py        сессия, текущий пользователь, проверка ролей
 │   │   └── v1/            auth · launcher · stages · tags · leads · shipments · carriers · admin · health
-│   └── worker/            Celery: приложение и задачи (бэкап, напоминания, чистка)
+│   └── worker/            Celery: приложение и задачи (бэкапы, чистка вложений)
 ├── alembic/               миграции (первая создаёт всю схему)
 ├── tests/                 pytest + httpx ASGITransport
 ├── Dockerfile             многоступенчатая сборка на Python 3.13
@@ -82,7 +82,9 @@ backend/
 | DELETE | `/api/v1/crm/leads/{id}` | свой лид (архивация) |
 | GET | `/api/v1/crm/leads/{id}/timeline` | авторизованные |
 | POST | `/api/v1/crm/leads/{id}/notes` | авторизованные |
-| GET | `/api/v1/crm/leads/{id}/pager` | авторизованные |
+| GET | `/api/v1/crm/leads/{id}/pager` | считает только видимые лиды |
+| POST | `/api/v1/crm/leads/{id}/transfer` | передать лид коллеге (свой лид) |
+| GET | `/api/v1/users/colleagues` | список активных сотрудников (имя и фамилия) |
 | GET/POST | `/api/v1/crm/leads/{id}/attachments` | авторизованные (до 25 МБ) |
 | GET/DELETE | `/api/v1/crm/attachments/{id}` | по доступу к лиду; удалить — автор или админ |
 | GET/POST | `/api/v1/shipments/{id}/attachments` | документы заявки |
@@ -147,7 +149,6 @@ celery -A app.worker.celery_app.celery beat   -l info
 | Задача | Расписание | Что делает |
 |---|---|---|
 | `backup_database` | 03:00 ежедневно | `pg_dump` в `/var/backups/crm`, хранит 14 дней |
-| `send_call_reminders` | 09:00 ежедневно | напоминания о запланированных звонках |
 | `backup_attachments` | воскресенье 04:00 | архив файлов (`files-*.tar.gz`), хранит 4 копии |
 | `cleanup_orphan_attachments` | воскресенье 04:30 | чистит записи о пропавших файлах |
 
