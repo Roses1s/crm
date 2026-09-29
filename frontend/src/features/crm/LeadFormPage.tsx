@@ -555,7 +555,7 @@ function LeadForm({ id }: { id?: string }) {
                         </Field>
                         <Field
                           label="Теги"
-                          help="Метки для фильтрации лидов в списке и канбане"
+                          help="Метки клиента — видны на карточке в списке и на канбане"
                         >
                           <TagsField
                             all={allTags}

@@ -58,9 +58,20 @@ async def create_superuser(email: str, password: str) -> None:
 
 async def seed() -> None:
     async with SessionLocal() as session:
+        # Этапы принадлежат конкретному сотруднику (личные доски), поэтому
+        # демо-воронку заводим на первом администраторе. Без него этапы
+        # создавать нельзя — поле владельца обязательное.
+        admin = (
+            await session.execute(select(User).where(User.role == Role.admin).limit(1))
+        ).scalar_one_or_none()
+        if admin is None:
+            print("Сначала создайте администратора: python -m app.cli createsuperuser")
+            return
+
         if int((await session.execute(select(func.count()).select_from(Stage))).scalar_one()) == 0:
             session.add_all(
-                Stage(name=n, sequence=s, is_closed=c, color=col) for n, s, c, col in DEFAULT_STAGES
+                Stage(name=n, sequence=s, is_closed=c, color=col, owner_id=admin.id)
+                for n, s, c, col in DEFAULT_STAGES
             )
         if int((await session.execute(select(func.count()).select_from(Tag))).scalar_one()) == 0:
             session.add_all(Tag(name=n, color=c) for n, c in DEFAULT_TAGS)
@@ -69,11 +80,9 @@ async def seed() -> None:
         stages = list((await session.execute(select(Stage).order_by(Stage.sequence))).scalars())
         tags = list((await session.execute(select(Tag))).scalars())
 
-        # Демо-лиды вешаем на первого администратора, иначе фильтр «Мои лиды»
-        # на свежей установке ничего не находит.
-        owner = (
-            await session.execute(select(User).where(User.role == Role.admin).limit(1))
-        ).scalar_one_or_none()
+        # Демо-лиды вешаем на того же администратора: доска показывает только
+        # карточки своего владельца, иначе на свежей установке она пустая.
+        owner = admin
 
         if int((await session.execute(select(func.count()).select_from(Lead))).scalar_one()) == 0:
             demo = [
