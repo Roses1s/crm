@@ -53,3 +53,34 @@ async def test_backups_report_missing_directory(auth_client: AsyncClient) -> Non
     assert body["results"] == []
     assert body["is_stale"] is True
     assert body["last_backup_at"] is None
+
+
+async def test_deleting_user_moves_leads_to_admin(
+    auth_client: AsyncClient, client: AsyncClient, seeded: dict[str, object]
+) -> None:
+    """Лиды уволенного сотрудника переезжают на доску администратора."""
+    manager_id = seeded["manager"].id  # type: ignore[attr-defined]
+    login = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "manager@crmdetroid.ru", "password": TEST_PASSWORD},
+    )
+    headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+    stages = (await client.get("/api/v1/crm/stages", headers=headers)).json()
+    # «Новый» есть и у администратора — карточка должна попасть в одноимённый этап.
+    new_stage = next(s for s in stages if s["name"] == "Новый")
+    await client.post(
+        "/api/v1/crm/leads",
+        json={"name": "ООО «Сирень»", "inn": "7451234565", "stage_id": new_stage["id"]},
+        headers=headers,
+    )
+
+    removed = await auth_client.delete(f"/api/v1/admin/users/{manager_id}")
+    assert removed.status_code == 204
+
+    mine = (await auth_client.get("/api/v1/crm/leads")).json()["results"]
+    moved = next(lead for lead in mine if lead["name"] == "ООО «Сирень»")
+    assert moved["stage_name"] == "Новый"
+
+    admin_stages = (await auth_client.get("/api/v1/crm/stages")).json()
+    assert moved["stage_id"] in [s["id"] for s in admin_stages]

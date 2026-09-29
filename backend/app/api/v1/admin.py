@@ -8,12 +8,15 @@ from typing import Any
 
 from fastapi import APIRouter, status
 from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.api.deps import AdminUser, SessionDep
+from app.api.v1.stages import ensure_default_stages
 from app.core.config import settings
 from app.core.errors import AppError, NotFoundError
 from app.core.logging import get_logger
 from app.core.security import hash_password
+from app.models.crm import Lead, Stage
 from app.models.security import LoginAttempt
 from app.models.user import User
 from app.schemas.user import UserCreate, UserRead, UserUpdate
@@ -21,6 +24,50 @@ from app.schemas.user import UserCreate, UserRead, UserUpdate
 log = get_logger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["администрирование"])
+
+
+async def transfer_leads(session: AsyncSession, *, from_user_id: int, to_user: User) -> int:
+    """Переносит лиды сотрудника на доску администратора. Возвращает их число.
+
+    Этап подбираем по названию: если у администратора есть колонка с таким же
+    именем, карточка встаёт в неё, иначе — в первую. Без этого лид ссылался бы
+    на удалённый этап и база отказала бы в удалении сотрудника.
+    """
+    leads = list(
+        (await session.execute(select(Lead).where(Lead.assigned_to_id == from_user_id)))
+        .unique()
+        .scalars()
+    )
+    if not leads:
+        return 0
+
+    # У администратора может не быть доски, если он ни разу её не открывал.
+    await ensure_default_stages(session, to_user.id)
+    target_stages = list(
+        (
+            await session.execute(
+                select(Stage).where(Stage.owner_id == to_user.id).order_by(Stage.sequence, Stage.id)
+            )
+        ).scalars()
+    )
+    by_name = {stage.name: stage for stage in target_stages}
+    fallback = target_stages[0]
+
+    old_stages = {
+        stage.id: stage
+        for stage in (
+            await session.execute(select(Stage).where(Stage.owner_id == from_user_id))
+        ).scalars()
+    }
+
+    for lead in leads:
+        old = old_stages.get(lead.stage_id)
+        same_name = by_name.get(old.name) if old else None
+        lead.stage_id = (same_name or fallback).id
+        lead.assigned_to_id = to_user.id
+
+    await session.flush()
+    return len(leads)
 
 
 @router.get("/users", response_model=list[UserRead], summary="Пользователи")
@@ -65,13 +112,24 @@ async def update_user(user_id: int, payload: UserUpdate, session: SessionDep, _:
 
 @router.delete("/users/{user_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Удалить")
 async def delete_user(user_id: int, session: SessionDep, current: AdminUser) -> None:
+    """Удаляет сотрудника, передавая его лиды администратору.
+
+    Доска увольняемого исчезает вместе с ним, поэтому карточки нужно куда-то
+    деть: иначе они остались бы без ответственного и пропали из интерфейса.
+    Передаём их тому администратору, который выполняет удаление, — дальше он
+    раздаёт их вручную. Заявки, документы и лента едут вместе с лидом.
+    """
     if user_id == current.id:
         raise AppError("Нельзя удалить самого себя", code="self_delete")
     user = await session.get(User, user_id)
     if user is None:
         raise NotFoundError(f"Пользователь {user_id} не найден")
+
+    moved = await transfer_leads(session, from_user_id=user_id, to_user=current)
+
     await session.delete(user)
     await session.commit()
+    log.info("user.deleted", user_id=user_id, by=current.id, leads_moved=moved)
 
 
 # --- безопасность ------------------------------------------------------------
