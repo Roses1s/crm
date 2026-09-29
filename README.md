@@ -19,12 +19,20 @@ CRM-система: React 19 + FastAPI + PostgreSQL 18, разворачивае
 |---|---|---|
 | 1 | Настройка VPS с нуля: безопасность → Docker → Nginx 1.27 → SSL | ✅ готово — [инструкция](docs/deploy/01-server-setup.md) |
 | 2 | Фронтенд-макет (Vite 6 + Tailwind v4 + React 19), только вёрстка на моках | ✅ готово — [`frontend/`](frontend/README.md) |
-| 3 | Скелет FastAPI (SQLAlchemy async + Alembic + Celery + Valkey) | 🔜 следующий |
-| 4 | Полный `docker-compose.yml` и деплой на `crmdetroid.ru` | ⏳ |
+| 3 | Скелет FastAPI (SQLAlchemy async + Alembic + Celery + Valkey) | ✅ готово — [`backend/`](backend/README.md) |
+| 4 | Полный `docker-compose.yml` и деплой на `crmdetroid.ru` | 🔜 следующий |
 
 ## Структура репозитория
 
 ```
+backend/                    # FastAPI: SQLAlchemy 2.0 async, Alembic, Celery, JWT
+├── app/core/               конфиг, безопасность, логи, кеш, лимитер, ошибки
+├── app/models/             9 таблиц: users, stages, tags, leads, shipments, ...
+├── app/api/v1/             auth · crm · shipments · carriers · admin · health
+├── app/worker/             Celery: бэкапы, напоминания, чистка вложений
+├── alembic/                миграции
+└── tests/                  pytest (22 теста, SQLite в памяти)
+
 frontend/                   # визуальный макет: React 19 + Vite 6 + Tailwind v4 (на моках)
 ├── src/app/                # router, providers, layout (AppShell, Navbar, ControlPanel)
 ├── src/features/           # auth · launcher · crm · shipments · admin
