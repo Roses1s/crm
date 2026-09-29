@@ -139,7 +139,7 @@ export function KanbanPage() {
   const { data: me } = useMe();
   const isAdmin = me?.role === "admin";
   const boardUserId = isAdmin && boardParam ? Number(boardParam) : null;
-  const { data: leads = [], isLoading } = useLeads({
+  const { data: leads = [] } = useLeads({
     search,
     stage: stageFilter ? Number(stageFilter) : null,
     tag: tagFilter ? Number(tagFilter) : null,
@@ -342,14 +342,6 @@ export function KanbanPage() {
           className="mx-4 mt-3 rounded-[4px] border border-odoo-danger/30 bg-red-50 px-3 py-2 text-sm text-odoo-danger"
         >
           Не удалось переместить лид. Изменение отменено.
-        </div>
-      )}
-
-      {view !== "list" && !isLoading && leads.length === 0 && (
-        <div className="px-4 pt-10 text-center text-sm text-odoo-text-muted">
-          Лиды не найдены. Нажмите{" "}
-          <span className="font-medium text-odoo-text">Новый</span> или «+
-          Добавить» в колонке.
         </div>
       )}
 
