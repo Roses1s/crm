@@ -1,0 +1,237 @@
+@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
+@import "tailwindcss";
+
+/*
+ * Tailwind CSS v4.
+ *
+ * В v4 нет tailwind.config.ts — дизайн-токены объявляются прямо в CSS через
+ * @theme. Тёмная тема переключается классом .dark на <html>, поэтому вариант
+ * dark: переопределён вручную (по умолчанию v4 использует prefers-color-scheme).
+ *
+ * Значения токенов лежат в :root / .dark ниже, а @theme inline только даёт им
+ * имена утилит (bg-odoo-surface, text-odoo-text-muted и т. д.). Благодаря
+ * inline утилита подставляет rgb(var(--odoo-*)) напрямую, поэтому смена темы
+ * перекрашивает интерфейс мгновенно, без пересборки классов.
+ */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --color-odoo-primary: rgb(var(--odoo-primary));
+  --color-odoo-primary-hover: rgb(var(--odoo-primary-hover));
+  --color-odoo-secondary: rgb(var(--odoo-secondary));
+
+  /* Фиксированные цвета фирменного тёмного фона (экран логина). */
+  --color-odoo-dark: #1b1d21;
+  --color-odoo-dark-light: #2c2c33;
+
+  --color-odoo-bg: rgb(var(--odoo-bg));
+  --color-odoo-surface: rgb(var(--odoo-surface));
+  --color-odoo-surface-hover: rgb(var(--odoo-surface-hover));
+  --color-odoo-surface-sunken: rgb(var(--odoo-surface-sunken));
+  --color-odoo-column-head: rgb(var(--odoo-column-head));
+  --color-odoo-track: rgb(var(--odoo-track));
+
+  --color-odoo-border: rgb(var(--odoo-border));
+  --color-odoo-border-light: rgb(var(--odoo-border-light));
+
+  --color-odoo-text: rgb(var(--odoo-text));
+  --color-odoo-text-soft: rgb(var(--odoo-text-soft));
+  --color-odoo-text-muted: rgb(var(--odoo-text-muted));
+  --color-odoo-text-light: rgb(var(--odoo-text-light));
+
+  --color-odoo-success: rgb(var(--odoo-success));
+  --color-odoo-warning: rgb(var(--odoo-warning));
+  --color-odoo-danger: rgb(var(--odoo-danger));
+  --color-odoo-info: rgb(var(--odoo-info));
+
+  --color-odoo-title-band: rgb(var(--odoo-title-band));
+  --color-odoo-statusbar: rgb(var(--odoo-statusbar));
+  --color-odoo-statusbar-text: rgb(var(--odoo-statusbar-text));
+  --color-odoo-drop: rgb(var(--odoo-drop));
+  --color-odoo-accent-soft: rgb(var(--odoo-accent-soft));
+  --color-odoo-accent-line: rgb(var(--odoo-accent-line));
+  --color-odoo-search-divider: rgb(var(--odoo-search-divider));
+  --color-odoo-search-icon: rgb(var(--odoo-search-icon));
+  --color-odoo-search-placeholder: rgb(var(--odoo-search-placeholder));
+  --color-odoo-search-action: rgb(var(--odoo-search-action));
+  --color-odoo-search-action-hover: rgb(var(--odoo-search-action-hover));
+  --color-odoo-chip: rgb(var(--odoo-chip));
+  --color-odoo-chip-text: rgb(var(--odoo-chip-text));
+  --color-odoo-avatar: rgb(var(--odoo-avatar));
+  --color-odoo-link: rgb(var(--odoo-link));
+  --color-odoo-action: rgb(var(--odoo-action));
+
+  /* Цвета тегов не меняются в тёмной теме — как в оригинале. */
+  --color-odoo-tag-blue-bg: #d4e6f9;
+  --color-odoo-tag-blue-text: #1a5276;
+  --color-odoo-tag-green-bg: #d5f5e3;
+  --color-odoo-tag-green-text: #1e8449;
+  --color-odoo-tag-red-bg: #fadbd8;
+  --color-odoo-tag-red-text: #922b21;
+  --color-odoo-tag-yellow-bg: #fcf3cf;
+  --color-odoo-tag-yellow-text: #7d6608;
+  --color-odoo-tag-purple-bg: #e8daef;
+  --color-odoo-tag-purple-text: #6c3483;
+  --color-odoo-tag-orange-bg: #fdebd0;
+  --color-odoo-tag-orange-text: #935116;
+
+  /* Цвет рамки по умолчанию для всех элементов (см. @layer base ниже). */
+  --color-border: hsl(var(--border));
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+}
+
+/*
+ * Токены тем.
+ *
+ * Светлые значения — ровно те, с которыми приложение задумано: светлая тема
+ * должна остаться пиксель-в-пиксель. Тёмные взяты из референсных скриншотов.
+ */
+:root {
+  color-scheme: light;
+
+  --odoo-primary: 113 75 103; /* #714B67 */
+  --odoo-primary-hover: 91 58 82; /* #5B3A52 */
+  --odoo-secondary: 0 160 157; /* #00A09D */
+
+  --odoo-bg: 248 249 250; /* #F8F9FA */
+  --odoo-surface: 255 255 255; /* #FFFFFF */
+  --odoo-surface-hover: 250 248 249; /* #faf8f9 */
+  --odoo-surface-sunken: 238 236 238; /* #eeecee */
+  --odoo-column-head: 250 249 250; /* #faf9fa */
+  --odoo-track: 222 220 223; /* #dedcdf */
+
+  --odoo-border: 222 226 230; /* #DEE2E6 */
+  --odoo-border-light: 233 236 239; /* #E9ECEF */
+
+  --odoo-text: 33 37 41; /* #212529 */
+  --odoo-text-soft: 73 80 87; /* #495057 */
+  --odoo-text-muted: 108 117 125; /* #6C757D */
+  --odoo-text-light: 173 181 189; /* #ADB5BD */
+
+  --odoo-success: 40 167 69; /* #28A745 */
+  --odoo-warning: 255 193 7; /* #FFC107 */
+  --odoo-danger: 220 53 69; /* #DC3545 */
+  --odoo-info: 23 162 184; /* #17A2B8 */
+
+  /* Контекстные токены: цвета, которые раньше писались инлайном. */
+  --odoo-title-band: 253 239 241; /* #fdeff1 */
+  --odoo-statusbar: 222 226 230; /* #DEE2E6 */
+  --odoo-statusbar-text: 73 80 87; /* #495057 */
+  --odoo-drop: 244 247 251; /* #f4f7fb */
+  --odoo-accent-soft: 233 242 242; /* #e9f2f2 */
+  --odoo-accent-line: 143 185 184; /* #8FB9B8 */
+  --odoo-search-divider: 200 216 216; /* #c8d8d8 */
+  --odoo-search-icon: 95 107 112; /* #5f6b70 */
+  --odoo-search-placeholder: 139 147 151; /* #8b9397 */
+  --odoo-search-action: 78 92 97; /* #4e5c61 */
+  --odoo-search-action-hover: 244 247 247; /* #f4f7f7 */
+  --odoo-chip: 238 234 234; /* #eeeaea */
+  --odoo-chip-text: 111 102 106; /* #6f666a */
+  --odoo-avatar: 75 75 85; /* #4b4b55 */
+  --odoo-link: 0 160 157; /* #00A09D */
+  --odoo-action: 113 75 103; /* #714B67 — интерактивный текст; в тёмной теме синий */
+
+  --border: 210 14% 89%;
+  --radius: 0.375rem;
+}
+
+.dark {
+  color-scheme: dark;
+
+  /* Залитые кнопки сохраняют фирменный цвет; синим становится только текст-действие. */
+  --odoo-primary: 113 75 103;
+  --odoo-primary-hover: 138 92 125;
+  --odoo-secondary: 0 176 173;
+
+  --odoo-bg: 27 28 31;
+  --odoo-surface: 43 44 48;
+  --odoo-surface-hover: 51 52 57;
+  --odoo-surface-sunken: 35 36 40;
+  --odoo-column-head: 39 40 45;
+  --odoo-track: 58 59 64;
+
+  --odoo-border: 62 64 70;
+  --odoo-border-light: 52 53 59;
+
+  --odoo-text: 228 228 230;
+  --odoo-text-soft: 200 200 204;
+  --odoo-text-muted: 154 154 160;
+  --odoo-text-light: 90 91 97;
+
+  --odoo-success: 61 184 94;
+  --odoo-warning: 255 193 7;
+  --odoo-danger: 232 87 101;
+  --odoo-info: 54 183 205;
+
+  --odoo-title-band: 61 47 58;
+  --odoo-statusbar: 53 54 59;
+  --odoo-statusbar-text: 200 200 204;
+  --odoo-drop: 38 49 61;
+  --odoo-accent-soft: 34 52 54;
+  --odoo-accent-line: 61 110 109;
+  --odoo-search-divider: 61 74 74;
+  --odoo-search-icon: 154 164 168;
+  --odoo-search-placeholder: 122 131 135;
+  --odoo-search-action: 176 194 196;
+  --odoo-search-action-hover: 42 56 57;
+  --odoo-chip: 58 52 56;
+  --odoo-chip-text: 201 195 203;
+  --odoo-avatar: 75 75 85;
+  --odoo-link: 106 176 232;
+  --odoo-action: 106 176 232;
+  --border: 220 8% 25%;
+}
+
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-border);
+  }
+
+  body {
+    font-family:
+      "Inter",
+      -apple-system,
+      BlinkMacSystemFont,
+      "Segoe UI",
+      sans-serif;
+    font-size: 13px;
+    line-height: 1.5;
+    color: rgb(var(--odoo-text));
+    background: rgb(var(--odoo-bg));
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1 {
+    font-size: 22px;
+    font-weight: 600;
+  }
+  h2 {
+    font-size: 18px;
+    font-weight: 600;
+  }
+  h3 {
+    font-size: 15px;
+    font-weight: 600;
+  }
+  h4 {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgb(var(--odoo-border));
+    border-radius: 9999px;
+  }
+}

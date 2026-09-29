@@ -18,13 +18,18 @@ CRM-система: React 19 + FastAPI + PostgreSQL 18, разворачивае
 | Этап | Что делаем | Статус |
 |---|---|---|
 | 1 | Настройка VPS с нуля: безопасность → Docker → Nginx 1.27 → SSL | ✅ готово — [инструкция](docs/deploy/01-server-setup.md) |
-| 2 | Фронтенд-макет (Vite 6 + Tailwind v4 + React 19), только вёрстка на моках | 🔜 следующий |
-| 3 | Скелет FastAPI (SQLAlchemy async + Alembic + Celery + Valkey) | ⏳ |
+| 2 | Фронтенд-макет (Vite 6 + Tailwind v4 + React 19), только вёрстка на моках | ✅ готово — [`frontend/`](frontend/README.md) |
+| 3 | Скелет FastAPI (SQLAlchemy async + Alembic + Celery + Valkey) | 🔜 следующий |
 | 4 | Полный `docker-compose.yml` и деплой на `crmdetroid.ru` | ⏳ |
 
 ## Структура репозитория
 
 ```
+frontend/                   # визуальный макет: React 19 + Vite 6 + Tailwind v4 (на моках)
+├── src/app/                # router, providers, layout (AppShell, Navbar, ControlPanel)
+├── src/features/           # auth · launcher · crm · shipments · admin
+└── src/shared/             # ui-компоненты, моковые данные, типы, утилиты
+
 deploy/                     # инфраструктура (зеркало каталога /opt/crm на сервере)
 ├── docker-compose.yml      # этап 1: nginx-шлюз; этап 4: весь стек
 ├── nginx/
