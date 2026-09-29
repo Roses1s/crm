@@ -1,5 +1,6 @@
 import {
   DndContext,
+  pointerWithin,
   DragOverlay,
   PointerSensor,
   TouchSensor,
@@ -108,6 +109,16 @@ export function KanbanPage() {
     setParams(next);
   }
 
+  /**
+   * Сначала смотрим, под каким элементом курсор, и только если он не попал
+   * никуда — ищем ближайший. Один closestCorners промахивался: у соседней
+   * колонки угол мог оказаться ближе, чем у той, куда целится пользователь.
+   */
+  function collisionDetection(args: Parameters<typeof closestCorners>[0]) {
+    const pointer = pointerWithin(args);
+    return pointer.length > 0 ? pointer : closestCorners(args);
+  }
+
   const sensors = useSensors(
     useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
     useSensor(TouchSensor, {
@@ -190,7 +201,7 @@ export function KanbanPage() {
         <div className="flex h-[calc(100dvh-90px)] min-h-0 snap-x snap-mandatory gap-0 overflow-x-auto overflow-y-hidden overscroll-x-contain border-t border-odoo-border-light bg-odoo-surface md:snap-none">
           <DndContext
             sensors={sensors}
-            collisionDetection={closestCorners}
+            collisionDetection={collisionDetection}
             onDragStart={onDragStart}
             onDragCancel={() => setActiveLead(null)}
             onDragEnd={onDragEnd}

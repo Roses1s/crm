@@ -66,7 +66,15 @@ export function Column({
   }
 
   return (
-    <div className="flex h-full w-[min(100vw-1rem,325px)] shrink-0 snap-center flex-col border-r border-odoo-border-light bg-odoo-surface md:w-[325px]">
+    // Зона приёма — вся колонка целиком, вместе с шапкой: раньше ref стоял
+    // только на списке карточек, и бросок в заголовок или в пустоту под ним
+    // проходил мимо — карточка возвращалась на место.
+    <div
+      ref={setNodeRef}
+      className={`flex h-full w-[min(100vw-1rem,325px)] shrink-0 snap-center flex-col border-r border-odoo-border-light md:w-[325px] ${
+        isOver ? "bg-odoo-drop" : "bg-odoo-surface"
+      }`}
+    >
       <div className="shrink-0 bg-odoo-column-head px-2.5 pb-2 pt-2">
         <div className="flex items-start justify-between gap-1">
           <div className="min-w-0">
@@ -267,10 +275,7 @@ export function Column({
         </div>
       )}
 
-      <div
-        ref={setNodeRef}
-        className={`flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain [scrollbar-gutter:stable] ${isOver ? "bg-odoo-drop" : "bg-odoo-surface"}`}
-      >
+      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain [scrollbar-gutter:stable]">
         <SortableContext
           items={shown.map((l) => `lead-${l.id}`)}
           strategy={verticalListSortingStrategy}
