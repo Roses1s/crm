@@ -29,6 +29,27 @@ log = get_logger(__name__)
 
 CHUNK = 1024 * 1024  # читаем файл мегабайтными кусками, не целиком в память
 
+# Белый список расширений. Сознательно без .svg и .htm(l): такие файлы браузер
+# разбирает как разметку, и открытие вложения могло бы стать XSS на домене.
+# Заодно отсекаются .exe и прочее, чего в CRM делать нечего.
+ALLOWED_EXTENSIONS: dict[str, str] = {
+    ".pdf": "application/pdf",
+    ".png": "image/png",
+    ".jpg": "image/jpeg",
+    ".jpeg": "image/jpeg",
+    ".gif": "image/gif",
+    ".webp": "image/webp",
+    ".txt": "text/plain",
+    ".csv": "text/csv",
+    ".doc": "application/msword",
+    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
+    ".xls": "application/vnd.ms-excel",
+    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
+    ".zip": "application/zip",
+    ".rar": "application/vnd.rar",
+    ".7z": "application/x-7z-compressed",
+}
+
 # Эти типы браузер может открыть прямо в окне — остальные всегда скачиваются.
 INLINE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp", "application/pdf"}
 
@@ -90,7 +111,13 @@ async def upload_attachment(
             raise NotFoundError(f"Запись ленты {entry_id} не найдена")
 
     original = Path(file.filename or "file").name  # отбрасываем путь целиком
-    suffix = Path(original).suffix[:12]
+    suffix = Path(original).suffix.lower()
+    if suffix not in ALLOWED_EXTENSIONS:
+        raise AppError(
+            f"Тип файла «{suffix or 'без расширения'}» не поддерживается. "
+            f"Разрешены: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
+            code="unsupported_file_type",
+        )
     relative = Path(str(lead_id)) / f"{uuid.uuid4().hex}{suffix}"
     target = _storage_root() / relative
 
@@ -102,7 +129,8 @@ async def upload_attachment(
         uploaded_by_id=user.id,
         name=original[:255],
         size=size,
-        content_type=(file.content_type or "application/octet-stream")[:120],
+        # Тип берём из расширения, а не из заголовка клиента: заголовку верить нельзя.
+        content_type=ALLOWED_EXTENSIONS[suffix],
         storage_path=str(target),
     )
     session.add(attachment)

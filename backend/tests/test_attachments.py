@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from pathlib import Path
 
+import pytest
 from httpx import AsyncClient
 
 from app.core.config import settings
@@ -34,14 +35,31 @@ async def test_upload_and_download(auth_client: AsyncClient, seeded: dict) -> No
     assert downloaded.headers["x-content-type-options"] == "nosniff"
 
 
-async def test_executable_is_served_as_download(auth_client: AsyncClient, seeded: dict) -> None:
+@pytest.mark.parametrize("name", ["page.html", "иконка.svg", "setup.exe", "файл-без-расширения"])
+async def test_dangerous_extensions_are_rejected(
+    auth_client: AsyncClient, seeded: dict, name: str
+) -> None:
+    """SVG и HTML браузер разбирает как разметку — такие вложения не принимаем."""
     lead_id = seeded["lead"].id  # type: ignore[attr-defined]
-    created = await auth_client.post(
+    response = await auth_client.post(
         f"/api/v1/crm/leads/{lead_id}/attachments",
-        files={"file": ("page.html", b"<script>alert(1)</script>", "text/html")},
+        files={"file": (name, b"<script>alert(1)</script>", "text/html")},
     )
-    response = await auth_client.get(f"/api/v1/crm/attachments/{created.json()['id']}")
-    assert response.headers["content-disposition"].startswith("attachment")
+    assert response.status_code == 400
+    assert response.json()["code"] == "unsupported_file_type"
+
+
+async def test_content_type_comes_from_extension_not_from_client(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    """Заголовку клиента не верим: тип определяется расширением файла."""
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    response = await auth_client.post(
+        f"/api/v1/crm/leads/{lead_id}/attachments",
+        files={"file": ("данные.csv", b"a,b,c", "text/html")},
+    )
+    assert response.status_code == 201
+    assert response.json()["content_type"] == "text/csv"
 
 
 async def test_path_traversal_in_filename_is_neutralised(
@@ -50,24 +68,31 @@ async def test_path_traversal_in_filename_is_neutralised(
     lead_id = seeded["lead"].id  # type: ignore[attr-defined]
     response = await auth_client.post(
         f"/api/v1/crm/leads/{lead_id}/attachments",
-        files={"file": ("../../etc/passwd", b"root:x:0:0", "text/plain")},
+        files={"file": ("../../etc/passwd.txt", b"root:x:0:0", "text/plain")},
     )
     assert response.status_code == 201
     # Имя для показа остаётся, но на диск файл лёг внутрь каталога вложений.
-    assert response.json()["name"] == "passwd"
+    assert response.json()["name"] == "passwd.txt"
     stored = list(Path(settings.attachments_dir).rglob("*"))
     assert all(Path(settings.attachments_dir) in p.parents for p in stored if p.is_file())
 
 
-async def test_too_big_file_is_rejected(auth_client: AsyncClient, seeded: dict) -> None:
+async def test_too_big_file_is_rejected(
+    auth_client: AsyncClient, seeded: dict, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Лимит проверяется по ходу записи, а не после — файл не читается в память целиком."""
     lead_id = seeded["lead"].id  # type: ignore[attr-defined]
-    payload = b"x" * (settings.max_upload_mb * 1024 * 1024 + 1024)
+    monkeypatch.setattr(settings, "max_upload_mb", 1)
+    before = {p for p in Path(settings.attachments_dir).rglob("*") if p.is_file()}
+
     response = await auth_client.post(
         f"/api/v1/crm/leads/{lead_id}/attachments",
-        files={"file": ("big.bin", payload, "application/octet-stream")},
+        files={"file": ("big.zip", b"x" * (2 * 1024 * 1024), "application/zip")},
     )
     assert response.status_code == 413
     assert response.json()["code"] == "file_too_large"
+    # Недописанный файл на диске не остаётся.
+    assert {p for p in Path(settings.attachments_dir).rglob("*") if p.is_file()} == before
 
 
 async def test_attachment_can_be_linked_to_timeline_entry(
