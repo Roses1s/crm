@@ -16,7 +16,13 @@ const ACTIVITY_COLOR: Record<ActivityState, string> = {
   done: "text-odoo-text-muted",
 };
 
-export function LeadCardBody({ lead, menuSpace = false }: { lead: Lead; menuSpace?: boolean }) {
+export function LeadCardBody({
+  lead,
+  menuSpace = false,
+}: {
+  lead: Lead;
+  menuSpace?: boolean;
+}) {
   const title = `${lead.name} — ${lead.inn}`;
   const activityState = lead.activity_state ?? null;
   const activityHint = activityState
@@ -26,7 +32,10 @@ export function LeadCardBody({ lead, menuSpace = false }: { lead: Lead; menuSpac
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className={menuSpace ? "pr-7" : ""}>
-        <h3 className="line-clamp-3 text-[15px] font-medium leading-5 text-odoo-text" title={title}>
+        <h3
+          className="line-clamp-3 text-[15px] font-medium leading-5 text-odoo-text"
+          title={title}
+        >
           {title}
         </h3>
         <p
@@ -56,14 +65,20 @@ export function LeadCardBody({ lead, menuSpace = false }: { lead: Lead; menuSpac
           <StarRating value={lead.priority} />
           <span
             title={activityHint}
-            className={activityState ? ACTIVITY_COLOR[activityState] : "text-odoo-text-light"}
+            className={
+              activityState
+                ? ACTIVITY_COLOR[activityState]
+                : "text-odoo-text-light"
+            }
           >
             <Clock3 className="h-4 w-4" />
           </span>
         </div>
         <span
           title={
-            [ownerLabel(lead), lead.assigned_to_email].filter(Boolean).join(" · ") || "Не назначен"
+            [ownerLabel(lead), lead.assigned_to_email]
+              .filter(Boolean)
+              .join(" · ") || "Не назначен"
           }
           className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-odoo-primary text-[9px] font-semibold text-white"
         >
@@ -78,27 +93,45 @@ export function LeadCardBody({ lead, menuSpace = false }: { lead: Lead; menuSpac
  * Карточка на доске. Перетаскивание включено через dnd-kit: карточку можно
  * тянуть в другую колонку, этап сохраняется на сервере (см. KanbanPage).
  */
-export function LeadCard({ lead, isOverlay }: { lead: Lead; isOverlay?: boolean }) {
+export function LeadCard({
+  lead,
+  isOverlay,
+}: {
+  lead: Lead;
+  isOverlay?: boolean;
+}) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+  const {
+    attributes,
+    listeners,
+    setNodeRef,
+    transform,
+    transition,
+    isDragging,
+  } = useSortable({
     id: `lead-${lead.id}`,
     disabled: isOverlay,
+    // Плавное расступание соседей: без своей длительности dnd-kit иногда
+    // отдаёт нулевой transition, и карточки переставляются рывком.
+    transition: { duration: 220, easing: "cubic-bezier(0.2, 0, 0, 1)" },
   });
   const style = isOverlay
     ? undefined
     : {
         transform: CSS.Translate.toString(transform),
-        transition: isDragging ? undefined : transition,
+        transition,
+        // Подсказка браузеру: слой готовится заранее, движение не дёргается.
+        willChange: transform ? "transform" : undefined,
       };
 
   const inner = (
     <div
       className={`overflow-hidden border-b border-odoo-border-light bg-odoo-surface px-2.5 py-2 ${
         isOverlay
-          ? "w-[325px] cursor-grabbing rounded-[4px] border border-odoo-primary shadow-lg"
+          ? "w-[325px] rotate-2 scale-[1.02] cursor-grabbing rounded-[4px] border border-odoo-primary shadow-2xl transition-transform"
           : isDragging
-            ? "cursor-grabbing opacity-25"
-            : "cursor-grab hover:bg-odoo-surface-hover"
+            ? "cursor-grabbing opacity-40 transition-opacity duration-150"
+            : "cursor-grab transition-colors duration-150 hover:bg-odoo-surface-hover"
       }`}
     >
       <LeadCardBody lead={lead} menuSpace={!isOverlay} />

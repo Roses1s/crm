@@ -34,11 +34,13 @@ import {
 } from "@/shared/api/hooks";
 import type { Lead } from "@/shared/types";
 
+// Приземление карточки: чуть дольше и с «доводкой» в конце — так глаз успевает
+// проследить путь от курсора до места в колонке.
 const dropAnimation: DropAnimation = {
-  duration: 160,
-  easing: "ease-out",
+  duration: 260,
+  easing: "cubic-bezier(0.2, 0, 0, 1)",
   sideEffects: defaultDropAnimationSideEffects({
-    styles: { active: { opacity: "0.3" } },
+    styles: { active: { opacity: "0.4" } },
   }),
 };
 

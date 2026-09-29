@@ -71,7 +71,7 @@ export function Column({
     // проходил мимо — карточка возвращалась на место.
     <div
       ref={setNodeRef}
-      className={`flex h-full w-[min(100vw-1rem,325px)] shrink-0 snap-center flex-col border-r border-odoo-border-light md:w-[325px] ${
+      className={`flex h-full w-[min(100vw-1rem,325px)] shrink-0 snap-center flex-col border-r border-odoo-border-light transition-colors duration-200 md:w-[325px] ${
         isOver ? "bg-odoo-drop" : "bg-odoo-surface"
       }`}
     >
