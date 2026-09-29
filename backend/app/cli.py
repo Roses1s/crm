@@ -2,6 +2,7 @@
 
 python -m app.cli createsuperuser --email admin@crmdetroid.ru --password ...
 python -m app.cli seed     # демо-данные: этапы, теги, лиды, заявки
+python -m app.cli resetboard --email admin@crmdetroid.ru  # вернуть доску к стандартной
 """
 
 from __future__ import annotations
@@ -27,6 +28,15 @@ DEFAULT_STAGES = [
     ("Договор", 4, False, "orange"),
     ("Выиграно", 5, True, "green"),
 ]
+# Стандартная воронка менеджера — та же, что создаётся при первом входе
+# (см. DEFAULT_STAGES в app/api/v1/stages.py).
+BOARD_STAGES = [
+    ("Новый", "slate"),
+    ("Перезвонить", "orange"),
+    ("Вышел на ЛПР", "blue"),
+    ("Потенциальный клиент", "purple"),
+    ("Уехали, ждём заявку", "green"),
+]
 DEFAULT_TAGS = [
     ("Крупный клиент", "green"),
     ("Рефрижератор", "blue"),
@@ -34,6 +44,60 @@ DEFAULT_TAGS = [
     ("Постоянный", "yellow"),
     ("Негабарит", "orange"),
 ]
+
+
+async def reset_board(email: str) -> None:
+    """Возвращает доску сотрудника к стандартному набору этапов.
+
+    Нужна после перехода на личные доски: администратору достались колонки
+    прежней общей воронки, а у менеджеров набор другой. Лиды не теряются —
+    они переезжают в первый этап новой доски.
+    """
+    async with SessionLocal() as session:
+        user = (
+            await session.execute(select(User).where(User.email == email.lower()))
+        ).scalar_one_or_none()
+        if user is None:
+            print(f"Пользователь {email} не найден")
+            return
+
+        old = list(
+            (await session.execute(select(Stage).where(Stage.owner_id == user.id))).scalars()
+        )
+
+        fresh = [
+            Stage(name=name, color=color, sequence=index, owner_id=user.id)
+            for index, (name, color) in enumerate(BOARD_STAGES, start=1)
+        ]
+        session.add_all(fresh)
+        await session.flush()
+
+        # Сначала перевозим карточки, иначе база не даст удалить старые этапы.
+        old_ids = [stage.id for stage in old]
+        moved = 0
+        if old_ids:
+            leads = list(
+                (await session.execute(select(Lead).where(Lead.stage_id.in_(old_ids))))
+                .unique()
+                .scalars()
+            )
+            by_name = {stage.name: stage for stage in fresh}
+            old_by_id = {stage.id: stage for stage in old}
+            for lead in leads:
+                previous = old_by_id.get(lead.stage_id)
+                same_name = by_name.get(previous.name) if previous else None
+                lead.stage_id = (same_name or fresh[0]).id
+                moved += 1
+            await session.flush()
+
+        for stage in old:
+            await session.delete(stage)
+        await session.commit()
+
+        print(
+            f"Доска {email} собрана заново: {len(fresh)} этапов, "
+            f"удалено старых {len(old)}, перенесено лидов {moved}"
+        )
 
 
 async def create_superuser(email: str, password: str) -> None:
@@ -147,9 +211,14 @@ def main() -> None:
 
     sub.add_parser("seed", help="загрузить демо-данные")
 
+    rb = sub.add_parser("resetboard", help="вернуть доску сотрудника к стандартной")
+    rb.add_argument("--email", required=True)
+
     args = parser.parse_args()
     if args.command == "createsuperuser":
         asyncio.run(create_superuser(args.email, args.password))
+    elif args.command == "resetboard":
+        asyncio.run(reset_board(args.email))
     else:
         asyncio.run(seed())
 

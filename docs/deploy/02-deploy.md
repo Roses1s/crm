@@ -444,3 +444,19 @@ docker compose exec postgres psql -U crm -d crm -c "select id, name, stage_id fr
 ```bash
 docker compose exec worker python -c "from app.worker.tasks import backup_attachments; print(backup_attachments())"
 ```
+
+
+## Вернуть доску сотрудника к стандартной
+
+После перехода на личные доски у администратора могли остаться этапы прежней
+общей воронки. Разовая команда пересобирает доску по стандартному набору
+(Новый · Перезвонить · Вышел на ЛПР · Потенциальный клиент · Уехали, ждём
+заявку). Лиды не теряются: карточка едет в этап с тем же названием, а если
+такого нет — в первый.
+
+```bash
+ssh crm "cd /opt/crm && docker compose exec -T backend python -m app.cli resetboard --email admin@crmdetroid.ru"
+```
+
+Команда выводит, сколько этапов создано, сколько удалено и сколько карточек
+переехало.
