@@ -23,6 +23,7 @@ import {
   useCanManage,
   useCreateStage,
   useLeads,
+  useMe,
   useMoveLead,
   useStages,
   useTags,
@@ -91,6 +92,7 @@ export function KanbanPage() {
   const tagFilter = params.get("tags");
   const priorityFilter = params.get("priority");
   const archived = params.get("is_archived") === "true";
+  const assignedFilter = params.get("assigned_to");
   const group = params.get("group") === "assigned" ? "assigned" : "stage";
   const view = params.get("view") === "list" ? "list" : "kanban";
 
@@ -127,11 +129,13 @@ export function KanbanPage() {
     return () => clearTimeout(timer);
   }, [searchInput, setParams]);
 
+  const { data: me } = useMe();
   const { data: leads = [], isLoading } = useLeads({
     search,
     stage: stageFilter ? Number(stageFilter) : null,
     tag: tagFilter ? Number(tagFilter) : null,
     priority: priorityFilter ? Number(priorityFilter) : null,
+    assigned: assignedFilter ? Number(assignedFilter) : null,
     archived,
   });
   const { data: stages = [] } = useStages();
@@ -139,7 +143,9 @@ export function KanbanPage() {
   const moveLead = useMoveLead();
   const createStage = useCreateStage();
 
-  const filterActive = Boolean(stageFilter || tagFilter || priorityFilter || archived);
+  const filterActive = Boolean(
+    stageFilter || tagFilter || priorityFilter || archived || assignedFilter,
+  );
 
   function setFilter(key: string, value: string) {
     const next = new URLSearchParams(params);
@@ -205,6 +211,14 @@ export function KanbanPage() {
             <Dropdown label="Фильтры" active={filterActive}>
               <button
                 type="button"
+                className={`block w-full px-3 py-1.5 text-left text-sm hover:bg-odoo-bg ${assignedFilter ? "font-medium text-odoo-action" : ""}`}
+                onClick={() => setFilter("assigned_to", assignedFilter ? "" : String(me?.id ?? ""))}
+              >
+                {assignedFilter ? "Показать все" : "Мои лиды"}
+              </button>
+              <div className="my-1 border-t border-odoo-border-light" />
+              <button
+                type="button"
                 className="block w-full px-3 py-1.5 text-left text-sm hover:bg-odoo-bg"
                 onClick={() => setFilter("priority", "")}
               >
@@ -256,7 +270,9 @@ export function KanbanPage() {
                   className="block w-full px-3 py-1.5 text-left text-sm text-odoo-action hover:bg-odoo-bg"
                   onClick={() => {
                     const next = new URLSearchParams(params);
-                    ["priority", "stage", "tags", "is_archived"].forEach((k) => next.delete(k));
+                    ["priority", "stage", "tags", "is_archived", "assigned_to"].forEach((k) =>
+                      next.delete(k),
+                    );
                     setParams(next);
                   }}
                 >

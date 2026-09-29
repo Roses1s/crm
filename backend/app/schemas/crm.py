@@ -5,6 +5,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
+from app.models.activity import ActivityType
 from app.models.timeline import EntryType
 from app.schemas.common import ORMModel
 
@@ -122,8 +123,43 @@ class LeadRead(ORMModel):
     assigned_to_email: str | None
     assigned_to_name: str | None
     tags: list[TagRead]
+    activity_state: str | None
+    next_activity_date: date | None
+    next_activity_summary: str | None
     created_at: datetime
     updated_at: datetime
+
+
+# --- активности --------------------------------------------------------------
+class ActivityRead(ORMModel):
+    id: int
+    lead_id: int
+    type: ActivityType
+    summary: str
+    note: str
+    due_date: date
+    is_done: bool
+    state: str
+    assigned_to_id: int | None
+    assigned_to_name: str | None
+    created_at: datetime
+
+
+class ActivityCreate(BaseModel):
+    type: ActivityType = ActivityType.call
+    summary: str = Field(min_length=1, max_length=255)
+    note: str = ""
+    due_date: date
+    assigned_to_id: int | None = None
+
+
+class ActivityUpdate(BaseModel):
+    type: ActivityType | None = None
+    summary: str | None = Field(default=None, min_length=1, max_length=255)
+    note: str | None = None
+    due_date: date | None = None
+    is_done: bool | None = None
+    assigned_to_id: int | None = None
 
 
 # --- лента -------------------------------------------------------------------

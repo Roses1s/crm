@@ -57,8 +57,28 @@ export interface Lead {
   assigned_to_email?: string | null;
   assigned_to_name?: string | null;
   tags: Tag[];
+  activity_state?: ActivityState | null;
+  next_activity_date?: string | null;
+  next_activity_summary?: string | null;
   created_at?: string;
   updated_at?: string;
+}
+
+export type ActivityType = "call" | "meeting" | "todo" | "email";
+export type ActivityState = "overdue" | "today" | "planned" | "done";
+
+export interface Activity {
+  id: number;
+  lead_id: number;
+  type: ActivityType;
+  summary: string;
+  note: string;
+  due_date: string;
+  is_done: boolean;
+  state: ActivityState;
+  assigned_to_id: number | null;
+  assigned_to_name: string | null;
+  created_at: string;
 }
 
 export interface Attachment {

@@ -28,7 +28,7 @@ CRM-система: React 19 + FastAPI + PostgreSQL 18, разворачивае
 ```
 backend/                    # FastAPI: SQLAlchemy 2.0 async, Alembic, Celery, JWT
 ├── app/core/               конфиг, безопасность, логи, кеш, лимитер, ошибки
-├── app/models/             9 таблиц: users, stages, tags, leads, shipments, ...
+├── app/models/             11 таблиц: users, stages, tags, leads, activities, ...
 ├── app/api/v1/             auth · crm · shipments · carriers · admin · health
 ├── app/worker/             Celery: бэкапы, напоминания, чистка вложений
 ├── alembic/                миграции (схема + журнал попыток входа)

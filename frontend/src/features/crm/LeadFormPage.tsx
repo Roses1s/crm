@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { AppShell, ControlPanel } from "@/app/layout/AppShell";
+import { ActivityPanel } from "@/features/crm/lead-form/ActivityPanel";
 import { TagsField } from "@/features/crm/lead-form/TagsField";
 import { empty, normalized, toForm, toPayload, type FormState } from "@/features/crm/lead-form/form-state";
 import { ApiError } from "@/shared/api/client";
@@ -544,6 +545,7 @@ function LeadForm({ id }: { id?: string }) {
 
         {!isNew && (
           <div className="w-full shrink-0 bg-odoo-surface lg:w-[33%] lg:max-w-[520px] lg:overflow-y-auto">
+            <ActivityPanel leadId={lead?.id} />
             <Chatter
               timeline={timeline}
               attachments={attachments}

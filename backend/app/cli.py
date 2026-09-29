@@ -69,6 +69,12 @@ async def seed() -> None:
         stages = list((await session.execute(select(Stage).order_by(Stage.sequence))).scalars())
         tags = list((await session.execute(select(Tag))).scalars())
 
+        # Демо-лиды вешаем на первого администратора, иначе фильтр «Мои лиды»
+        # на свежей установке ничего не находит.
+        owner = (
+            await session.execute(select(User).where(User.role == Role.admin).limit(1))
+        ).scalar_one_or_none()
+
         if int((await session.execute(select(func.count()).select_from(Lead))).scalar_one()) == 0:
             demo = [
                 ("ООО «Уралпромснаб»", "7451234565", "Громов Сергей", 3, stages[2]),
@@ -86,6 +92,7 @@ async def seed() -> None:
                     stage_id=stage.id,
                     credit_limit=Decimal("250000"),
                     next_call_date=date.today() + timedelta(days=i),
+                    assigned_to_id=owner.id if owner else None,
                 )
                 lead.tags = tags[: (i % 3) + 1]
                 session.add(lead)

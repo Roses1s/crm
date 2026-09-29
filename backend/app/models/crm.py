@@ -20,6 +20,7 @@ from sqlalchemy.orm import Mapped, mapped_column, relationship
 from app.db.base import Base, TimestampMixin
 
 if TYPE_CHECKING:
+    from app.models.activity import Activity
     from app.models.shipment import Shipment
     from app.models.timeline import TimelineEntry
     from app.models.user import User
@@ -103,6 +104,32 @@ class Lead(Base, TimestampMixin):
     timeline: Mapped[list[TimelineEntry]] = relationship(
         back_populates="lead", cascade="all, delete-orphan"
     )
+    # selectin: на списке лидов это один дополнительный запрос на всю страницу,
+    # а не по запросу на карточку.
+    activities: Mapped[list[Activity]] = relationship(
+        back_populates="lead", cascade="all, delete-orphan", lazy="selectin"
+    )
+
+    @property
+    def _open_activities(self) -> list[Activity]:
+        return sorted((a for a in self.activities if not a.is_done), key=lambda a: a.due_date)
+
+    @property
+    def next_activity_date(self) -> date | None:
+        """Ближайший срок среди незакрытых действий."""
+        activities = self._open_activities
+        return activities[0].due_date if activities else None
+
+    @property
+    def next_activity_summary(self) -> str | None:
+        activities = self._open_activities
+        return activities[0].summary if activities else None
+
+    @property
+    def activity_state(self) -> str | None:
+        """Цвет часиков на карточке: просрочено / сегодня / запланировано."""
+        activities = self._open_activities
+        return activities[0].state.value if activities else None
 
     # Плоские поля для API: фронтенду удобнее получить имя этапа и
     # ответственного строкой, чем ходить за вложенными объектами.
