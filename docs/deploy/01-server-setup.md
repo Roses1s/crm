@@ -1093,6 +1093,74 @@ systemctl restart ssh.socket 2>/dev/null; systemctl restart ssh
 
 ---
 
+## Приложение Б. Вход с другого компьютера
+
+После запрета паролей на сервер пускает только ключ. Чтобы зайти с нового компьютера,
+нужно добавить его ключ в `~/.ssh/authorized_keys` пользователя `deploy`.
+В файле может быть сколько угодно строк — **одна строка = один компьютер**.
+
+### Способ 1 (правильный): отдельный ключ для каждого компьютера
+
+1. На **новом** компьютере создаём ключ:
+   ```powershell
+   ssh-keygen -t ed25519 -C "crm-noutbuk" -f "$env:USERPROFILE\.ssh\id_ed25519_crm"
+   Get-Content "$env:USERPROFILE\.ssh\id_ed25519_crm.pub"
+   ```
+   (macOS/Linux: `ssh-keygen -t ed25519 -C "crm-noutbuk" -f ~/.ssh/id_ed25519_crm && cat ~/.ssh/id_ed25519_crm.pub`)
+
+2. Копируем показанную строку и со **старого** (уже работающего) компьютера добавляем её на сервер:
+   ```powershell
+   ssh crm "echo 'СТРОКА_КЛЮЧА_С_НОВОГО_ПК' >> ~/.ssh/authorized_keys && sort -u -o ~/.ssh/authorized_keys ~/.ssh/authorized_keys && cat ~/.ssh/authorized_keys"
+   ```
+
+3. Проверяем с нового компьютера:
+   ```powershell
+   ssh -i "$env:USERPROFILE\.ssh\id_ed25519_crm" deploy@77.222.38.191
+   ```
+
+Плюс способа: потерял ноутбук — удаляешь одну строку из `authorized_keys`, остальные
+компьютеры продолжают работать.
+
+### Способ 2 (быстрый): перенести существующий ключ
+
+Скопировать **два файла** `id_ed25519_crm` и `id_ed25519_crm.pub` из папки `.ssh`
+старого компьютера в такую же папку нового (флешкой или архивом с паролем — не мессенджером).
+
+Если Windows после копирования ругается `UNPROTECTED PRIVATE KEY FILE`:
+```powershell
+icacls "$env:USERPROFILE\.ssh\id_ed25519_crm" /inheritance:r /grant:r "$($env:USERNAME):(R)"
+```
+
+### Аварийный вход (ключей нет вообще)
+
+В панели sweb.ru открыть **VNC-консоль** — это «монитор, подключённый к серверу»,
+она не зависит от настроек SSH, и там работает вход под root по паролю. Далее:
+
+```bash
+# посмотреть/добавить ключ
+nano /home/deploy/.ssh/authorized_keys
+chown deploy:deploy /home/deploy/.ssh/authorized_keys
+chmod 600 /home/deploy/.ssh/authorized_keys
+
+# либо временно вернуть вход по паролю
+sed -i 's/^PasswordAuthentication no/PasswordAuthentication yes/' /etc/ssh/sshd_config.d/00-crm-hardening.conf
+systemctl restart ssh.socket 2>/dev/null; systemctl restart ssh
+```
+
+После восстановления доступа не забыть вернуть `PasswordAuthentication no`.
+
+### Управление списком ключей
+
+```bash
+cat -n ~/.ssh/authorized_keys        # посмотреть все ключи с номерами строк
+sed -i '2d' ~/.ssh/authorized_keys   # удалить доступ, записанный во 2-й строке
+```
+
+Комментарий в конце строки (`crm-noutbuk`, `crmdetroid`) нужен именно для того,
+чтобы понимать, чей это компьютер.
+
+---
+
 ## Приложение B. Команды на каждый день
 
 ```bash
