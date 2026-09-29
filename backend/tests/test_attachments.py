@@ -144,3 +144,79 @@ async def test_operator_cannot_delete_foreign_attachment(
     removed = await auth_client.delete(f"/api/v1/crm/attachments/{attachment_id}")
     assert removed.status_code == 204
     assert (await auth_client.get(f"/api/v1/crm/leads/{lead_id}/attachments")).json() == []
+
+
+async def test_shipment_attachment_upload_and_isolation(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    """Файл заявки скачивается общей ручкой и не попадает в список файлов лида."""
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    shipment_id = (await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})).json()[
+        "id"
+    ]
+
+    uploaded = await auth_client.post(
+        f"/api/v1/shipments/{shipment_id}/attachments",
+        files={"file": ("Накладная.pdf", b"%PDF-1.4 ttn", "application/pdf")},
+    )
+    assert uploaded.status_code == 201, uploaded.text
+    attachment_id = uploaded.json()["id"]
+
+    listed = await auth_client.get(f"/api/v1/shipments/{shipment_id}/attachments")
+    assert [a["name"] for a in listed.json()] == ["Накладная.pdf"]
+
+    # Владелец решил показывать документы перевозки только на самой заявке.
+    lead_files = await auth_client.get(f"/api/v1/crm/leads/{lead_id}/attachments")
+    assert "Накладная.pdf" not in [a["name"] for a in lead_files.json()]
+
+    downloaded = await auth_client.get(f"/api/v1/crm/attachments/{attachment_id}")
+    assert downloaded.status_code == 200
+    assert downloaded.content == b"%PDF-1.4 ttn"
+
+
+async def test_shipment_attachment_rejects_dangerous_extension(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    shipment_id = (await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})).json()[
+        "id"
+    ]
+
+    response = await auth_client.post(
+        f"/api/v1/shipments/{shipment_id}/attachments",
+        files={"file": ("схема.svg", b"<svg onload=alert(1)>", "image/svg+xml")},
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "unsupported_file_type"
+
+
+async def test_shipment_attachment_unknown_shipment(auth_client: AsyncClient) -> None:
+    response = await auth_client.post(
+        "/api/v1/shipments/999999/attachments",
+        files={"file": ("Накладная.pdf", b"%PDF", "application/pdf")},
+    )
+    assert response.status_code == 404
+
+
+async def test_shipment_attachment_can_be_deleted(auth_client: AsyncClient, seeded: dict) -> None:
+    """Удаление идёт общей ручкой: автор файла может удалить свою загрузку."""
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    shipment_id = (await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})).json()[
+        "id"
+    ]
+    attachment = (
+        await auth_client.post(
+            f"/api/v1/shipments/{shipment_id}/attachments",
+            files={"file": ("Акт.pdf", b"%PDF act", "application/pdf")},
+        )
+    ).json()
+
+    stored = Path(settings.attachments_dir) / "shipments" / str(shipment_id)
+    assert list(stored.iterdir()), "файл должен лежать в папке заявки"
+
+    deleted = await auth_client.delete(f"/api/v1/crm/attachments/{attachment['id']}")
+    assert deleted.status_code == 204
+
+    remaining = await auth_client.get(f"/api/v1/shipments/{shipment_id}/attachments")
+    assert remaining.json() == []
+    assert not list(stored.iterdir()), "файл должен исчезнуть и с диска"
