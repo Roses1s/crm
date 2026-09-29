@@ -1,0 +1,74 @@
+# Автопроверки кода.
+#
+# Запускаются при каждой отправке в рабочую ветку и при открытии pull request.
+# Повторяют ровно то, что агент делает вручную: линтеры, типы, тесты, сборка.
+# Docker, PostgreSQL и Valkey здесь не нужны — тесты бэкенда идут на SQLite.
+
+name: Проверки
+
+on:
+  push:
+    branches: ["arena/**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  backend:
+    name: Бэкенд — ruff, mypy, pytest
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          python-version: "3.11"
+          cache: pip
+
+      - name: Установка зависимостей
+        run: pip install -e ".[dev]"
+
+      - name: Стиль и формат
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Типы
+        run: mypy app
+
+      - name: Тесты
+        run: python -m pytest -q
+
+      - name: Миграции проходят на пустой базе
+        env:
+          DATABASE_URL: sqlite+aiosqlite:////tmp/checks.db
+        run: alembic upgrade head
+
+  frontend:
+    name: Фронтенд — типы, тесты, сборка
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Установка зависимостей
+        run: npm ci
+
+      - name: Типы
+        run: npx tsc -b
+
+      - name: Тесты
+        run: npm test
+
+      - name: Сборка
+        run: npm run build
