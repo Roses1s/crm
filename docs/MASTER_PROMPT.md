@@ -8,7 +8,7 @@
 
 ```text
 Ты продолжаешь работу над проектом CRM Detroid в репозитории Roses1s/crm,
-ветка arena/01a0eb16-crm. Я — владелец проекта, не администратор и не
+ветка arena/01a0ec70-crm. Я — владелец проекта, не администратор и не
 программист: объясняй простым языком, команды давай готовыми для копирования,
 отвечай по-русски.
 
@@ -30,7 +30,7 @@ FastAPI + PostgreSQL 18 + Valkey + Celery, React 19 + Vite 6 + Tailwind v4,
 2. Проверь, не изменилось ли что-то после последней отметки в STATUS.md
    (в нём указан «последний учтённый коммит»):
 
-   git fetch origin arena/01a0eb16-crm
+   git fetch origin arena/01a0ec70-crm
    git log --oneline <хеш_из_STATUS>..FETCH_HEAD
    git diff --stat <хеш_из_STATUS>..FETCH_HEAD
    git status --short
@@ -43,7 +43,7 @@ FastAPI + PostgreSQL 18 + Valkey + Celery, React 19 + Vite 6 + Tailwind v4,
    Признак: git log показывает один коммит или git ls-files — два файла.
    Лечится так:
 
-   git fetch origin arena/01a0eb16-crm
+   git fetch origin arena/01a0ec70-crm
    git reset FETCH_HEAD        # индекс и HEAD на удалённое состояние
    git status --short          # пусто = рабочее дерево совпадает с GitHub
 
@@ -61,12 +61,12 @@ FastAPI + PostgreSQL 18 + Valkey + Celery, React 19 + Vite 6 + Tailwind v4,
 
 КАТЕГОРИЧЕСКИЙ ЗАПРЕТ ПО GIT (нарушение = потеря моей работы):
 
-- Работай ТОЛЬКО в ветке arena/01a0eb16-crm. Она единственная.
+- Работай ТОЛЬКО в ветке arena/01a0ec70-crm. Она единственная.
 - НЕЛЬЗЯ создавать новые ветки: ни git branch, ни git checkout -b,
   ни git switch -c, ни через веб-интерфейс GitHub.
 - НЕЛЬЗЯ переключаться на другую ветку, переименовывать, удалять текущую
   или менять ветку по умолчанию в настройках репозитория.
-- НЕЛЬЗЯ пушить куда-либо, кроме origin arena/01a0eb16-crm. В main — никогда.
+- НЕЛЬЗЯ пушить куда-либо, кроме origin arena/01a0ec70-crm. В main — никогда.
 - НЕЛЬЗЯ переписывать уже отправленную историю: без git push --force,
   --force-with-lease, без rebase и reset --hard по опубликованным коммитам,
   без изменения чужих коммитов.
@@ -74,7 +74,7 @@ FastAPI + PostgreSQL 18 + Valkey + Celery, React 19 + Vite 6 + Tailwind v4,
 - Если задача выглядит так, будто нужна отдельная ветка или pull request, —
   остановись, объясни ситуацию и спроси меня. Сам не решай.
 - Разрешено и нормально: git fetch, git log, git diff, git status, git add,
-  git commit, git push origin arena/01a0eb16-crm, а также git reset
+  git commit, git push origin arena/01a0ec70-crm, а также git reset
   (mixed/soft) для восстановления локальной истории по инструкции из шага 3.
 
 ПРАВИЛА РАБОТЫ:
@@ -105,7 +105,7 @@ FastAPI + PostgreSQL 18 + Valkey + Celery, React 19 + Vite 6 + Tailwind v4,
   и «В работе»;
 - если наступил на новые грабли — допиши их в раздел 9 docs/PROJECT.md,
   чтобы следующий на них не наступил;
-- закоммить и запушь в arena/01a0eb16-crm.
+- закоммить и запушь в arena/01a0ec70-crm.
 ```
 
 ---
