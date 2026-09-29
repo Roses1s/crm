@@ -829,6 +829,7 @@ ssl_session_tickets off;
 
 # OCSP stapling НЕ включаем: с 2025 года Let's Encrypt не кладёт OCSP-адрес
 # в сертификаты (перешли на CRL) — nginx на это ругался предупреждением.
+EOF
 
 cat > /opt/crm/nginx/snippets/security-headers.conf <<'EOF'
 add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
