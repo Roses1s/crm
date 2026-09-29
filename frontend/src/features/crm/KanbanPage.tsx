@@ -154,9 +154,13 @@ export function KanbanPage() {
       {isAdmin && (
         <BoardSwitcher
           boardUserId={boardUserId}
-          onChange={(userId) =>
-            setFilter("board", userId ? String(userId) : "")
-          }
+          query={searchInput}
+          onChange={(userId) => {
+            // После перехода на доску строку поиска очищаем: иначе на чужой
+            // доске остался бы отбор по фамилии сотрудника.
+            if (userId) setSearchInput("");
+            setFilter("board", userId ? String(userId) : "");
+          }}
         />
       )}
 
