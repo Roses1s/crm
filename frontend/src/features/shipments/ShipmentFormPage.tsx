@@ -158,7 +158,8 @@ function ShipmentForm({ id }: { id?: string }) {
         </Button>
       </Toolbar>
 
-      <div className="flex min-h-[calc(100vh-140px)] flex-col lg:flex-row">
+      {/* Та же защита от разъезжающихся колонок, что и в карточке лида. */}
+      <div className="mx-auto flex min-h-[calc(100vh-140px)] w-full max-w-[1900px] flex-col lg:flex-row">
         <div className="flex-1 p-4">
           {!isNew && (
             <div className="mb-4 flex flex-wrap gap-1">
@@ -362,7 +363,7 @@ function ShipmentForm({ id }: { id?: string }) {
         </div>
 
         {!isNew && shipment && (
-          <div className="w-full lg:w-[360px]">
+          <div className="w-full shrink-0 lg:w-[420px]">
             {/* Ленты изменений у заявки нет, поэтому правая колонка — документы. */}
             <ShipmentAttachments shipmentId={shipment.id} />
           </div>

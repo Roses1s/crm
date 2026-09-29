@@ -363,7 +363,13 @@ function LeadForm({ id }: { id?: string }) {
         }
       />
 
-      <div className="flex min-h-0 flex-col lg:h-[calc(100dvh-90px)] lg:flex-row">
+      {/*
+        Ширину рабочей области ограничиваем целиком, а не только формой: без
+        этого на широком экране (или при уменьшенном масштабе) лист упирался
+        в свой предел, чаттер прижимался к правому краю, и между ними зияла
+        пустая полоса. mx-auto собирает пару «форма + лента» по центру.
+      */}
+      <div className="mx-auto flex min-h-0 w-full max-w-[1900px] flex-col lg:h-[calc(100dvh-90px)] lg:flex-row">
         <div className="min-w-0 flex-1 lg:overflow-y-auto">
           <FormSheetBg>
             {error && <FormAlert>{error}</FormAlert>}
@@ -621,7 +627,11 @@ function LeadForm({ id }: { id?: string }) {
         </div>
 
         {!isNew && (
-          <div className="w-full shrink-0 bg-odoo-surface lg:w-[33%] lg:max-w-[520px] lg:overflow-y-auto">
+          <div
+            // Постоянная ширина вместо доли экрана: доля уводила ленту тем
+            // дальше от формы, чем шире монитор.
+            className="w-full shrink-0 bg-odoo-surface lg:w-[420px] lg:overflow-y-auto"
+          >
             <Chatter
               timeline={timeline}
               attachments={attachments}
