@@ -76,6 +76,8 @@ services:
 
   # --- фоновые задачи -------------------------------------------------------
   worker:
+    build:
+      context: ./backend
     image: crm-backend:latest
     container_name: crm-worker
     restart: unless-stopped
@@ -95,6 +97,8 @@ services:
     networks: [internal]
 
   beat:
+    build:
+      context: ./backend
     image: crm-backend:latest
     container_name: crm-beat
     restart: unless-stopped
