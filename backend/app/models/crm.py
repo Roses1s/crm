@@ -35,11 +35,16 @@ lead_tags = Table(
 
 
 class Stage(Base, TimestampMixin):
-    """Колонка канбана."""
+    """Колонка канбана. Принадлежит сотруднику: у каждого своя воронка."""
 
     __tablename__ = "stages"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    # Владелец доски. Пусто только у этапов, оставшихся от общей воронки
+    # до перехода на личные доски: миграция раздаёт их администратору.
+    owner_id: Mapped[int | None] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     sequence: Mapped[int] = mapped_column(Integer, default=0, nullable=False, index=True)
     is_closed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)

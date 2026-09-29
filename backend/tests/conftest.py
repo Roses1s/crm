@@ -104,11 +104,15 @@ async def seeded(session: AsyncSession) -> dict[str, object]:
         last_name="Кузнецов",
         role=Role.manager,
     )
-    new_stage = Stage(name="Новый", sequence=1, color="slate")
-    talks_stage = Stage(name="Переговоры", sequence=2, color="blue")
+    session.add_all([admin, manager])
+    await session.flush()
+
+    # Этапы принадлежат доске админа — как после перехода на личные воронки.
+    new_stage = Stage(name="Новый", sequence=1, color="slate", owner_id=admin.id)
+    talks_stage = Stage(name="Переговоры", sequence=2, color="blue", owner_id=admin.id)
     tag = Tag(name="Крупный клиент", color="green")
     carrier = Carrier(name="ООО «АвтоТрансЛайн»", inn="7447112236")
-    session.add_all([admin, manager, new_stage, talks_stage, tag, carrier])
+    session.add_all([new_stage, talks_stage, tag, carrier])
     await session.flush()
 
     lead = Lead(
