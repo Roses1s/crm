@@ -42,7 +42,7 @@ export function FormAlert({
   children: ReactNode;
 }) {
   const tones = {
-    danger: "border-odoo-danger/30 bg-red-50 text-odoo-danger",
+    danger: "border-odoo-danger/30 bg-odoo-danger/10 text-odoo-danger",
     warning: "border-amber-300 bg-amber-50 text-amber-800",
   };
   return (

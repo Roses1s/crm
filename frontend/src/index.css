@@ -160,7 +160,8 @@
   --odoo-text: 228 228 230;
   --odoo-text-soft: 200 200 204;
   --odoo-text-muted: 154 154 160;
-  --odoo-text-light: 90 91 97;
+  /* Было 90 91 97 — подсказки почти сливались с поверхностью. */
+  --odoo-text-light: 133 134 141;
 
   --odoo-success: 61 184 94;
   --odoo-warning: 255 193 7;
@@ -226,6 +227,27 @@
     letter-spacing: 0.5px;
   }
 
+  /*
+   * Поля ввода и выпадающие списки. Без явных цветов браузер в тёмной теме
+   * рисует их сам: список <option> получался серым по белому и не читался.
+   */
+  input,
+  select,
+  textarea {
+    background-color: rgb(var(--odoo-surface));
+    color: rgb(var(--odoo-text));
+  }
+
+  select option {
+    background-color: rgb(var(--odoo-surface));
+    color: rgb(var(--odoo-text));
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: rgb(var(--odoo-text-muted));
+  }
+
   ::-webkit-scrollbar {
     width: 6px;
     height: 6px;
@@ -245,6 +267,16 @@
  */
 .login-screen {
   color-scheme: light;
+}
+
+/* Экран входа светлый всегда, поэтому общие тёмные цвета полей тут не нужны. */
+.login-screen input {
+  background-color: #ffffff;
+  color: #1b1d21;
+}
+
+.login-screen input::placeholder {
+  color: #b4b4ba;
 }
 
 .login-screen input:-webkit-autofill,

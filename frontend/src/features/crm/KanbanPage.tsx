@@ -339,7 +339,7 @@ export function KanbanPage() {
       {moveLead.isError && (
         <div
           role="alert"
-          className="mx-4 mt-3 rounded-[4px] border border-odoo-danger/30 bg-red-50 px-3 py-2 text-sm text-odoo-danger"
+          className="mx-4 mt-3 rounded-[4px] border border-odoo-danger/30 bg-odoo-danger/10 px-3 py-2 text-sm text-odoo-danger"
         >
           Не удалось переместить лид. Изменение отменено.
         </div>
