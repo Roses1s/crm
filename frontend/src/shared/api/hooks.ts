@@ -8,6 +8,7 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type {
+  Attachment,
   Carrier,
   DashboardStats,
   LauncherApp,
@@ -20,7 +21,7 @@ import type {
   User,
 } from "@/shared/types";
 import { clearTokens, saveTokens } from "./auth";
-import { api, type Page } from "./client";
+import { api, apiBlob, apiUpload, type Page } from "./client";
 
 export interface LeadFilters {
   search?: string;
@@ -52,6 +53,7 @@ export const keys = {
   shipments: (status: string) => ["shipments", status] as const,
   shipment: (id: string | number) => ["shipment", String(id)] as const,
   leadShipments: (id: string | number) => ["lead-shipments", String(id)] as const,
+  attachments: (id: string | number) => ["attachments", String(id)] as const,
   carriers: ["carriers"] as const,
   users: ["users"] as const,
   stats: ["stats"] as const,
@@ -276,6 +278,58 @@ export function useAddNote(id: string | undefined) {
   });
 }
 
+// --- вложения ----------------------------------------------------------------
+export function useLeadAttachments(id: string | number | undefined) {
+  return useQuery({
+    queryKey: keys.attachments(id ?? "new"),
+    queryFn: () => api<Attachment[]>(`/crm/leads/${id}/attachments`),
+    enabled: Boolean(id) && id !== "new",
+  });
+}
+
+export function useUploadAttachment(leadId: string | number | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ file, entryId }: { file: File; entryId?: number }) =>
+      apiUpload<Attachment>(
+        `/crm/leads/${leadId}/attachments${entryId ? `?entry_id=${entryId}` : ""}`,
+        file,
+      ),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.attachments(leadId ?? "") });
+      void qc.invalidateQueries({ queryKey: keys.timeline(leadId ?? "") });
+    },
+  });
+}
+
+export function useDeleteAttachment(leadId: string | number | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (attachmentId: number) =>
+      api<void>(`/crm/attachments/${attachmentId}`, { method: "DELETE" }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.attachments(leadId ?? "") });
+      void qc.invalidateQueries({ queryKey: keys.timeline(leadId ?? "") });
+    },
+  });
+}
+
+/** Содержимое файла — для миниатюр и предпросмотра. */
+export function attachmentBlob(attachmentId: number): Promise<Blob> {
+  return apiBlob(`/crm/attachments/${attachmentId}`);
+}
+
+/** Скачивание: получаем файл с токеном и отдаём браузеру. */
+export async function downloadAttachment(attachment: Attachment): Promise<void> {
+  const blob = await attachmentBlob(attachment.id);
+  const url = URL.createObjectURL(blob);
+  const link = document.createElement("a");
+  link.href = url;
+  link.download = attachment.name;
+  link.click();
+  URL.revokeObjectURL(url);
+}
+
 // --- заявки ------------------------------------------------------------------
 export function useShipments(status = "") {
   return useQuery({
@@ -390,6 +444,7 @@ export function useStats() {
 }
 
 interface BackupsResponse {
+  storage: { files: number; bytes: number; free_bytes: number };
   results: { name: string; size: number }[];
   last_backup_at: string | null;
   age_hours: number | null;

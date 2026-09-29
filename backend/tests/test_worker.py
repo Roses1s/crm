@@ -20,6 +20,7 @@ def test_celery_imports_task_modules() -> None:
     celery.loader.import_default_modules()
     registered = {name for name in celery.tasks if name.startswith("app.")}
     assert registered == {
+        "app.worker.tasks.backup_attachments",
         "app.worker.tasks.backup_database",
         "app.worker.tasks.cleanup_orphan_attachments",
         "app.worker.tasks.send_call_reminders",

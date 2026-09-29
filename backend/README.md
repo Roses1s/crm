@@ -82,12 +82,16 @@ backend/
 | GET | `/api/v1/crm/leads/{id}/timeline` | авторизованные |
 | POST | `/api/v1/crm/leads/{id}/notes` | авторизованные |
 | GET | `/api/v1/crm/leads/{id}/pager` | авторизованные |
+| GET/POST | `/api/v1/crm/leads/{id}/attachments` | авторизованные (до 25 МБ) |
+| GET/DELETE | `/api/v1/crm/attachments/{id}` | скачать — все; удалить — автор или manager+ |
 | GET/POST | `/api/v1/shipments` | авторизованные |
 | GET/PATCH | `/api/v1/shipments/{id}` | авторизованные |
 | PATCH | `/api/v1/shipments/{id}/status` | авторизованные |
 | GET | `/api/v1/leads/{id}/shipments` | авторизованные |
 | GET/POST/PATCH | `/api/v1/carriers` | чтение — все, изменение — manager+ |
 | GET | `/api/v1/admin/stats` | manager+ (кеш 60 с) |
+| GET | `/api/v1/admin/backups` · POST `/api/v1/admin/backup` | manager+ / admin |
+| GET | `/api/v1/admin/login-attempts` | admin |
 | GET/POST/PATCH/DELETE | `/api/v1/admin/users` | admin |
 | GET | `/health`, `/health/ready` | без авторизации |
 
@@ -111,6 +115,13 @@ backend/
 **Кеш и лимитер** не роняют приложение: если Valkey недоступен, кеш уходит
 в память процесса, а slowapi — на in-memory хранилище.
 
+**Вложения.** Файлы лежат в томе `attachments` (`/var/lib/crm/attachments/<lead_id>/<uuid>.<ext>`),
+метаданные — в таблице `attachments`. На диск попадает обезличенное имя: так исключены
+совпадения и подстановка пути. Скачивание идёт через API с проверкой токена, причём
+картинки и PDF отдаются с `Content-Disposition: inline`, а всё остальное — только
+`attachment` + `X-Content-Type-Options: nosniff`, чтобы html-файл не выполнился в браузере.
+Лимит 25 МБ проверяется потоково, по мегабайту, и совпадает с `client_max_body_size` nginx.
+
 **bcrypt < 5.** passlib 1.7.4 несовместим с bcrypt 5.0 (падает при определении
 бэкенда), поэтому версия зафиксирована в зависимостях.
 
@@ -125,6 +136,7 @@ celery -A app.worker.celery_app.celery beat   -l info
 |---|---|---|
 | `backup_database` | 03:00 ежедневно | `pg_dump` в `/var/backups/crm`, хранит 14 дней |
 | `send_call_reminders` | 09:00 ежедневно | напоминания о запланированных звонках |
+| `backup_attachments` | воскресенье 04:00 | архив файлов (`files-*.tar.gz`), хранит 4 копии |
 | `cleanup_orphan_attachments` | воскресенье 04:30 | чистит записи о пропавших файлах |
 
 ## Миграции

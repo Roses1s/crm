@@ -85,3 +85,7 @@ class Attachment(Base, TimestampMixin):
 
     entry: Mapped[TimelineEntry | None] = relationship(back_populates="attachments")
     uploaded_by: Mapped[User | None] = relationship(lazy="joined")
+
+    @property
+    def uploaded_by_name(self) -> str:
+        return self.uploaded_by.full_name or self.uploaded_by.email if self.uploaded_by else "—"

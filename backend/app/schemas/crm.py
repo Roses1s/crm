@@ -132,6 +132,7 @@ class AttachmentRead(ORMModel):
     name: str
     size: int
     content_type: str
+    uploaded_by_name: str = "—"
     created_at: datetime
 
 

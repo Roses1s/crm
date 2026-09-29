@@ -72,6 +72,8 @@ services:
              gunicorn app.main:app -c gunicorn.conf.py"
     volumes:
       - backups:/var/backups/crm
+      # Вложения лидов: том переживает пересборку образа и перезапуск.
+      - attachments:/var/lib/crm/attachments
     depends_on:
       postgres:
         condition: service_healthy
@@ -102,6 +104,7 @@ services:
       start_period: 40s
     volumes:
       - backups:/var/backups/crm
+      - attachments:/var/lib/crm/attachments
     depends_on:
       backend:
         condition: service_started
@@ -166,6 +169,7 @@ volumes:
   pgdata:
   valkeydata:
   backups:
+  attachments:
 
 networks:
   # internal — без выхода наружу: база, кеш, воркеры

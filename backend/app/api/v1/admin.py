@@ -131,7 +131,10 @@ async def list_backups(_: ManagerUser) -> dict[str, Any]:
     age_hours = (
         round((datetime.now(tz=UTC).timestamp() - last_mtime) / 3600, 1) if last_mtime else None
     )
+    from app.api.v1.attachments import disk_usage
+
     return {
+        "storage": disk_usage(),
         "results": results,
         "last_backup_at": (
             datetime.fromtimestamp(last_mtime, tz=UTC).isoformat() if last_mtime else None

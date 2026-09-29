@@ -8,6 +8,7 @@ from __future__ import annotations
 
 import shutil
 import subprocess
+import tarfile
 from datetime import UTC, date, datetime, timedelta
 from pathlib import Path
 from typing import Any
@@ -73,6 +74,34 @@ def backup_database() -> dict[str, Any]:
 
     size = target.stat().st_size
     log.info("backup.ok", file=target.name, size=size, removed_old=removed)
+    return {"ok": True, "file": target.name, "size": size}
+
+
+@shared_task(name="app.worker.tasks.backup_attachments")
+def backup_attachments() -> dict[str, Any]:
+    """Архив вложений. Дамп базы файлы не содержит, поэтому копим отдельно
+    и реже: файлы меняются медленно, а место на диске не бесконечное."""
+    source = Path(settings.attachments_dir)
+    if not source.exists() or not any(source.rglob("*")):
+        log.info("backup.files.empty")
+        return {"ok": True, "skipped": "вложений нет"}
+
+    BACKUP_DIR.mkdir(parents=True, exist_ok=True)
+    stamp = datetime.now(tz=UTC).strftime("%Y-%m-%d-%H%M")
+    target = BACKUP_DIR / f"files-{stamp}.tar.gz"
+
+    with tarfile.open(target, "w:gz") as archive:
+        archive.add(source, arcname="attachments")
+
+    # Оставляем только N последних архивов файлов.
+    archives = sorted(BACKUP_DIR.glob("files-*.tar.gz"), key=lambda f: f.stat().st_mtime)
+    removed = 0
+    for old in archives[: max(0, len(archives) - settings.backup_files_keep)]:
+        old.unlink()
+        removed += 1
+
+    size = target.stat().st_size
+    log.info("backup.files.ok", file=target.name, size=size, removed_old=removed)
     return {"ok": True, "file": target.name, "size": size}
 
 

@@ -8,11 +8,18 @@
 from __future__ import annotations
 
 import os
+import shutil
+import tempfile
 from collections.abc import AsyncGenerator
 
 # Переменные окружения выставляются ДО импорта приложения.
+# Вложения в тестах пишутся во временный каталог, который чистится после прогона.
+_ATTACHMENTS_TMP = tempfile.mkdtemp(prefix="crm-test-attachments-")
+
 os.environ.update(
     DATABASE_URL="sqlite+aiosqlite:///:memory:",
+    ATTACHMENTS_DIR=_ATTACHMENTS_TMP,
+    MAX_UPLOAD_MB="1",
     SECRET_KEY="test-secret",
     RATE_LIMIT_ENABLED="false",
     LOG_JSON="false",
@@ -40,6 +47,15 @@ from app.models.crm import Lead, Stage, Tag
 from app.models.user import Role, User
 
 TEST_PASSWORD = "SuperSecret123"
+
+
+@pytest.fixture(autouse=True)
+def _clean_attachments() -> AsyncGenerator[None, None]:  # type: ignore[misc]
+    """Каждый тест начинает с пустым каталогом вложений."""
+    shutil.rmtree(_ATTACHMENTS_TMP, ignore_errors=True)
+    os.makedirs(_ATTACHMENTS_TMP, exist_ok=True)
+    yield
+    shutil.rmtree(_ATTACHMENTS_TMP, ignore_errors=True)
 
 
 @pytest.fixture(autouse=True)

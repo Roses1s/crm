@@ -11,16 +11,21 @@ import {
   useArchiveLead,
   useCanManage,
   useCreateLead,
+  useDeleteAttachment,
   useLead,
+  useLeadAttachments,
   useLeadPager,
   useLeadShipments,
   useLeadTimeline,
   useStages,
   useTags,
   useUpdateLead,
+  useUploadAttachment,
 } from "@/shared/api/hooks";
 import { ownerInitials, ownerLabel } from "@/shared/lib/owner";
+import type { Attachment } from "@/shared/types";
 import { Chatter } from "@/shared/ui/chatter";
+import { FilePreview } from "@/shared/ui/file-preview";
 import {
   Field,
   FormAlert,
@@ -53,17 +58,21 @@ function LeadForm({ id }: { id?: string }) {
   const { data: timeline = [] } = useLeadTimeline(id);
   const { data: shipments = [] } = useLeadShipments(lead?.id);
   const { data: pager } = useLeadPager(id);
+  const { data: attachments = [] } = useLeadAttachments(lead?.id);
 
   const createLead = useCreateLead();
   const updateLead = useUpdateLead(id);
   const archiveLead = useArchiveLead();
   const addNote = useAddNote(id);
+  const uploadAttachment = useUploadAttachment(lead?.id);
+  const deleteAttachment = useDeleteAttachment(lead?.id);
 
   const [form, setForm] = useState<FormState>(empty);
   const [pristine, setPristine] = useState<FormState>(empty);
   const [error, setError] = useState("");
   const [tab, setTab] = useState("shipments");
   const [actionsOpen, setActionsOpen] = useState(false);
+  const [preview, setPreview] = useState<Attachment | null>(null);
   const loadedId = useRef<number | null>(null);
 
   // Загруженную карточку кладём в форму один раз: фоновое обновление
@@ -537,12 +546,30 @@ function LeadForm({ id }: { id?: string }) {
           <div className="w-full shrink-0 bg-odoo-surface lg:w-[33%] lg:max-w-[520px] lg:overflow-y-auto">
             <Chatter
               timeline={timeline}
-              onSubmit={(body) => addNote.mutate(body)}
-              posting={addNote.isPending}
+              attachments={attachments}
+              posting={addNote.isPending || uploadAttachment.isPending}
+              uploading={uploadAttachment.isPending}
+              onSubmit={(body, files) => {
+                // Сначала создаём запись, затем цепляем к ней файлы —
+                // так вложения попадают именно в эту строку ленты.
+                if (!body && files.length === 0) return;
+                addNote.mutate(body || "Вложение", {
+                  onSuccess: (entry) => {
+                    for (const file of files) {
+                      uploadAttachment.mutate({ file, entryId: Number(entry.id) });
+                    }
+                  },
+                });
+              }}
+              onUpload={(file) => uploadAttachment.mutate({ file })}
+              onDelete={(file) => deleteAttachment.mutate(file.id)}
+              onPreview={(file) => setPreview(file)}
             />
           </div>
         )}
       </div>
+
+      {preview && <FilePreview file={preview} onClose={() => setPreview(null)} />}
     </AppShell>
   );
 }

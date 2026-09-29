@@ -1,14 +1,16 @@
 import { format, formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { Download, Paperclip, Search, Trash2, X } from "lucide-react";
-import { useMemo, useState } from "react";
+import { useMemo, useRef, useState } from "react";
+
+import { downloadAttachment } from "@/shared/api/hooks";
 import type { Attachment, TimelineEntry } from "@/shared/types";
+import { formatSize, previewKind, useObjectUrl } from "@/shared/ui/file-preview";
 
 /**
- * Чаттер (правая колонка карточки).
- *
- * Лента и отправка примечаний работают с API. Загрузка и удаление вложений
- * пока только в вёрстке — ручки файлов появятся следующим шагом.
+ * Чаттер (правая колонка карточки): лента событий, примечания и вложения.
+ * Файлы приходят из закрытой ручки, поэтому картинки сначала скачиваются
+ * с токеном и показываются из памяти браузера.
  */
 
 const MODES: { id: string; label: string; placeholder: string; action: string }[] = [
@@ -19,6 +21,9 @@ const MODES: { id: string; label: string; placeholder: string; action: string }[
     action: "Записать",
   },
 ];
+
+/** Картинки крупнее этого размера не разворачиваем в ленте — только чипом. */
+const INLINE_IMAGE_MAX = 5 * 1024 * 1024;
 
 function relativeTime(iso: string): string {
   const date = new Date(iso);
@@ -38,28 +43,66 @@ function dayLabel(iso: string): string {
   return format(date, "d MMMM yyyy 'г.'", { locale: ru });
 }
 
-export function formatSize(bytes: number): string {
-  if (!bytes) return "0 Б";
-  const units = ["Б", "КБ", "МБ", "ГБ"];
-  const i = Math.min(Math.floor(Math.log(bytes) / Math.log(1024)), units.length - 1);
-  const value = bytes / 1024 ** i;
-  return `${i === 0 ? value : value.toFixed(1)} ${units[i]}`;
+function AttachmentThumb({ file, onOpen }: { file: Attachment; onOpen: () => void }) {
+  const { url, failed } = useObjectUrl(file);
+
+  if (failed) {
+    return (
+      <span className="inline-flex items-center gap-1 rounded-[4px] border border-odoo-border bg-odoo-surface px-1.5 py-0.5 text-[11px] text-odoo-text-muted">
+        <Paperclip className="h-3 w-3" />
+        {file.name}
+      </span>
+    );
+  }
+
+  return (
+    <button
+      type="button"
+      onClick={onOpen}
+      title={`${file.name} · ${formatSize(file.size)} — открыть полностью`}
+      className="block overflow-hidden rounded-[4px] border border-odoo-border bg-odoo-surface transition-colors hover:border-odoo-primary"
+    >
+      {url ? (
+        <img src={url} alt={file.name} className="max-h-[220px] max-w-full object-contain" />
+      ) : (
+        <span className="flex h-[120px] w-[160px] animate-pulse items-center justify-center bg-odoo-bg text-[11px] text-odoo-text-light">
+          Загрузка…
+        </span>
+      )}
+    </button>
+  );
 }
 
 interface ChatterProps {
   timeline: TimelineEntry[];
   attachments?: Attachment[];
-  /** Отправка примечания. Если не передана — форма только отображается. */
-  onSubmit?: (body: string) => void;
+  /** Отправка примечания вместе с выбранными файлами. */
+  onSubmit?: (body: string, files: File[]) => void;
   posting?: boolean;
+  onUpload?: (file: File) => void;
+  onDelete?: (attachment: Attachment) => void;
+  uploading?: boolean;
+  onPreview?: (attachment: Attachment) => void;
 }
 
-export function Chatter({ timeline, attachments, onSubmit, posting = false }: ChatterProps) {
+export function Chatter({
+  timeline,
+  attachments,
+  onSubmit,
+  posting = false,
+  onUpload,
+  onDelete,
+  uploading = false,
+  onPreview,
+}: ChatterProps) {
   const [text, setText] = useState("");
   const [mode, setMode] = useState("note");
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
   const [filesOpen, setFilesOpen] = useState(false);
+  const [pending, setPending] = useState<File[]>([]);
+  const panelInput = useRef<HTMLInputElement | null>(null);
+  const composerInput = useRef<HTMLInputElement | null>(null);
   const files = attachments ?? [];
 
   const current = MODES.find((m) => m.id === mode) ?? MODES[0];
@@ -68,7 +111,7 @@ export function Chatter({ timeline, attachments, onSubmit, posting = false }: Ch
     const q = query.trim().toLowerCase();
     const rows = q
       ? timeline.filter((e) =>
-          `${e.author_name} ${e.body} ${e.field_label ?? ""} ${e.old_value ?? ""} ${e.new_value ?? ""}`
+          `${e.author_name ?? ""} ${e.body} ${e.field_label ?? ""} ${e.old_value ?? ""} ${e.new_value ?? ""}`
             .toLowerCase()
             .includes(q),
         )
@@ -82,6 +125,11 @@ export function Chatter({ timeline, attachments, onSubmit, posting = false }: Ch
     }
     return [...byDay.entries()];
   }, [timeline, query]);
+
+  function openFile(file: Attachment) {
+    if (onPreview) onPreview(file);
+    else void downloadAttachment(file);
+  }
 
   return (
     <div className="flex h-full min-h-[420px] flex-col border-l border-odoo-border bg-odoo-surface">
@@ -136,13 +184,26 @@ export function Chatter({ timeline, attachments, onSubmit, posting = false }: Ch
 
       {filesOpen && (
         <div className="border-b border-odoo-border-light px-3 pb-2">
+          <input
+            ref={panelInput}
+            type="file"
+            className="hidden"
+            onChange={(e) => {
+              const file = e.target.files?.[0];
+              if (file) onUpload?.(file);
+              e.target.value = "";
+            }}
+          />
           <button
             type="button"
-            className="mb-1 inline-flex h-7 items-center gap-1 rounded-[4px] border border-odoo-border bg-odoo-surface px-2 text-[13px] text-odoo-text transition-colors hover:bg-odoo-bg"
+            disabled={uploading || !onUpload}
+            onClick={() => panelInput.current?.click()}
+            className="mb-1 inline-flex h-7 items-center gap-1 rounded-[4px] border border-odoo-border bg-odoo-surface px-2 text-[13px] text-odoo-text transition-colors hover:bg-odoo-bg disabled:opacity-60"
           >
             <Paperclip className="h-3.5 w-3.5" />
-            Прикрепить файл
+            {uploading ? "Загрузка…" : "Прикрепить файл"}
           </button>
+
           {files.length === 0 ? (
             <p className="py-1 text-[12px] text-odoo-text-light">Вложений пока нет</p>
           ) : (
@@ -153,29 +214,37 @@ export function Chatter({ timeline, attachments, onSubmit, posting = false }: Ch
                   className="flex items-center gap-2 border-t border-odoo-border-light py-1 text-[13px] first:border-t-0"
                 >
                   <Paperclip className="h-3.5 w-3.5 shrink-0 text-odoo-text-light" />
-                  <span
+                  <button
+                    type="button"
+                    onClick={() => openFile(file)}
                     title={`${file.name} · ${formatSize(file.size)}`}
-                    className="min-w-0 flex-1 truncate text-left text-odoo-action"
+                    className="min-w-0 flex-1 truncate text-left text-odoo-action hover:underline"
                   >
                     {file.name}
-                  </span>
+                  </button>
                   <span className="shrink-0 text-[11px] text-odoo-text-muted">
                     {formatSize(file.size)}
                   </span>
                   <button
                     type="button"
                     aria-label={`Скачать ${file.name}`}
+                    onClick={() => void downloadAttachment(file)}
                     className="shrink-0 text-odoo-text-muted hover:text-odoo-text"
                   >
                     <Download className="h-3.5 w-3.5" />
                   </button>
-                  <button
-                    type="button"
-                    aria-label={`Удалить ${file.name}`}
-                    className="shrink-0 text-odoo-text-muted hover:text-odoo-danger"
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  {onDelete && (
+                    <button
+                      type="button"
+                      aria-label={`Удалить ${file.name}`}
+                      onClick={() => {
+                        if (window.confirm(`Удалить вложение «${file.name}»?`)) onDelete(file);
+                      }}
+                      className="shrink-0 text-odoo-text-muted hover:text-odoo-danger"
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </li>
               ))}
             </ul>
@@ -209,9 +278,11 @@ export function Chatter({ timeline, attachments, onSubmit, posting = false }: Ch
         className="border-b border-odoo-border-light px-3 pb-2"
         onSubmit={(event) => {
           event.preventDefault();
-          if (!text.trim() || !onSubmit) return;
-          onSubmit(text.trim());
+          if (!onSubmit) return;
+          if (!text.trim() && pending.length === 0) return;
+          onSubmit(text.trim(), pending);
           setText("");
+          setPending([]);
         }}
       >
         <textarea
@@ -221,18 +292,57 @@ export function Chatter({ timeline, attachments, onSubmit, posting = false }: Ch
           placeholder={current.placeholder}
           className="w-full resize-y rounded-[4px] border border-odoo-border px-2 py-1.5 text-[13px] text-odoo-text outline-none placeholder:text-odoo-text-light focus:border-odoo-primary"
         />
+
+        {pending.length > 0 && (
+          <ul className="mt-1 flex flex-wrap gap-1">
+            {pending.map((file, i) => (
+              <li
+                key={`${file.name}-${i}`}
+                className="inline-flex items-center gap-1 rounded-[4px] border border-odoo-border bg-odoo-bg px-1.5 py-0.5 text-[11px]"
+              >
+                <Paperclip className="h-3 w-3 shrink-0 text-odoo-text-light" />
+                <span className="max-w-[150px] truncate" title={file.name}>
+                  {file.name}
+                </span>
+                <span className="text-odoo-text-muted">{formatSize(file.size)}</span>
+                <button
+                  type="button"
+                  aria-label={`Убрать ${file.name}`}
+                  onClick={() => setPending((list) => list.filter((_, index) => index !== i))}
+                  className="text-odoo-text-muted hover:text-odoo-danger"
+                >
+                  <X className="h-3 w-3" />
+                </button>
+              </li>
+            ))}
+          </ul>
+        )}
+
         <div className="mt-1 flex items-center justify-end gap-1">
+          <input
+            ref={composerInput}
+            type="file"
+            multiple
+            className="hidden"
+            aria-label="Файлы записи"
+            onChange={(e) => {
+              const chosen = Array.from(e.target.files ?? []);
+              if (chosen.length) setPending((list) => [...list, ...chosen]);
+              e.target.value = "";
+            }}
+          />
           <button
             type="button"
             aria-label="Прикрепить файл к записи"
             title="Прикрепить файл к записи"
+            onClick={() => composerInput.current?.click()}
             className="inline-flex h-7 w-7 items-center justify-center rounded-sm text-odoo-text-muted transition-colors hover:bg-odoo-bg hover:text-odoo-text"
           >
             <Paperclip className="h-4 w-4" />
           </button>
           <button
             type="submit"
-            disabled={posting || !text.trim() || !onSubmit}
+            disabled={posting || !onSubmit || (!text.trim() && pending.length === 0)}
             className="h-7 rounded-[4px] bg-odoo-primary px-3 text-[13px] font-medium text-white transition-colors hover:bg-odoo-primary-hover disabled:opacity-50"
           >
             {posting ? "Отправка…" : current.action}
@@ -270,6 +380,7 @@ export function Chatter({ timeline, attachments, onSubmit, posting = false }: Ch
                       - {relativeTime(entry.created_at)}
                     </span>
                   </div>
+
                   {entry.field_label ? (
                     <div className="flex flex-wrap items-baseline gap-1 text-[13px]">
                       <span className="text-odoo-text-light">•</span>
@@ -289,22 +400,31 @@ export function Chatter({ timeline, attachments, onSubmit, posting = false }: Ch
                       </p>
                     )
                   )}
+
                   {entry.attachments && entry.attachments.length > 0 && (
                     <ul className="mt-1 flex flex-wrap items-start gap-1">
-                      {entry.attachments.map((file) => (
-                        <li key={file.id}>
-                          <span
-                            title={`${file.name} · ${formatSize(file.size)}`}
-                            className="inline-flex max-w-[240px] items-center gap-1 rounded-[4px] border border-odoo-border bg-odoo-surface px-1.5 py-0.5 text-[11px] text-odoo-action transition-colors hover:bg-odoo-bg"
-                          >
-                            <Paperclip className="h-3 w-3 shrink-0" />
-                            <span className="truncate">{file.name}</span>
-                            <span className="shrink-0 text-odoo-text-muted">
-                              {formatSize(file.size)}
-                            </span>
-                          </span>
-                        </li>
-                      ))}
+                      {entry.attachments.map((file) =>
+                        previewKind(file) === "image" && file.size <= INLINE_IMAGE_MAX ? (
+                          <li key={file.id}>
+                            <AttachmentThumb file={file} onOpen={() => openFile(file)} />
+                          </li>
+                        ) : (
+                          <li key={file.id}>
+                            <button
+                              type="button"
+                              onClick={() => openFile(file)}
+                              title={`${file.name} · ${formatSize(file.size)}`}
+                              className="inline-flex max-w-[240px] items-center gap-1 rounded-[4px] border border-odoo-border bg-odoo-surface px-1.5 py-0.5 text-[11px] text-odoo-action transition-colors hover:bg-odoo-bg"
+                            >
+                              <Paperclip className="h-3 w-3 shrink-0" />
+                              <span className="truncate">{file.name}</span>
+                              <span className="shrink-0 text-odoo-text-muted">
+                                {formatSize(file.size)}
+                              </span>
+                            </button>
+                          </li>
+                        ),
+                      )}
                     </ul>
                   )}
                 </div>

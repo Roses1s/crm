@@ -1,5 +1,6 @@
 import { useBackups, useLoginAttempts, useRunBackup } from "@/shared/api/hooks";
 import { Button } from "@/shared/ui/button";
+import { formatSize } from "@/shared/ui/file-preview";
 
 function staleMessage(ageHours: number | null): string {
   if (ageHours === null) return "Резервных копий нет. Проверьте, работает ли celery.";
@@ -48,6 +49,32 @@ export function SecurityPage() {
           ))}
           {files.length === 0 && <li className="text-odoo-text-muted">Файлов нет</li>}
         </ul>
+      </div>
+
+      <div>
+        <h2 className="mb-3">Вложения</h2>
+        <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-3">
+          <div className="rounded-md border border-odoo-border-light bg-odoo-surface p-3">
+            <div className="text-xs uppercase text-odoo-text-muted">Файлов</div>
+            <div className="mt-1 text-lg font-semibold">{backups?.storage.files ?? "—"}</div>
+          </div>
+          <div className="rounded-md border border-odoo-border-light bg-odoo-surface p-3">
+            <div className="text-xs uppercase text-odoo-text-muted">Занято</div>
+            <div className="mt-1 text-lg font-semibold">
+              {backups ? formatSize(backups.storage.bytes) : "—"}
+            </div>
+          </div>
+          <div className="rounded-md border border-odoo-border-light bg-odoo-surface p-3">
+            <div className="text-xs uppercase text-odoo-text-muted">Свободно на диске</div>
+            <div className="mt-1 text-lg font-semibold">
+              {backups ? formatSize(backups.storage.free_bytes) : "—"}
+            </div>
+          </div>
+        </div>
+        <p className="mt-2 text-[12px] text-odoo-text-muted">
+          Файлы хранятся в томе на сервере и архивируются отдельной задачей по воскресеньям —
+          дамп базы их не содержит.
+        </p>
       </div>
 
       <div>

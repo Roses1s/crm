@@ -70,3 +70,37 @@ export interface Page<T> {
   previous: number | null;
   results: T[];
 }
+
+/** Загрузка файла: FormData, Content-Type браузер выставит сам (с boundary). */
+export async function apiUpload<T>(path: string, file: File): Promise<T> {
+  const token = getAccessToken();
+  const form = new FormData();
+  form.append("file", file);
+
+  const response = await fetch(`${BASE}${path}`, {
+    method: "POST",
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+    body: form,
+  });
+
+  const payload = await response.json().catch(() => null);
+  if (!response.ok) {
+    const detail =
+      payload && typeof payload === "object" && "detail" in payload
+        ? String((payload as { detail: unknown }).detail)
+        : `Ошибка ${response.status}`;
+    throw new ApiError(response.status, detail);
+  }
+  return payload as T;
+}
+
+/** Файл приходит из закрытой ручки, поэтому его нельзя вставить в <img src>:
+ *  сначала скачиваем с токеном, потом показываем из памяти. */
+export async function apiBlob(path: string): Promise<Blob> {
+  const token = getAccessToken();
+  const response = await fetch(`${BASE}${path}`, {
+    headers: token ? { Authorization: `Bearer ${token}` } : {},
+  });
+  if (!response.ok) throw new ApiError(response.status, "Не удалось получить файл");
+  return response.blob();
+}

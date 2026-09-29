@@ -62,11 +62,18 @@ class Settings(BaseSettings):
     rate_limit_login: str = "10/minute"
     rate_limit_default: str = "300/minute"
 
+    # --- вложения ----------------------------------------------------------
+    attachments_dir: str = "/var/lib/crm/attachments"
+    # Должно совпадать с client_max_body_size в конфиге nginx.
+    max_upload_mb: int = 25
+
     # --- резервные копии ---------------------------------------------------
     backup_dir: str = "/var/backups/crm"
     backup_keep_days: int = 14
     # Копия считается устаревшей, если её нет дольше этого срока.
     backup_stale_hours: int = 36
+    # Файлы вложений архивируются отдельно и реже: дамп базы их не содержит.
+    backup_files_keep: int = 4
 
     # --- наблюдаемость ----------------------------------------------------
     sentry_dsn: str | None = None
