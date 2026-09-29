@@ -13,12 +13,23 @@
 
 name: crm
 
+# Ротация логов: по умолчанию Docker пишет их без ограничений и способен
+# занять весь диск (15 ГБ). Держим по 10 МБ на файл и три файла на контейнер.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
 services:
   # --- база данных ----------------------------------------------------------
   postgres:
     image: postgres:18-alpine
     container_name: crm-postgres
     restart: unless-stopped
+    logging: *default-logging
+    # Предел памяти: контейнер перезапустится сам, а не утянет сервер.
+    mem_limit: 512m
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-crm}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?задайте POSTGRES_PASSWORD в .env}
@@ -44,6 +55,9 @@ services:
     image: valkey/valkey:8-alpine
     container_name: crm-valkey
     restart: unless-stopped
+    logging: *default-logging
+    # Предел памяти: контейнер перезапустится сам, а не утянет сервер.
+    mem_limit: 160m
     command: ["valkey-server", "--appendonly", "yes", "--save", "60", "1"]
     volumes:
       - valkeydata:/data
@@ -61,6 +75,9 @@ services:
     image: crm-backend:latest
     container_name: crm-backend
     restart: unless-stopped
+    logging: *default-logging
+    # Предел памяти: контейнер перезапустится сам, а не утянет сервер.
+    mem_limit: 448m
     env_file: [.env]
     environment:
       POSTGRES_HOST: postgres
@@ -88,6 +105,9 @@ services:
     image: crm-backend:latest
     container_name: crm-worker
     restart: unless-stopped
+    logging: *default-logging
+    # Предел памяти: контейнер перезапустится сам, а не утянет сервер.
+    mem_limit: 320m
     env_file: [.env]
     environment:
       POSTGRES_HOST: postgres
@@ -118,6 +138,9 @@ services:
     image: crm-backend:latest
     container_name: crm-beat
     restart: unless-stopped
+    logging: *default-logging
+    # Предел памяти: контейнер перезапустится сам, а не утянет сервер.
+    mem_limit: 160m
     env_file: [.env]
     environment:
       POSTGRES_HOST: postgres
@@ -143,6 +166,9 @@ services:
     image: crm-frontend:latest
     container_name: crm-frontend
     restart: unless-stopped
+    logging: *default-logging
+    # Предел памяти: контейнер перезапустится сам, а не утянет сервер.
+    mem_limit: 96m
     networks: [edge]
 
   # --- публичный вход -------------------------------------------------------
@@ -150,6 +176,9 @@ services:
     image: nginx:1.27-alpine
     container_name: crm-nginx
     restart: unless-stopped
+    logging: *default-logging
+    # Предел памяти: контейнер перезапустится сам, а не утянет сервер.
+    mem_limit: 96m
     ports:
       - "80:80"
       - "443:443"
