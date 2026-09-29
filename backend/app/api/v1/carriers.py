@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, status
 from sqlalchemy import select
 
-from app.api.deps import CurrentUser, ManagerUser, SessionDep
+from app.api.deps import AdminUser, CurrentUser, ManagerUser, SessionDep
 from app.core.errors import NotFoundError
 from app.models.carrier import Carrier
 from app.schemas.carrier import CarrierCreate, CarrierRead, CarrierUpdate
@@ -36,7 +36,7 @@ async def create_carrier(payload: CarrierCreate, session: SessionDep, _: Manager
 
 @router.patch("/{carrier_id}", response_model=CarrierRead, summary="Изменить")
 async def update_carrier(
-    carrier_id: int, payload: CarrierUpdate, session: SessionDep, _: ManagerUser
+    carrier_id: int, payload: CarrierUpdate, session: SessionDep, _: AdminUser
 ) -> Carrier:
     carrier = await session.get(Carrier, carrier_id)
     if carrier is None:

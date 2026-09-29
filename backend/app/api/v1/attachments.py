@@ -244,9 +244,9 @@ async def delete_attachment(attachment_id: int, session: SessionDep, user: Curre
     if attachment is None:
         raise NotFoundError(f"Вложение {attachment_id} не найдено")
 
-    # Удалять может тот, кто загрузил, либо руководитель.
-    if attachment.uploaded_by_id != user.id and user.role not in (Role.admin, Role.manager):
-        raise PermissionDeniedError("Удалить вложение может автор или руководитель")
+    # Свой файл удаляет автор, чужой — только администратор.
+    if attachment.uploaded_by_id != user.id and user.role != Role.admin:
+        raise PermissionDeniedError("Удалить чужое вложение может только администратор")
 
     Path(attachment.storage_path).unlink(missing_ok=True)
     await session.delete(attachment)

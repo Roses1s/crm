@@ -13,9 +13,10 @@ if TYPE_CHECKING:
 
 
 class Role(enum.StrEnum):
+    """Ролей две: менеджер работает со своей воронкой, админ настраивает систему."""
+
     admin = "admin"
     manager = "manager"
-    operator = "operator"
 
 
 class User(Base, TimestampMixin):
@@ -30,7 +31,7 @@ class User(Base, TimestampMixin):
     # и добавление новой роли не требует ALTER TYPE.
     role: Mapped[Role] = mapped_column(
         Enum(Role, native_enum=False, length=20, values_callable=lambda e: [x.value for x in e]),
-        default=Role.operator,
+        default=Role.manager,
         nullable=False,
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)

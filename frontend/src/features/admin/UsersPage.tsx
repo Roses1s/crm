@@ -5,11 +5,10 @@ import { useCreateUser, useDeleteUser, useUpdateUser, useUsers } from "@/shared/
 import type { Role, User } from "@/shared/types";
 import { Button } from "@/shared/ui/button";
 
-const ROLE_ORDER: Record<string, number> = { admin: 0, manager: 1, operator: 2 };
+const ROLE_ORDER: Record<string, number> = { admin: 0, manager: 1 };
 const ROLE_LABEL: Record<string, string> = {
-  admin: "Admin",
-  manager: "Manager",
-  operator: "Operator",
+  admin: "Администратор",
+  manager: "Менеджер",
 };
 
 interface FormState {
@@ -24,7 +23,7 @@ const emptyForm: FormState = {
   email: "",
   first_name: "",
   last_name: "",
-  role: "operator",
+  role: "manager",
   password: "",
 };
 
@@ -161,9 +160,8 @@ export function UsersPage() {
             value={form.role}
             onChange={(e) => setForm((f) => ({ ...f, role: e.target.value as Role }))}
           >
-            <option value="operator">operator</option>
-            <option value="manager">manager</option>
-            <option value="admin">admin</option>
+            <option value="manager">Менеджер</option>
+            <option value="admin">Администратор</option>
           </select>
         </label>
 

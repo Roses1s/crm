@@ -101,7 +101,7 @@ async def test_my_activities_are_sorted_by_due_date(auth_client: AsyncClient, se
     assert [a["summary"] for a in mine] == ["Сегодня", "Позже"]
 
 
-async def test_operator_cannot_delete_foreign_activity(
+async def test_manager_cannot_delete_foreign_activity(
     client: AsyncClient, auth_client: AsyncClient, seeded: dict
 ) -> None:
     lead_id = seeded["lead"].id  # type: ignore[attr-defined]
@@ -109,7 +109,7 @@ async def test_operator_cannot_delete_foreign_activity(
 
     login = await client.post(
         "/api/v1/auth/login",
-        json={"email": "operator@crmdetroid.ru", "password": TEST_PASSWORD},
+        json={"email": "manager@crmdetroid.ru", "password": TEST_PASSWORD},
     )
     token = login.json()["access_token"]
 

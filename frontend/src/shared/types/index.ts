@@ -1,6 +1,6 @@
 /** Типы повторяют схемы бэкенда (backend/app/schemas). */
 
-export type Role = "admin" | "manager" | "operator";
+export type Role = "admin" | "manager";
 
 export interface User {
   id: number;

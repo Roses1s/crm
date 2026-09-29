@@ -5,7 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter, status
 from sqlalchemy import select
 
-from app.api.deps import CurrentUser, ManagerUser, SessionDep
+from app.api.deps import AdminUser, CurrentUser, SessionDep
 from app.core.errors import NotFoundError
 from app.models.crm import Tag
 from app.schemas.crm import TagCreate, TagRead
@@ -19,7 +19,7 @@ async def list_tags(session: SessionDep, _: CurrentUser) -> list[Tag]:
 
 
 @router.post("", response_model=TagRead, status_code=status.HTTP_201_CREATED, summary="Создать тег")
-async def create_tag(payload: TagCreate, session: SessionDep, _: ManagerUser) -> Tag:
+async def create_tag(payload: TagCreate, session: SessionDep, _: AdminUser) -> Tag:
     tag = Tag(**payload.model_dump())
     session.add(tag)
     await session.commit()
@@ -28,7 +28,7 @@ async def create_tag(payload: TagCreate, session: SessionDep, _: ManagerUser) ->
 
 
 @router.delete("/{tag_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Удалить тег")
-async def delete_tag(tag_id: int, session: SessionDep, _: ManagerUser) -> None:
+async def delete_tag(tag_id: int, session: SessionDep, _: AdminUser) -> None:
     tag = await session.get(Tag, tag_id)
     if tag is None:
         raise NotFoundError(f"Тег {tag_id} не найден")

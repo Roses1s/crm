@@ -89,7 +89,7 @@ async def session(engine) -> AsyncGenerator[AsyncSession, None]:
 
 @pytest.fixture
 async def seeded(session: AsyncSession) -> dict[str, object]:
-    """Минимальный набор данных: админ, оператор, этапы, тег, лид, перевозчик."""
+    """Минимальный набор данных: админ, менеджер, этапы, тег, лид, перевозчик."""
     admin = User(
         email="admin@crmdetroid.ru",
         hashed_password=hash_password(TEST_PASSWORD),
@@ -97,18 +97,18 @@ async def seeded(session: AsyncSession) -> dict[str, object]:
         last_name="Соколов",
         role=Role.admin,
     )
-    operator = User(
-        email="operator@crmdetroid.ru",
+    manager = User(
+        email="manager@crmdetroid.ru",
         hashed_password=hash_password(TEST_PASSWORD),
         first_name="Денис",
         last_name="Кузнецов",
-        role=Role.operator,
+        role=Role.manager,
     )
     new_stage = Stage(name="Новый", sequence=1, color="slate")
     talks_stage = Stage(name="Переговоры", sequence=2, color="blue")
     tag = Tag(name="Крупный клиент", color="green")
     carrier = Carrier(name="ООО «АвтоТрансЛайн»", inn="7447112236")
-    session.add_all([admin, operator, new_stage, talks_stage, tag, carrier])
+    session.add_all([admin, manager, new_stage, talks_stage, tag, carrier])
     await session.flush()
 
     lead = Lead(
@@ -125,7 +125,7 @@ async def seeded(session: AsyncSession) -> dict[str, object]:
 
     return {
         "admin": admin,
-        "operator": operator,
+        "manager": manager,
         "stage_new": new_stage,
         "stage_talks": talks_stage,
         "tag": tag,

@@ -119,7 +119,8 @@ async def update_activity(
 )
 async def delete_activity(activity_id: int, session: SessionDep, user: CurrentUser) -> None:
     activity = await _get_or_404(session, activity_id)
-    if activity.assigned_to_id != user.id and user.role not in (Role.admin, Role.manager):
+    # Своё действие удаляет исполнитель, чужое — только администратор.
+    if activity.assigned_to_id != user.id and user.role != Role.admin:
         raise PermissionDeniedError("Удалить действие может исполнитель или руководитель")
     await session.delete(activity)
     await session.commit()

@@ -36,7 +36,7 @@ async def test_failed_login_is_recorded(client: AsyncClient, seeded: dict[str, o
 async def test_login_attempts_require_admin(client: AsyncClient, seeded: dict[str, object]) -> None:
     login = await client.post(
         "/api/v1/auth/login",
-        json={"email": "operator@crmdetroid.ru", "password": TEST_PASSWORD},
+        json={"email": "manager@crmdetroid.ru", "password": TEST_PASSWORD},
     )
     token = login.json()["access_token"]
     response = await client.get(

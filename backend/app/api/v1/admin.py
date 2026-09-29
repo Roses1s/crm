@@ -10,7 +10,7 @@ from fastapi import APIRouter, status
 from fastapi_cache.decorator import cache
 from sqlalchemy import func, select
 
-from app.api.deps import AdminUser, ManagerUser, SessionDep
+from app.api.deps import AdminUser, SessionDep
 from app.core.config import settings
 from app.core.errors import AppError, NotFoundError
 from app.core.logging import get_logger
@@ -28,7 +28,7 @@ router = APIRouter(prefix="/admin", tags=["администрирование"])
 
 @router.get("/stats", summary="Сводка для дашборда")
 @cache(expire=settings.cache_ttl_seconds)
-async def stats(session: SessionDep, _: ManagerUser) -> dict[str, Any]:
+async def stats(session: SessionDep, _: AdminUser) -> dict[str, Any]:
     """Цифры для дашборда. Ответ кешируется в Valkey на минуту."""
     leads_total = int(
         (
@@ -121,7 +121,7 @@ async def delete_user(user_id: int, session: SessionDep, current: AdminUser) -> 
 
 # --- безопасность ------------------------------------------------------------
 @router.get("/backups", summary="Список резервных копий")
-async def list_backups(_: ManagerUser) -> dict[str, Any]:
+async def list_backups(_: AdminUser) -> dict[str, Any]:
     """Файлы из каталога бэкапов + признак «копия устарела»."""
     directory = Path(settings.backup_dir)
     files = sorted(directory.glob("crm-*.dump"), key=lambda f: f.stat().st_mtime, reverse=True)

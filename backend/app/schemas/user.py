@@ -20,7 +20,7 @@ class UserCreate(BaseModel):
     password: str = Field(min_length=8, max_length=128)
     first_name: str = ""
     last_name: str = ""
-    role: Role = Role.operator
+    role: Role = Role.manager
 
 
 class UserUpdate(BaseModel):

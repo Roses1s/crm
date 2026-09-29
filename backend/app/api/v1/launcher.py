@@ -19,7 +19,7 @@ APPS: list[dict[str, Any]] = [
         "description": "Лиды, воронка продаж и карточки клиентов",
         "icon": "Kanban",
         "route": "/crm",
-        "min_role": Role.operator,
+        "min_role": Role.manager,
     },
     {
         "id": 2,
@@ -28,7 +28,7 @@ APPS: list[dict[str, Any]] = [
         "description": "Перевозки, маршруты и статусы отгрузок",
         "icon": "Package",
         "route": "/shipments",
-        "min_role": Role.operator,
+        "min_role": Role.manager,
     },
     {
         "id": 3,
@@ -37,11 +37,11 @@ APPS: list[dict[str, Any]] = [
         "description": "Отчёты, пользователи, перевозчики, безопасность",
         "icon": "Settings",
         "route": "/admin",
-        "min_role": Role.manager,
+        "min_role": Role.admin,
     },
 ]
 
-RANK = {Role.operator: 0, Role.manager: 1, Role.admin: 2}
+RANK = {Role.manager: 0, Role.admin: 1}
 
 
 @router.get("/apps", summary="Приложения, доступные текущей роли")

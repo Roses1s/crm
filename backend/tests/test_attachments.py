@@ -114,7 +114,7 @@ async def test_attachment_can_be_linked_to_timeline_entry(
     assert [a["name"] for a in entry["attachments"]] == ["act.pdf"]
 
 
-async def test_operator_cannot_delete_foreign_attachment(
+async def test_manager_cannot_delete_foreign_attachment(
     client: AsyncClient, auth_client: AsyncClient, seeded: dict
 ) -> None:
     lead_id = seeded["lead"].id  # type: ignore[attr-defined]
@@ -126,13 +126,13 @@ async def test_operator_cannot_delete_foreign_attachment(
 
     login = await client.post(
         "/api/v1/auth/login",
-        json={"email": "operator@crmdetroid.ru", "password": TEST_PASSWORD},
+        json={"email": "manager@crmdetroid.ru", "password": TEST_PASSWORD},
     )
-    operator_token = login.json()["access_token"]
+    manager_token = login.json()["access_token"]
 
     denied = await client.delete(
         f"/api/v1/crm/attachments/{attachment_id}",
-        headers={"Authorization": f"Bearer {operator_token}"},
+        headers={"Authorization": f"Bearer {manager_token}"},
     )
     assert denied.status_code == 403
 

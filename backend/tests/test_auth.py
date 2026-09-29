@@ -65,10 +65,10 @@ async def test_access_token_is_not_accepted_as_refresh(
     assert response.status_code == 401
 
 
-async def test_operator_cannot_list_users(client: AsyncClient, seeded: dict[str, object]) -> None:
+async def test_manager_cannot_list_users(client: AsyncClient, seeded: dict[str, object]) -> None:
     login = await client.post(
         "/api/v1/auth/login",
-        json={"email": "operator@crmdetroid.ru", "password": TEST_PASSWORD},
+        json={"email": "manager@crmdetroid.ru", "password": TEST_PASSWORD},
     )
     token = login.json()["access_token"]
     response = await client.get("/api/v1/admin/users", headers={"Authorization": f"Bearer {token}"})
