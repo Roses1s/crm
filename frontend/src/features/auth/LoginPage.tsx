@@ -60,7 +60,7 @@ export function LoginPage() {
             {/* Логотип компании; alt пустой — рядом идёт текстовое название. */}
             <img src="/logo.svg" alt="" className="h-14 w-14" />
             <h1 className="mt-4 text-[22px] font-semibold tracking-tight text-[#1b1d21]">
-              Detroid
+              Детроид
             </h1>
             <p className="mt-1 text-[13px] text-[#8a8a94]">Вход в систему</p>
           </div>
