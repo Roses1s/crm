@@ -1,14 +1,12 @@
+import { useSortable } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { Clock3, MoreVertical } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
+
 import { ownerInitials, ownerLabel } from "@/shared/lib/owner";
 import type { Lead } from "@/shared/types";
 import { StarRating } from "./StarRating";
-
-/**
- * Карточка лида на канбан-доске.
- * Drag-and-drop убран: карточки расположены статично, клик открывает лид.
- */
 
 export function LeadCardBody({ lead, menuSpace = false }: { lead: Lead; menuSpace?: boolean }) {
   const title = `${lead.name} — ${lead.inn}`;
@@ -61,44 +59,87 @@ export function LeadCardBody({ lead, menuSpace = false }: { lead: Lead; menuSpac
   );
 }
 
-export function LeadCard({ lead }: { lead: Lead }) {
+/**
+ * Карточка на доске. Перетаскивание включено через dnd-kit: карточку можно
+ * тянуть в другую колонку, этап сохраняется на сервере (см. KanbanPage).
+ */
+export function LeadCard({ lead, isOverlay }: { lead: Lead; isOverlay?: boolean }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
+    id: `lead-${lead.id}`,
+    disabled: isOverlay,
+  });
+  const style = isOverlay
+    ? undefined
+    : {
+        transform: CSS.Translate.toString(transform),
+        transition: isDragging ? undefined : transition,
+      };
+
+  const inner = (
+    <div
+      className={`overflow-hidden border-b border-odoo-border-light bg-odoo-surface px-2.5 py-2 ${
+        isOverlay
+          ? "w-[325px] cursor-grabbing rounded-[4px] border border-odoo-primary shadow-lg"
+          : isDragging
+            ? "cursor-grabbing opacity-25"
+            : "cursor-grab hover:bg-odoo-surface-hover"
+      }`}
+    >
+      <LeadCardBody lead={lead} menuSpace={!isOverlay} />
+    </div>
+  );
+
+  if (isOverlay) return inner;
 
   return (
-    <div className="group relative">
-      <div className="absolute right-1 top-1 z-20">
-        <button
-          type="button"
-          aria-label="Меню карточки"
-          title="Меню"
-          className="rounded-[4px] p-1 text-odoo-text-light opacity-0 hover:bg-odoo-bg hover:text-odoo-text focus:opacity-100 group-hover:opacity-100"
-          onClick={(e) => {
-            e.preventDefault();
-            e.stopPropagation();
-            setMenuOpen((open) => !open);
-          }}
-        >
-          <MoreVertical className="h-4 w-4" />
-        </button>
-        {menuOpen && (
-          <div
-            className="absolute right-0 top-7 min-w-[110px] rounded-[4px] border border-odoo-border bg-odoo-surface py-1 shadow-lg"
-            onClick={(e) => e.stopPropagation()}
+    <div
+      ref={setNodeRef}
+      style={style}
+      {...attributes}
+      {...listeners}
+      className="group relative touch-none"
+      aria-label={`Переместить ${lead.name}`}
+    >
+      {!isDragging && (
+        <div className="absolute right-1 top-1 z-20">
+          <button
+            type="button"
+            aria-label="Меню карточки"
+            title="Меню"
+            className="rounded-[4px] p-1 text-odoo-text-light opacity-0 hover:bg-odoo-bg hover:text-odoo-text focus:opacity-100 group-hover:opacity-100"
+            onPointerDown={(e) => e.stopPropagation()}
+            onClick={(e) => {
+              e.preventDefault();
+              e.stopPropagation();
+              setMenuOpen((open) => !open);
+            }}
           >
-            <Link
-              to={`/crm/leads/${lead.id}`}
-              className="block px-3 py-1.5 text-left text-xs text-odoo-text hover:bg-odoo-bg"
+            <MoreVertical className="h-4 w-4" />
+          </button>
+          {menuOpen && (
+            <div
+              className="absolute right-0 top-7 min-w-[110px] rounded-[4px] border border-odoo-border bg-odoo-surface py-1 shadow-lg"
+              onPointerDown={(e) => e.stopPropagation()}
+              onClick={(e) => e.stopPropagation()}
             >
-              Открыть
-            </Link>
-          </div>
-        )}
-      </div>
-      <Link to={`/crm/leads/${lead.id}`} className="block">
-        <div className="overflow-hidden border-b border-odoo-border-light bg-odoo-surface px-2.5 py-2 hover:bg-odoo-surface-hover">
-          <LeadCardBody lead={lead} menuSpace />
+              <Link
+                to={`/crm/leads/${lead.id}`}
+                className="block px-3 py-1.5 text-left text-xs text-odoo-text hover:bg-odoo-bg"
+              >
+                Открыть
+              </Link>
+            </div>
+          )}
         </div>
-      </Link>
+      )}
+      {isDragging ? (
+        inner
+      ) : (
+        <Link to={`/crm/leads/${lead.id}`} className="block">
+          {inner}
+        </Link>
+      )}
     </div>
   );
 }

@@ -16,6 +16,7 @@ from app.core.security import (
     decode_token,
     verify_password,
 )
+from app.models.security import LoginAttempt
 from app.models.user import User
 from app.schemas.auth import LoginRequest, RefreshRequest, TokenPair
 from app.schemas.user import UserRead
@@ -40,7 +41,19 @@ async def login(request: Request, payload: LoginRequest, session: SessionDep) ->
         await session.execute(select(User).where(User.email == payload.email.lower()))
     ).scalar_one_or_none()
 
-    if user is None or not verify_password(payload.password, user.hashed_password):
+    ok = user is not None and verify_password(payload.password, user.hashed_password)
+    # Каждая попытка попадает в журнал — из него строится раздел «Безопасность».
+    session.add(
+        LoginAttempt(
+            email=payload.email.lower(),
+            ip_address=request.client.host if request.client else "",
+            user_agent=request.headers.get("user-agent", "")[:255],
+            successful=ok,
+        )
+    )
+    await session.commit()
+
+    if not ok or user is None:
         log.warning(
             "auth.login_failed",
             email=payload.email,

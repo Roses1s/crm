@@ -39,7 +39,8 @@ export function ControlPanel({
   pager,
   onNew,
   children,
-  searchable,
+  search,
+  onSearch,
   onSettings,
   createTo,
   view,
@@ -54,8 +55,8 @@ export function ControlPanel({
   pager?: ReactNode;
   onNew?: () => void;
   children?: ReactNode;
-  /** Показывать поисковую строку (в макете она не фильтрует — только вёрстка). */
-  searchable?: boolean;
+  search?: string;
+  onSearch?: (value: string) => void;
   onSettings?: () => void;
   /** Ссылка кнопки «Новый» — вместо мутации просто переход. */
   createTo?: string;
@@ -129,13 +130,15 @@ export function ControlPanel({
             <Settings className="h-4 w-4" />
           </button>
         )}
-        {searchable && (
+        {onSearch && (
           <div className="pointer-events-none order-last flex w-full justify-center md:absolute md:inset-x-0 md:order-none md:w-auto">
             <div className="pointer-events-auto flex h-9 w-full items-stretch overflow-hidden rounded-[3px] border border-odoo-accent-line bg-odoo-surface shadow-xs focus-within:ring-1 focus-within:ring-odoo-accent-line md:w-[min(100%,600px)]">
               <span className="flex items-center pl-3 pr-2">
                 <Search className="h-4 w-4 shrink-0 text-odoo-search-icon" />
               </span>
               <input
+                value={search ?? ""}
+                onChange={(e) => onSearch(e.target.value)}
                 placeholder="Поиск..."
                 aria-label="Поиск лидов"
                 className="min-w-0 flex-1 bg-transparent pr-2 text-[14px] outline-none placeholder:text-odoo-search-placeholder"

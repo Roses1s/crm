@@ -1,5 +1,9 @@
+import { useDroppable } from "@dnd-kit/core";
+import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { MoreHorizontal, Plus } from "lucide-react";
 import { useState } from "react";
+
+import { useDeleteStage, useUpdateStage } from "@/shared/api/hooks";
 import type { Lead, Stage } from "@/shared/types";
 import { LeadCard } from "./LeadCard";
 import { QuickCreate } from "./QuickCreate";
@@ -9,26 +13,36 @@ import { STAGE_COLORS, stageColor } from "./stage-colors";
 const CARDS_PER_COLUMN = 20;
 
 /**
- * Колонка канбана. Зона перетаскивания и мутации этапа убраны:
- * меню этапа открывается, но пункты ничего не меняют.
+ * Колонка канбана: приёмник для перетаскивания карточек и меню управления
+ * этапом (переименовать, закрывающий, цвет, удалить).
  */
 export function Column({
   stage,
   leads,
+  canManage,
   folded,
   onFold,
+  allStages,
 }: {
   stage: Stage;
   leads: Lead[];
+  canManage: boolean;
   folded: boolean;
   onFold: () => void;
+  allStages: Stage[];
 }) {
   const [visible, setVisible] = useState(CARDS_PER_COLUMN);
   const shown = leads.slice(0, visible);
   const hidden = leads.length - shown.length;
+  const { setNodeRef, isOver } = useDroppable({ id: `stage-${stage.id}` });
+  const [editing, setEditing] = useState(false);
+  const [name, setName] = useState(stage.name);
   const [menu, setMenu] = useState(false);
   const [quick, setQuick] = useState(false);
   const color = stageColor(stage.color);
+
+  const patch = useUpdateStage();
+  const remove = useDeleteStage();
 
   if (folded) {
     return (
@@ -50,10 +64,33 @@ export function Column({
       <div className="shrink-0 bg-odoo-column-head px-2.5 pb-2 pt-2">
         <div className="flex items-start justify-between gap-1">
           <div className="min-w-0">
-            <span className="truncate text-[15px] font-semibold leading-5 text-odoo-text">
-              {stage.name}
-              <span className="ml-1 font-normal text-odoo-text-muted">{leads.length}</span>
-            </span>
+            {editing && canManage ? (
+              <input
+                autoFocus
+                className="w-full rounded-[4px] border border-odoo-primary px-1 text-[15px] font-semibold"
+                value={name}
+                onChange={(e) => setName(e.target.value)}
+                onBlur={() => {
+                  setEditing(false);
+                  if (name.trim() && name !== stage.name) {
+                    patch.mutate({ id: stage.id, name: name.trim() });
+                  }
+                }}
+                onKeyDown={(e) => {
+                  if (e.key === "Enter") (e.target as HTMLInputElement).blur();
+                }}
+              />
+            ) : (
+              <button
+                type="button"
+                className="truncate text-[15px] font-semibold leading-5 text-odoo-text"
+                onDoubleClick={() => canManage && setEditing(true)}
+                title={canManage ? "Двойной клик — переименовать" : undefined}
+              >
+                {stage.name}
+                <span className="ml-1 font-normal text-odoo-text-muted">{leads.length}</span>
+              </button>
+            )}
           </div>
           <div className="relative flex items-center gap-px">
             <button
@@ -74,50 +111,77 @@ export function Column({
             >
               ‹
             </button>
-            <button
-              type="button"
-              className="inline-flex h-6 w-6 items-center justify-center rounded-sm text-odoo-text-muted hover:bg-odoo-surface-sunken hover:text-odoo-text"
-              onClick={() => setMenu((v) => !v)}
-              title="Меню этапа"
-              aria-label="Меню этапа"
-            >
-              <MoreHorizontal className="h-4 w-4" />
-            </button>
-            {menu && (
-              <div className="absolute right-0 top-6 z-20 min-w-[200px] rounded-[4px] border border-odoo-border bg-odoo-surface py-1 shadow-lg">
+            {canManage && (
+              <>
                 <button
                   type="button"
-                  className="block w-full px-3 py-1.5 text-left text-sm hover:bg-odoo-bg"
-                  onClick={() => setMenu(false)}
+                  className="inline-flex h-6 w-6 items-center justify-center rounded-sm text-odoo-text-muted hover:bg-odoo-surface-sunken hover:text-odoo-text"
+                  onClick={() => setMenu((v) => !v)}
+                  title="Меню этапа"
+                  aria-label="Меню этапа"
                 >
-                  Переименовать
+                  <MoreHorizontal className="h-4 w-4" />
                 </button>
-                <button
-                  type="button"
-                  className="block w-full px-3 py-1.5 text-left text-sm hover:bg-odoo-bg"
-                  onClick={() => setMenu(false)}
-                >
-                  {stage.is_closed ? "Открывающий этап" : "Закрывающий этап"}
-                </button>
-                <div className="flex flex-wrap gap-1 px-3 py-1.5">
-                  {Object.keys(STAGE_COLORS).map((c) => (
+                {menu && (
+                  <div className="absolute right-0 top-6 z-20 min-w-[200px] rounded-[4px] border border-odoo-border bg-odoo-surface py-1 shadow-lg">
                     <button
-                      key={c}
                       type="button"
-                      className="h-4 w-4 rounded-full border border-white shadow-sm"
-                      style={{ background: STAGE_COLORS[c] }}
-                      onClick={() => setMenu(false)}
-                    />
-                  ))}
-                </div>
-                <button
-                  type="button"
-                  className="block w-full px-3 py-1.5 text-left text-sm text-odoo-danger hover:bg-odoo-bg"
-                  onClick={() => setMenu(false)}
-                >
-                  Удалить
-                </button>
-              </div>
+                      className="block w-full px-3 py-1.5 text-left text-sm hover:bg-odoo-bg"
+                      onClick={() => {
+                        setMenu(false);
+                        setEditing(true);
+                      }}
+                    >
+                      Переименовать
+                    </button>
+                    <button
+                      type="button"
+                      className="block w-full px-3 py-1.5 text-left text-sm hover:bg-odoo-bg"
+                      onClick={() => {
+                        setMenu(false);
+                        patch.mutate({ id: stage.id, is_closed: !stage.is_closed });
+                      }}
+                    >
+                      {stage.is_closed ? "Открывающий этап" : "Закрывающий этап"}
+                    </button>
+                    <div className="flex flex-wrap gap-1 px-3 py-1.5">
+                      {Object.keys(STAGE_COLORS).map((c) => (
+                        <button
+                          key={c}
+                          type="button"
+                          aria-label={`Цвет ${c}`}
+                          className="h-4 w-4 rounded-full border border-white shadow-sm"
+                          style={{ background: STAGE_COLORS[c] }}
+                          onClick={() => {
+                            setMenu(false);
+                            patch.mutate({ id: stage.id, color: c });
+                          }}
+                        />
+                      ))}
+                    </div>
+                    <button
+                      type="button"
+                      className="block w-full px-3 py-1.5 text-left text-sm text-odoo-danger hover:bg-odoo-bg"
+                      onClick={() => {
+                        setMenu(false);
+                        const other = allStages.find((s) => s.id !== stage.id);
+                        if (leads.length && !other) return;
+                        const question = leads.length
+                          ? `Удалить этап «${stage.name}»? ${leads.length} лид(ов) переедут в «${other?.name}».`
+                          : `Удалить этап «${stage.name}»?`;
+                        if (window.confirm(question)) {
+                          remove.mutate({
+                            id: stage.id,
+                            fallbackId: leads.length ? other?.id : undefined,
+                          });
+                        }
+                      }}
+                    >
+                      Удалить
+                    </button>
+                  </div>
+                )}
+              </>
             )}
           </div>
         </div>
@@ -133,10 +197,18 @@ export function Column({
           </div>
         </div>
       </div>
-      <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain bg-odoo-surface [scrollbar-gutter:stable]">
-        {shown.map((lead) => (
-          <LeadCard key={lead.id} lead={lead} />
-        ))}
+      <div
+        ref={setNodeRef}
+        className={`flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain [scrollbar-gutter:stable] ${isOver ? "bg-odoo-drop" : "bg-odoo-surface"}`}
+      >
+        <SortableContext
+          items={shown.map((l) => `lead-${l.id}`)}
+          strategy={verticalListSortingStrategy}
+        >
+          {shown.map((lead) => (
+            <LeadCard key={lead.id} lead={lead} />
+          ))}
+        </SortableContext>
         {hidden > 0 && (
           <button
             type="button"
@@ -147,7 +219,7 @@ export function Column({
           </button>
         )}
         {quick ? (
-          <QuickCreate onDone={() => setQuick(false)} />
+          <QuickCreate stageId={stage.id} onDone={() => setQuick(false)} />
         ) : (
           <button
             type="button"

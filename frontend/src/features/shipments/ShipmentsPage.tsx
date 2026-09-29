@@ -1,4 +1,4 @@
-import { Link } from "react-router-dom";
+import { Link, useSearchParams } from "react-router-dom";
 import { AppShell, Breadcrumb, Toolbar } from "@/app/layout/AppShell";
 import { useShipments } from "@/shared/api/hooks";
 import { Button } from "@/shared/ui/button";
@@ -11,15 +11,26 @@ const STATUS: Record<string, { label: string; cls: string }> = {
   cancelled: { label: "Отменена", cls: "bg-odoo-tag-red-bg text-odoo-tag-red-text" },
 };
 
-/** Список заявок из API. Фильтр по статусу пока визуальный. */
+/** Список заявок. Фильтр по статусу — в адресной строке и в запросе к API. */
 export function ShipmentsPage() {
-  const { data: shipments = [] } = useShipments();
+  const [params, setParams] = useSearchParams();
+  const status = params.get("status") ?? "";
+  const { data: shipments = [], isLoading } = useShipments(status);
 
   return (
     <AppShell>
       <Breadcrumb items={["Заявки", "Все"]} />
       <Toolbar>
-        <select className="rounded-[4px] border border-odoo-border px-2 py-1 text-sm text-odoo-text-muted">
+        <select
+          className="rounded-[4px] border border-odoo-border px-2 py-1 text-sm text-odoo-text-muted"
+          value={status}
+          onChange={(e) => {
+            const next = new URLSearchParams(params);
+            if (e.target.value) next.set("status", e.target.value);
+            else next.delete("status");
+            setParams(next);
+          }}
+        >
           <option value="">Все статусы</option>
           {Object.entries(STATUS).map(([k, v]) => (
             <option key={k} value={k}>
@@ -45,6 +56,13 @@ export function ShipmentsPage() {
             </tr>
           </thead>
           <tbody>
+            {!isLoading && shipments.length === 0 && (
+              <tr>
+                <td colSpan={6} className="p-6 text-center text-odoo-text-muted">
+                  Заявок нет. Нажмите «Создать», чтобы добавить первую.
+                </td>
+              </tr>
+            )}
             {shipments.map((s) => {
               const st = STATUS[s.status] ?? STATUS.new;
               return (

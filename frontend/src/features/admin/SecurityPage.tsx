@@ -1,41 +1,80 @@
-import { backups, loginAttempts } from "@/shared/mock/security";
+import { useBackups, useLoginAttempts, useRunBackup } from "@/shared/api/hooks";
 import { Button } from "@/shared/ui/button";
 
+function staleMessage(ageHours: number | null): string {
+  if (ageHours === null) return "Резервных копий нет. Проверьте, работает ли celery.";
+  const days = Math.floor(ageHours / 24);
+  const age = days >= 1 ? `${days} дн.` : `${Math.round(ageHours)} ч.`;
+  return `Последней копии уже ${age}. Похоже, ночная задача не отрабатывает — проверьте celery.`;
+}
+
 export function SecurityPage() {
+  const { data: backups } = useBackups();
+  const { data: attempts = [] } = useLoginAttempts();
+  const run = useRunBackup();
+
+  const files = backups?.results ?? [];
+
   return (
     <div className="space-y-8">
       <div>
         <div className="mb-3 flex items-center justify-between">
           <h2>Бэкапы</h2>
-          <Button>Запустить бэкап</Button>
+          <Button onClick={() => run.mutate()} disabled={run.isPending}>
+            {run.isPending ? "Запуск…" : "Запустить бэкап"}
+          </Button>
         </div>
+
+        {run.isSuccess && (
+          <p className="mb-3 text-sm text-odoo-text-muted">
+            Задача поставлена в очередь — файл появится через несколько секунд.
+          </p>
+        )}
+        {backups?.is_stale && (
+          <p
+            role="alert"
+            className="mb-3 rounded-[4px] border border-odoo-danger/40 bg-odoo-danger/10 px-3 py-2 text-sm text-odoo-danger"
+          >
+            {staleMessage(backups.age_hours)}
+          </p>
+        )}
+
         <ul className="text-sm">
-          {backups.map((b) => (
-            <li key={b.name} className="border-b border-odoo-border-light py-1.5">
-              {b.name} <span className="text-odoo-text-muted">({Math.round(b.size / 1024)} КБ)</span>
+          {files.map((file) => (
+            <li key={file.name} className="border-b border-odoo-border-light py-1.5">
+              {file.name}{" "}
+              <span className="text-odoo-text-muted">({Math.round(file.size / 1024)} КБ)</span>
             </li>
           ))}
-          {backups.length === 0 && <li className="text-odoo-text-muted">Файлов нет</li>}
+          {files.length === 0 && <li className="text-odoo-text-muted">Файлов нет</li>}
         </ul>
       </div>
+
       <div>
-        <h2 className="mb-3">Попытки входа (axes)</h2>
+        <h2 className="mb-3">Неудачные попытки входа</h2>
         <table className="w-full text-sm">
           <thead className="bg-odoo-bg text-xs uppercase text-odoo-text-muted">
             <tr>
               <th className="p-2 text-left">Пользователь</th>
               <th className="p-2 text-left">IP</th>
-              <th className="p-2 text-left">Время</th>
+              <th className="p-2 text-left">Последняя попытка</th>
               <th className="p-2 text-left">Неудач</th>
             </tr>
           </thead>
           <tbody>
-            {loginAttempts.map((a) => (
-              <tr key={a.id} className="border-b border-odoo-border-light">
-                <td className="p-2">{a.username}</td>
-                <td className="p-2">{a.ip_address}</td>
-                <td className="p-2">{a.attempt_time}</td>
-                <td className="p-2">{a.failures}</td>
+            {attempts.length === 0 && (
+              <tr>
+                <td colSpan={4} className="p-4 text-center text-odoo-text-muted">
+                  Неудачных попыток не было
+                </td>
+              </tr>
+            )}
+            {attempts.map((attempt) => (
+              <tr key={attempt.id} className="border-b border-odoo-border-light">
+                <td className="p-2">{attempt.username}</td>
+                <td className="p-2">{attempt.ip_address}</td>
+                <td className="p-2">{attempt.attempt_time.slice(0, 19).replace("T", " ")}</td>
+                <td className="p-2">{attempt.failures}</td>
               </tr>
             ))}
           </tbody>

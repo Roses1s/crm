@@ -3,6 +3,7 @@
 from app.db.base import Base
 from app.models.carrier import Carrier
 from app.models.crm import Lead, Stage, Tag, lead_tags
+from app.models.security import LoginAttempt
 from app.models.shipment import Shipment, ShipmentStatus, TransportType
 from app.models.timeline import Attachment, EntryType, TimelineEntry
 from app.models.user import Role, User
@@ -13,6 +14,7 @@ __all__ = [
     "Carrier",
     "EntryType",
     "Lead",
+    "LoginAttempt",
     "Role",
     "Shipment",
     "ShipmentStatus",

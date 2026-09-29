@@ -12,10 +12,15 @@ const TAG_STYLES: Record<string, string> = {
   orange: "bg-odoo-tag-orange-bg text-odoo-tag-orange-text",
 };
 
-export function TagsField({ all, initial }: { all: Tag[]; initial: number[] }) {
-  // Локальное состояние — чтобы пилюли можно было добавлять и убирать
-  // визуально. Никуда не сохраняется.
-  const [value, setValue] = useState<number[]>(initial);
+export function TagsField({
+  all,
+  value,
+  onChange,
+}: {
+  all: Tag[];
+  value: number[];
+  onChange: (ids: number[]) => void;
+}) {
   const [open, setOpen] = useState(false);
   const selected = all.filter((t) => value.includes(t.id));
   const rest = all.filter((t) => !value.includes(t.id));
@@ -38,7 +43,7 @@ export function TagsField({ all, initial }: { all: Tag[]; initial: number[] }) {
             type="button"
             aria-label={`Убрать тег ${tag.name}`}
             className="opacity-60 transition-opacity hover:opacity-100"
-            onClick={() => setValue((v) => v.filter((x) => x !== tag.id))}
+            onClick={() => onChange(value.filter((x) => x !== tag.id))}
           >
             <X className="h-3 w-3" />
           </button>
@@ -69,7 +74,7 @@ export function TagsField({ all, initial }: { all: Tag[]; initial: number[] }) {
                 type="button"
                 className="block w-full px-3 py-1 text-left text-[13px] text-odoo-text hover:bg-odoo-bg"
                 onClick={() => {
-                  setValue((v) => [...v, tag.id]);
+                  onChange([...value, tag.id]);
                   setOpen(false);
                 }}
               >

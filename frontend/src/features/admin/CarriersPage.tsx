@@ -1,8 +1,38 @@
-import { useCarriers } from "@/shared/api/hooks";
+import { useState } from "react";
+
+import { ApiError } from "@/shared/api/client";
+import { useCarriers, useCreateCarrier } from "@/shared/api/hooks";
 import { Button } from "@/shared/ui/button";
 
 export function CarriersPage() {
   const { data: carriers = [] } = useCarriers();
+  const create = useCreateCarrier();
+  const [name, setName] = useState("");
+  const [inn, setInn] = useState("");
+  const [error, setError] = useState("");
+
+  function submit() {
+    setError("");
+    if (!name.trim() || !inn.trim()) {
+      setError("Заполните название и ИНН");
+      return;
+    }
+    create.mutate(
+      { name: name.trim(), inn: inn.trim() },
+      {
+        onSuccess: () => {
+          setName("");
+          setInn("");
+        },
+        onError: (err) =>
+          setError(
+            err instanceof ApiError && err.status === 422
+              ? "ИНН должен содержать 10 или 12 цифр"
+              : "Не удалось добавить перевозчика",
+          ),
+      },
+    );
+  }
 
   return (
     <div>
@@ -11,13 +41,21 @@ export function CarriersPage() {
         <input
           className="rounded-[4px] border border-odoo-border px-2 py-1.5 text-sm"
           placeholder="Название"
+          value={name}
+          onChange={(e) => setName(e.target.value)}
         />
         <input
           className="rounded-[4px] border border-odoo-border px-2 py-1.5 text-sm"
           placeholder="ИНН"
+          inputMode="numeric"
+          value={inn}
+          onChange={(e) => setInn(e.target.value)}
         />
-        <Button>Добавить</Button>
+        <Button onClick={submit} disabled={create.isPending}>
+          {create.isPending ? "Добавление…" : "Добавить"}
+        </Button>
       </div>
+      {error && <p className="mb-3 text-sm text-odoo-danger">{error}</p>}
       <table className="w-full text-sm">
         <thead className="bg-odoo-bg text-xs uppercase text-odoo-text-muted">
           <tr>

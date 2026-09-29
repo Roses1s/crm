@@ -62,6 +62,12 @@ class Settings(BaseSettings):
     rate_limit_login: str = "10/minute"
     rate_limit_default: str = "300/minute"
 
+    # --- резервные копии ---------------------------------------------------
+    backup_dir: str = "/var/backups/crm"
+    backup_keep_days: int = 14
+    # Копия считается устаревшей, если её нет дольше этого срока.
+    backup_stale_hours: int = 36
+
     # --- наблюдаемость ----------------------------------------------------
     sentry_dsn: str | None = None
     sentry_traces_sample_rate: float = 0.1

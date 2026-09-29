@@ -23,7 +23,7 @@ from app.models.timeline import Attachment
 configure_logging()
 log = get_logger("worker")
 
-BACKUP_DIR = Path("/var/backups/crm")
+BACKUP_DIR = Path(settings.backup_dir)
 
 _sync_engine = create_engine(settings.alembic_dsn, pool_pre_ping=True, future=True)
 SyncSession: sessionmaker[Session] = sessionmaker(bind=_sync_engine, expire_on_commit=False)
@@ -46,7 +46,7 @@ def backup_database() -> dict[str, Any]:
         log.error("backup.failed", stderr=result.stderr.strip()[:500])
         return {"ok": False, "error": result.stderr.strip()[:500]}
 
-    cutoff = datetime.now(tz=UTC) - timedelta(days=14)
+    cutoff = datetime.now(tz=UTC) - timedelta(days=settings.backup_keep_days)
     removed = 0
     for old in BACKUP_DIR.glob("crm-*.dump"):
         if datetime.fromtimestamp(old.stat().st_mtime, tz=UTC) < cutoff:

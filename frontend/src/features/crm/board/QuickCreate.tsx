@@ -1,19 +1,39 @@
 import { useState } from "react";
 
+import { ApiError } from "@/shared/api/client";
+import { useCreateLead } from "@/shared/api/hooks";
+
 /**
- * Быстрое создание лида в колонке. В макете форма ничего не отправляет —
- * это только вёрстка полей и кнопок.
+ * Быстрое создание лида прямо в колонке: название + ИНН.
+ * Контрольную сумму ИНН проверяет сервер — его сообщение и показываем.
  */
-export function QuickCreate({ onDone }: { onDone: () => void }) {
+export function QuickCreate({ stageId, onDone }: { stageId: number; onDone: () => void }) {
   const [name, setName] = useState("");
   const [inn, setInn] = useState("");
+  const create = useCreateLead();
+
+  const error = create.error
+    ? create.error instanceof ApiError && create.error.status === 422
+      ? "Проверьте ИНН: нужно 10 или 12 цифр с верной контрольной суммой"
+      : "Не удалось создать лид"
+    : "";
 
   return (
     <form
       className="border-b border-odoo-border-light bg-odoo-surface px-2.5 py-2"
-      onSubmit={(e) => {
-        e.preventDefault();
-        onDone();
+      onSubmit={(event) => {
+        event.preventDefault();
+        if (!name.trim() || !inn.trim()) return;
+        create.mutate(
+          { name: name.trim(), inn: inn.trim(), stage_id: stageId },
+          {
+            onSuccess: () => {
+              setName("");
+              setInn("");
+              onDone();
+            },
+          },
+        );
       }}
     >
       <div className="border border-odoo-accent-line bg-odoo-surface shadow-xs focus-within:ring-1 focus-within:ring-odoo-accent-line">
@@ -35,10 +55,10 @@ export function QuickCreate({ onDone }: { onDone: () => void }) {
       <div className="mt-2 flex items-center gap-2">
         <button
           type="submit"
-          className="rounded-[3px] bg-odoo-primary px-3 py-1 text-[12px] font-medium text-white hover:opacity-90 disabled:opacity-60"
-          disabled={!name.trim() || !inn.trim()}
+          className="rounded-[3px] bg-odoo-primary px-3 py-1 text-[12px] font-medium text-white hover:opacity-90 disabled:cursor-wait disabled:opacity-60"
+          disabled={create.isPending || !name.trim() || !inn.trim()}
         >
-          Добавить
+          {create.isPending ? "Добавление…" : "Добавить"}
         </button>
         <button
           type="button"
@@ -48,6 +68,7 @@ export function QuickCreate({ onDone }: { onDone: () => void }) {
           Отмена
         </button>
       </div>
+      {error && <p className="mt-1.5 text-[11px] text-odoo-danger">{error}</p>}
     </form>
   );
 }
