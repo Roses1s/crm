@@ -1,3 +1,4 @@
+README.md
 pyproject.toml
 app/__init__.py
 app/cli.py
@@ -29,6 +30,7 @@ app/db/session.py
 app/models/__init__.py
 app/models/carrier.py
 app/models/crm.py
+app/models/security.py
 app/models/shipment.py
 app/models/timeline.py
 app/models/user.py
@@ -49,4 +51,5 @@ crm_backend.egg-info/top_level.txt
 tests/test_auth.py
 tests/test_health.py
 tests/test_leads.py
+tests/test_security_admin.py
 tests/test_shipments.py

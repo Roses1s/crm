@@ -12,6 +12,8 @@ dependencies = [
     "gunicorn>=23.0",
     "sqlalchemy[asyncio]>=2.0.36",
     "asyncpg>=0.30",
+    # Синхронный драйвер для задач Celery (там нет цикла событий).
+    "psycopg[binary]>=3.2",
     "alembic>=1.14",
     "pydantic[email]>=2.10",
     "pydantic-settings>=2.7",

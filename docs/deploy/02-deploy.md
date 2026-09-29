@@ -326,6 +326,11 @@ Nginx стартовал раньше, чем бэкенд. Достаточно
 После правки: `docker compose down -v && docker compose up -d` (том пустой,
 терять нечего).
 
+**Воркер или beat перезапускаются по кругу.**
+`docker compose logs worker --tail 20`. Если там `ModuleNotFoundError` —
+не хватает пакета в образе; после `git pull` нужна пересборка:
+`docker compose build backend && docker compose up -d`.
+
 **Бэкенд перезапускается по кругу.**
 `docker compose logs backend --tail 50`. Чаще всего: не заполнен `.env`
 (`SECRET_KEY`, `POSTGRES_PASSWORD`) или база ещё инициализируется — подождите минуту.

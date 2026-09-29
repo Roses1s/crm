@@ -13,8 +13,8 @@ from pathlib import Path
 from typing import Any
 
 from celery import shared_task
-from sqlalchemy import create_engine, select
-from sqlalchemy.orm import Session, sessionmaker
+from sqlalchemy import Engine, create_engine, select
+from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.logging import configure_logging, get_logger
@@ -26,8 +26,16 @@ log = get_logger("worker")
 
 BACKUP_DIR = Path(settings.backup_dir)
 
-_sync_engine = create_engine(settings.alembic_dsn, pool_pre_ping=True, future=True)
-SyncSession: sessionmaker[Session] = sessionmaker(bind=_sync_engine, expire_on_commit=False)
+# Движок создаётся при первом обращении, а не при импорте модуля: иначе любая
+# проблема с драйвером роняла бы воркер ещё до старта Celery.
+_sync_engine: Engine | None = None
+
+
+def _session() -> Session:
+    global _sync_engine
+    if _sync_engine is None:
+        _sync_engine = create_engine(settings.sync_dsn, pool_pre_ping=True, future=True)
+    return Session(_sync_engine, expire_on_commit=False)
 
 
 @shared_task(name="app.worker.tasks.backup_database")
@@ -42,7 +50,7 @@ def backup_database() -> dict[str, Any]:
         return {"ok": False, "error": "pg_dump не установлен в образе"}
 
     result = subprocess.run(
-        ["pg_dump", "--format=custom", "--no-owner", "--file", str(target), settings.alembic_dsn],
+        ["pg_dump", "--format=custom", "--no-owner", "--file", str(target), settings.plain_dsn],
         capture_output=True,
         text=True,
         check=False,
@@ -72,7 +80,7 @@ def backup_database() -> dict[str, Any]:
 def send_call_reminders() -> dict[str, Any]:
     """Напоминания о звонках, запланированных на сегодня."""
     today = date.today()
-    with SyncSession() as session:
+    with _session() as session:
         leads = list(
             session.execute(
                 select(Lead).where(
@@ -98,7 +106,7 @@ def send_call_reminders() -> dict[str, Any]:
 def cleanup_orphan_attachments() -> dict[str, Any]:
     """Удаляет записи о файлах, которых уже нет на диске."""
     removed = 0
-    with SyncSession() as session:
+    with _session() as session:
         attachments = list(session.execute(select(Attachment)).scalars())
         for attachment in attachments:
             if attachment.storage_path and not Path(attachment.storage_path).exists():

@@ -90,9 +90,19 @@ class Settings(BaseSettings):
 
     @computed_field  # type: ignore[prop-decorator]
     @property
-    def alembic_dsn(self) -> str:
-        """Синхронный DSN — Alembic и psql понимают его напрямую."""
-        return self.sqlalchemy_dsn.replace("+asyncpg", "").replace("+aiosqlite", "")
+    def sync_dsn(self) -> str:
+        """Синхронный DSN для Celery: asyncpg там не работает, нужен psycopg 3."""
+        return self.sqlalchemy_dsn.replace("+asyncpg", "+psycopg").replace("+aiosqlite", "")
+
+    @computed_field  # type: ignore[prop-decorator]
+    @property
+    def plain_dsn(self) -> str:
+        """URL без драйвера — его понимают pg_dump и psql."""
+        return (
+            self.sqlalchemy_dsn.replace("+asyncpg", "")
+            .replace("+psycopg", "")
+            .replace("+aiosqlite", "")
+        )
 
     @computed_field  # type: ignore[prop-decorator]
     @property
