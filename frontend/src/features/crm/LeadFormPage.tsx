@@ -15,7 +15,6 @@ import { ApiError } from "@/shared/api/client";
 import {
   useAddNote,
   useArchiveLead,
-  useCanManage,
   useCreateLead,
   useDeleteAttachment,
   useLead,
@@ -56,7 +55,6 @@ export function LeadFormPage() {
 function LeadForm({ id }: { id?: string }) {
   const isNew = id === "new" || !id;
   const navigate = useNavigate();
-  const canManage = useCanManage();
 
   const { data: lead, isLoading } = useLead(id);
   const { data: stages = [] } = useStages();
@@ -280,7 +278,7 @@ function LeadForm({ id }: { id?: string }) {
           />
         }
         cog={
-          !isNew && canManage ? (
+          !isNew ? (
             <span className="relative inline-flex">
               <button
                 type="button"
@@ -385,7 +383,7 @@ function LeadForm({ id }: { id?: string }) {
                       >
                         Создать заявку
                       </Link>
-                      {canManage && (
+                      {
                         <button
                           type="button"
                           disabled={archiveLead.isPending}
@@ -394,7 +392,7 @@ function LeadForm({ id }: { id?: string }) {
                         >
                           Проигрыш
                         </button>
-                      )}
+                      }
                     </>
                   ) : null
                 }

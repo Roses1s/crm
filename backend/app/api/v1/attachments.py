@@ -82,6 +82,19 @@ async def _save_upload(upload: UploadFile, target: Path) -> int:
     return written
 
 
+async def _store_upload(file: UploadFile, relative_dir: Path) -> tuple[str, str, int, Path]:
+    """Проверяет тип, сохраняет файл и возвращает имя, тип, размер и путь.
+
+    Общая часть загрузки для лидов и заявок: различается только папка,
+    остальное — белый список расширений, лимит размера и обезличенное имя.
+    """
+    original = Path(file.filename or "file").name  # отбрасываем путь целиком
+    suffix = _checked_suffix(original)
+    target = _storage_root() / relative_dir / f"{uuid.uuid4().hex}{suffix}"
+    size = await _save_upload(file, target)
+    return original[:255], ALLOWED_EXTENSIONS[suffix], size, target
+
+
 def _checked_suffix(original: str) -> str:
     """Проверяет расширение по белому списку и возвращает его в нижнем регистре."""
     suffix = Path(original).suffix.lower()
@@ -131,21 +144,16 @@ async def upload_attachment(
         if entry is None or entry.lead_id != lead_id:
             raise NotFoundError(f"Запись ленты {entry_id} не найдена")
 
-    original = Path(file.filename or "file").name  # отбрасываем путь целиком
-    suffix = _checked_suffix(original)
-    relative = Path(str(lead_id)) / f"{uuid.uuid4().hex}{suffix}"
-    target = _storage_root() / relative
-
-    size = await _save_upload(file, target)
+    # Тип берём из расширения, а не из заголовка клиента: заголовку верить нельзя.
+    name, content_type, size, target = await _store_upload(file, Path(str(lead_id)))
 
     attachment = Attachment(
         lead_id=lead_id,
         entry_id=entry_id,
         uploaded_by_id=user.id,
-        name=original[:255],
+        name=name,
         size=size,
-        # Тип берём из расширения, а не из заголовка клиента: заголовку верить нельзя.
-        content_type=ALLOWED_EXTENSIONS[suffix],
+        content_type=content_type,
         storage_path=str(target),
     )
     session.add(attachment)
@@ -194,13 +202,10 @@ async def upload_shipment_attachment(
     # Документы заявки доступны тому же кругу, что и сама заявка.
     await get_lead_or_404(session, shipment.lead_id, user)
 
-    original = Path(file.filename or "file").name  # отбрасываем путь целиком
-    suffix = _checked_suffix(original)
     # Файлы заявки лежат в отдельной папке, чтобы не смешиваться с файлами лида.
-    relative = Path("shipments") / str(shipment_id) / f"{uuid.uuid4().hex}{suffix}"
-    target = _storage_root() / relative
-
-    size = await _save_upload(file, target)
+    name, content_type, size, target = await _store_upload(
+        file, Path("shipments") / str(shipment_id)
+    )
 
     attachment = Attachment(
         # lead_id заполняем от заявки: так файл не потеряется при подсчёте
@@ -208,9 +213,9 @@ async def upload_shipment_attachment(
         lead_id=shipment.lead_id,
         shipment_id=shipment_id,
         uploaded_by_id=user.id,
-        name=original[:255],
+        name=name,
         size=size,
-        content_type=ALLOWED_EXTENSIONS[suffix],
+        content_type=content_type,
         storage_path=str(target),
     )
     session.add(attachment)

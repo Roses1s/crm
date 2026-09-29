@@ -25,7 +25,8 @@ export function TagsField({
   const selected = all.filter((t) => value.includes(t.id));
   const rest = all.filter((t) => !value.includes(t.id));
 
-  if (all.length === 0) return <span className="text-odoo-text-light">Теги не настроены</span>;
+  if (all.length === 0)
+    return <span className="text-odoo-text-light">Теги не настроены</span>;
 
   return (
     <div className="relative flex flex-wrap items-center gap-1">

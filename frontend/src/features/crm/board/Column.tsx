@@ -22,14 +22,12 @@ const CARDS_PER_COLUMN = 20;
 export function Column({
   stage,
   leads,
-  canManage,
   folded,
   onFold,
   allStages,
 }: {
   stage: Stage;
   leads: Lead[];
-  canManage: boolean;
   folded: boolean;
   onFold: () => void;
   allStages: Stage[];
@@ -78,7 +76,7 @@ export function Column({
       <div className="shrink-0 bg-odoo-column-head px-2.5 pb-2 pt-2">
         <div className="flex items-start justify-between gap-1">
           <div className="min-w-0">
-            {editing && canManage ? (
+            {editing ? (
               <input
                 autoFocus
                 className="w-full rounded-[4px] border border-odoo-primary px-1 text-[15px] font-semibold"
@@ -98,8 +96,8 @@ export function Column({
               <button
                 type="button"
                 className="truncate text-[15px] font-semibold leading-5 text-odoo-text"
-                onDoubleClick={() => canManage && setEditing(true)}
-                title={canManage ? "Двойной клик — переименовать" : undefined}
+                onDoubleClick={() => setEditing(true)}
+                title="Двойной клик — переименовать"
               >
                 {stage.name}
                 <span className="ml-1 font-normal text-odoo-text-muted">
@@ -127,7 +125,7 @@ export function Column({
             >
               ‹
             </button>
-            {canManage && (
+            {
               <>
                 <button
                   type="button"
@@ -196,7 +194,7 @@ export function Column({
                   </div>
                 )}
               </>
-            )}
+            }
           </div>
         </div>
         <div className="mt-1 flex items-center gap-2">

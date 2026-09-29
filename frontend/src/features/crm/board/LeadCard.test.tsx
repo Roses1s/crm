@@ -20,7 +20,9 @@ describe("Карточка лида на канбане", () => {
   it("показывает название, ИНН, контакт и тег", () => {
     renderWithProviders(<LeadCardBody lead={LEAD} />);
 
-    expect(screen.getByRole("heading", { name: /Уралпромснаб/ })).toBeInTheDocument();
+    expect(
+      screen.getByRole("heading", { name: /Уралпромснаб/ }),
+    ).toBeInTheDocument();
     expect(screen.getByText(/7451234565/)).toBeInTheDocument();
     expect(screen.getByText("Громов Сергей")).toBeInTheDocument();
     expect(screen.getByText("Крупный клиент")).toBeInTheDocument();

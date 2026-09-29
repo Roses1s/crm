@@ -18,15 +18,12 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { AppShell, ControlPanel } from "@/app/layout/AppShell";
-import {
-  BoardBanner,
-  BoardSuggestions,
-} from "@/features/crm/board/BoardSwitcher";
+import { BoardBanner } from "@/features/crm/board/BoardBanner";
+import { BoardSuggestions } from "@/features/crm/board/BoardSuggestions";
 import { Column } from "@/features/crm/board/Column";
 import { LeadCard } from "@/features/crm/board/LeadCard";
 import { LeadListView } from "@/features/crm/list/LeadListView";
 import {
-  useCanManage,
   useCreateStage,
   useLeads,
   useMe,
@@ -54,7 +51,6 @@ const dropAnimation: DropAnimation = {
  */
 export function KanbanPage() {
   const [params, setParams] = useSearchParams();
-  const canManage = useCanManage();
 
   const search = params.get("search") ?? "";
   // Админ может открыть доску сотрудника: номер лежит в адресе (?board=N).
@@ -230,7 +226,6 @@ export function KanbanPage() {
                 key={stage.id}
                 stage={stage}
                 leads={columnLeads(stage.id)}
-                canManage={canManage}
                 folded={folded.includes(stage.id)}
                 onFold={() =>
                   setFolded((f) =>
@@ -247,7 +242,7 @@ export function KanbanPage() {
             </DragOverlay>
           </DndContext>
 
-          {canManage && (
+          {
             <div className="w-[200px] shrink-0 p-2">
               {newStage ? (
                 <input
@@ -284,7 +279,7 @@ export function KanbanPage() {
                 </button>
               )}
             </div>
-          )}
+          }
         </div>
       )}
     </AppShell>

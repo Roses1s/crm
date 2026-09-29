@@ -2,7 +2,8 @@ import { screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
-import { BoardBanner, BoardSuggestions } from "@/features/crm/board/BoardSwitcher";
+import { BoardBanner } from "@/features/crm/board/BoardBanner";
+import { BoardSuggestions } from "@/features/crm/board/BoardSuggestions";
 import { renderWithProviders } from "@/test/utils";
 
 const USERS = [
@@ -28,14 +29,18 @@ vi.mock("@/shared/api/hooks", () => ({ useUsers: () => ({ data: USERS }) }));
 
 describe("Доски сотрудников", () => {
   it("молчит, пока в поиске меньше двух букв", () => {
-    renderWithProviders(<BoardSuggestions query="К" boardUserId={null} onPick={vi.fn()} />);
+    renderWithProviders(
+      <BoardSuggestions query="К" boardUserId={null} onPick={vi.fn()} />,
+    );
     expect(screen.queryByText("Сотрудники")).not.toBeInTheDocument();
   });
 
   it("предлагает сотрудника по фамилии и отдаёт его номер", async () => {
     const user = userEvent.setup();
     const onPick = vi.fn();
-    renderWithProviders(<BoardSuggestions query="кузн" boardUserId={null} onPick={onPick} />);
+    renderWithProviders(
+      <BoardSuggestions query="кузн" boardUserId={null} onPick={onPick} />,
+    );
 
     expect(screen.queryByText("Петрова Ольга")).not.toBeInTheDocument();
     await user.click(screen.getByText("Кузнецов Денис"));
@@ -47,7 +52,9 @@ describe("Доски сотрудников", () => {
     const onLeave = vi.fn();
     renderWithProviders(<BoardBanner boardUserId={2} onLeave={onLeave} />);
 
-    expect(screen.getByText(/Доска сотрудника: Кузнецов Денис/)).toBeInTheDocument();
+    expect(
+      screen.getByText(/Доска сотрудника: Кузнецов Денис/),
+    ).toBeInTheDocument();
     await user.click(screen.getByText(/вернуться к своей/));
     expect(onLeave).toHaveBeenCalled();
   });

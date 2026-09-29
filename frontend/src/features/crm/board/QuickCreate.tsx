@@ -7,7 +7,13 @@ import { useCreateLead } from "@/shared/api/hooks";
  * Быстрое создание лида прямо в колонке: название + ИНН.
  * Контрольную сумму ИНН проверяет сервер — его сообщение и показываем.
  */
-export function QuickCreate({ stageId, onDone }: { stageId: number; onDone: () => void }) {
+export function QuickCreate({
+  stageId,
+  onDone,
+}: {
+  stageId: number;
+  onDone: () => void;
+}) {
   const [name, setName] = useState("");
   const [inn, setInn] = useState("");
   const create = useCreateLead();

@@ -39,10 +39,11 @@ class Stage(Base, TimestampMixin):
     __tablename__ = "stages"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    # Владелец доски. Пусто только у этапов, оставшихся от общей воронки
-    # до перехода на личные доски: миграция раздаёт их администратору.
-    owner_id: Mapped[int | None] = mapped_column(
-        ForeignKey("users.id", ondelete="CASCADE"), index=True
+    # Владелец доски. Этап без хозяина никуда не попадёт, поэтому поле
+    # обязательное: временная «пустота» нужна была только на время перехода
+    # с общей воронки на личные доски.
+    owner_id: Mapped[int] = mapped_column(
+        ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     sequence: Mapped[int] = mapped_column(Integer, default=0, nullable=False, index=True)

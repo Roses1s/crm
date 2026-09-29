@@ -1,5 +1,11 @@
 /** Приоритет лида звёздами. В макете звёзды некликабельны по умолчанию. */
-export function StarRating({ value, onChange }: { value: number; onChange?: (n: number) => void }) {
+export function StarRating({
+  value,
+  onChange,
+}: {
+  value: number;
+  onChange?: (n: number) => void;
+}) {
   return (
     <span
       className="text-[15px] leading-none tracking-tight text-odoo-warning"
