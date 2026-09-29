@@ -139,7 +139,7 @@ export function LoginPage() {
       </main>
 
       <footer className="pb-7 text-center text-[12px] text-[#b4b4ba]">
-        CRM Детроид · транспортная компания
+        Детроид · транспортная компания
       </footer>
     </div>
   );
