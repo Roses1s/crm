@@ -1,8 +1,11 @@
 # Инструкция для агента (и для нового разработчика)
 
-**Начните с [`docs/PROJECT.md`](docs/PROJECT.md)** — там весь контекст: архитектура,
-доменная модель, API, эксплуатация, подводные камни и журнал решений.
-Этот файл — короткая выжимка, чтобы не наделать типовых ошибок в первые минуты.
+**Порядок чтения:** этот файл → [`docs/PROJECT.md`](docs/PROJECT.md) (весь контекст:
+архитектура, доменная модель, API, эксплуатация, подводные камни, журнал решений)
+→ [`docs/STATUS.md`](docs/STATUS.md) (на каком этапе проект сейчас и что менялось).
+
+Готовый текст для передачи проекта новому агенту — в
+[`docs/MASTER_PROMPT.md`](docs/MASTER_PROMPT.md).
 
 ## Проект в пяти строках
 
@@ -63,6 +66,8 @@ git fetch origin arena/01a0eb16-crm && git reset FETCH_HEAD && git status --shor
 | Документ | О чём |
 |---|---|
 | [`docs/PROJECT.md`](docs/PROJECT.md) | полный контекст проекта |
+| [`docs/STATUS.md`](docs/STATUS.md) | текущее состояние, что сделано и что дальше |
+| [`docs/MASTER_PROMPT.md`](docs/MASTER_PROMPT.md) | промт для передачи проекта новому агенту |
 | [`docs/deploy/01-server-setup.md`](docs/deploy/01-server-setup.md) | сервер с нуля: SSH, UFW, Docker, TLS |
 | [`docs/deploy/02-deploy.md`](docs/deploy/02-deploy.md) | деплой, `deploy.sh`, чек-лист, частые проблемы |
 | [`backend/README.md`](backend/README.md) | API, модели, активности, вложения, Celery |
