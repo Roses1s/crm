@@ -15,7 +15,13 @@ export function Breadcrumb({ items }: { items: string[] }) {
       {items.map((item, i) => (
         <span key={`${item}-${i}`}>
           {i > 0 && <span className="mx-1.5 text-odoo-text-light">/</span>}
-          <span className={i === items.length - 1 ? "font-medium text-odoo-text" : ""}>{item}</span>
+          <span
+            className={
+              i === items.length - 1 ? "font-medium text-odoo-text" : ""
+            }
+          >
+            {item}
+          </span>
         </span>
       ))}
     </div>
@@ -41,6 +47,7 @@ export function ControlPanel({
   children,
   search,
   onSearch,
+  searchSuggestions,
   onSettings,
   createTo,
   view,
@@ -57,6 +64,8 @@ export function ControlPanel({
   children?: ReactNode;
   search?: string;
   onSearch?: (value: string) => void;
+  /** Выпадающий список под строкой поиска (например, доски сотрудников). */
+  searchSuggestions?: ReactNode;
   onSettings?: () => void;
   /** Ссылка кнопки «Новый» — вместо мутации просто переход. */
   createTo?: string;
@@ -86,18 +95,29 @@ export function ControlPanel({
           </button>
         )}
         {crumbs && crumbs.length > 0 ? (
-          <nav aria-label="Хлебные крошки" className="flex min-w-0 flex-col justify-center">
+          <nav
+            aria-label="Хлебные крошки"
+            className="flex min-w-0 flex-col justify-center"
+          >
             {crumbs.length > 1 && (
               <span className="flex items-center gap-1 text-[11px] leading-[14px]">
                 {crumbs.slice(0, -1).map((crumb, i) => (
-                  <span key={`${crumb.label}-${i}`} className="flex items-center gap-1">
+                  <span
+                    key={`${crumb.label}-${i}`}
+                    className="flex items-center gap-1"
+                  >
                     {i > 0 && <span className="text-odoo-text-light">/</span>}
                     {crumb.to ? (
-                      <Link to={crumb.to} className="text-odoo-action hover:underline">
+                      <Link
+                        to={crumb.to}
+                        className="text-odoo-action hover:underline"
+                      >
                         {crumb.label}
                       </Link>
                     ) : (
-                      <span className="text-odoo-text-muted">{crumb.label}</span>
+                      <span className="text-odoo-text-muted">
+                        {crumb.label}
+                      </span>
                     )}
                   </span>
                 ))}
@@ -111,12 +131,16 @@ export function ControlPanel({
             </span>
           </nav>
         ) : (
-          <span className="text-[14px] font-medium leading-none text-odoo-text">{title}</span>
+          <span className="text-[14px] font-medium leading-none text-odoo-text">
+            {title}
+          </span>
         )}
         {status}
         {stats && (
           <div className="pointer-events-none absolute inset-x-0 hidden justify-center lg:flex">
-            <div className="pointer-events-auto flex items-center gap-2">{stats}</div>
+            <div className="pointer-events-auto flex items-center gap-2">
+              {stats}
+            </div>
           </div>
         )}
         {onSettings && (
@@ -132,26 +156,31 @@ export function ControlPanel({
         )}
         {onSearch && (
           <div className="pointer-events-none order-last flex w-full justify-center md:absolute md:inset-x-0 md:order-none md:w-auto">
-            <div className="pointer-events-auto flex h-9 w-full items-stretch overflow-hidden rounded-[3px] border border-odoo-accent-line bg-odoo-surface shadow-xs focus-within:ring-1 focus-within:ring-odoo-accent-line md:w-[min(100%,600px)]">
-              <span className="flex items-center pl-3 pr-2">
-                <Search className="h-4 w-4 shrink-0 text-odoo-search-icon" />
-              </span>
-              <input
-                value={search ?? ""}
-                onChange={(e) => onSearch(e.target.value)}
-                placeholder="Поиск..."
-                aria-label="Поиск лидов"
-                className="min-w-0 flex-1 bg-transparent pr-2 text-[14px] outline-none placeholder:text-odoo-search-placeholder"
-              />
-              <button
-                type="button"
-                className="flex w-9 shrink-0 items-center justify-center border-l border-odoo-search-divider text-odoo-search-action hover:bg-odoo-search-action-hover"
-                onClick={onSettings}
-                title="Параметры поиска"
-                aria-label="Параметры поиска"
-              >
-                <ChevronDown className="h-4 w-4" />
-              </button>
+            <div className="pointer-events-auto relative w-full md:w-[min(100%,600px)]">
+              <div className="flex h-9 w-full items-stretch overflow-hidden rounded-[3px] border border-odoo-accent-line bg-odoo-surface shadow-xs focus-within:ring-1 focus-within:ring-odoo-accent-line">
+                <span className="flex items-center pl-3 pr-2">
+                  <Search className="h-4 w-4 shrink-0 text-odoo-search-icon" />
+                </span>
+                <input
+                  value={search ?? ""}
+                  onChange={(e) => onSearch(e.target.value)}
+                  placeholder="Поиск..."
+                  aria-label="Поиск лидов"
+                  className="min-w-0 flex-1 bg-transparent pr-2 text-[14px] outline-none placeholder:text-odoo-search-placeholder"
+                />
+                {onSettings && (
+                  <button
+                    type="button"
+                    className="flex w-9 shrink-0 items-center justify-center border-l border-odoo-search-divider text-odoo-search-action hover:bg-odoo-search-action-hover"
+                    onClick={onSettings}
+                    title="Параметры поиска"
+                    aria-label="Параметры поиска"
+                  >
+                    <ChevronDown className="h-4 w-4" />
+                  </button>
+                )}
+              </div>
+              {searchSuggestions}
             </div>
           </div>
         )}

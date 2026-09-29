@@ -16,7 +16,10 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { AppShell, ControlPanel } from "@/app/layout/AppShell";
-import { BoardSwitcher } from "@/features/crm/board/BoardSwitcher";
+import {
+  BoardBanner,
+  BoardSuggestions,
+} from "@/features/crm/board/BoardSwitcher";
 import { Column } from "@/features/crm/board/Column";
 import { LeadCard } from "@/features/crm/board/LeadCard";
 import { LeadListView } from "@/features/crm/list/LeadListView";
@@ -149,18 +152,26 @@ export function KanbanPage() {
         view={view}
         onView={(v) => setFilter("view", v === "list" ? "list" : "")}
         count={view === "list" ? leads.length : undefined}
+        searchSuggestions={
+          isAdmin ? (
+            <BoardSuggestions
+              query={searchInput}
+              boardUserId={boardUserId}
+              onPick={(userId) => {
+                // Строку поиска очищаем: на чужой доске отбор по фамилии
+                // сотрудника не нужен.
+                setSearchInput("");
+                setFilter("board", String(userId));
+              }}
+            />
+          ) : undefined
+        }
       ></ControlPanel>
 
-      {isAdmin && (
-        <BoardSwitcher
+      {boardUserId !== null && (
+        <BoardBanner
           boardUserId={boardUserId}
-          query={searchInput}
-          onChange={(userId) => {
-            // После перехода на доску строку поиска очищаем: иначе на чужой
-            // доске остался бы отбор по фамилии сотрудника.
-            if (userId) setSearchInput("");
-            setFilter("board", userId ? String(userId) : "");
-          }}
+          onLeave={() => setFilter("board", "")}
         />
       )}
 

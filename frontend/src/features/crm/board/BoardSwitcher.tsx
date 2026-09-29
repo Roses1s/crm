@@ -1,26 +1,24 @@
 import { LayoutGrid, X } from "lucide-react";
-import { useMemo } from "react";
+import { useMemo, useState } from "react";
 
 import { useUsers } from "@/shared/api/hooks";
 
 /**
- * Доски сотрудников глазами администратора.
- *
- * Отдельного поля нет: админ набирает фамилию в обычной строке поиска, а тут
- * появляется подсказка «Открыть доску». Когда доска выбрана, на её месте
- * висит плашка с именем владельца — иначе легко забыть, что смотришь чужое.
+ * Подбор сотрудников по тому, что админ набрал в строке поиска.
+ * Возвращает готовый выпадающий список — он показывается прямо под полем.
  */
-export function BoardSwitcher({
-  boardUserId,
+export function BoardSuggestions({
   query,
-  onChange,
+  boardUserId,
+  onPick,
 }: {
-  boardUserId: number | null;
   query: string;
-  onChange: (userId: number | null) => void;
+  boardUserId: number | null;
+  onPick: (userId: number) => void;
 }) {
   const { data: users = [] } = useUsers();
-  const current = users.find((u) => u.id === boardUserId);
+  // Закрытие «крестиком» не должно возвращаться, пока не изменится запрос.
+  const [dismissed, setDismissed] = useState("");
 
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -30,43 +28,71 @@ export function BoardSwitcher({
       .filter((u) =>
         `${u.last_name} ${u.first_name} ${u.email}`.toLowerCase().includes(q),
       )
-      .slice(0, 4);
+      .slice(0, 5);
   }, [users, query, boardUserId]);
 
-  if (current) {
-    return (
-      <div className="flex items-center gap-2 border-b border-odoo-border-light bg-odoo-surface px-3 py-1.5">
-        <span className="rounded-[3px] bg-odoo-accent-soft px-2 py-0.5 text-[12px] font-medium text-odoo-action">
-          Доска сотрудника:{" "}
-          {`${current.last_name} ${current.first_name}`.trim() || current.email}
+  if (matches.length === 0 || dismissed === query.trim()) return null;
+
+  return (
+    <div className="absolute inset-x-0 top-full z-50 mt-1 overflow-hidden rounded-[3px] border border-odoo-border bg-odoo-surface shadow-lg">
+      <div className="flex items-center justify-between border-b border-odoo-border-light px-3 py-1">
+        <span className="text-[11px] uppercase tracking-wide text-odoo-text-muted">
+          Сотрудники
         </span>
         <button
           type="button"
-          onClick={() => onChange(null)}
-          className="inline-flex items-center gap-1 text-[12px] text-odoo-text-muted hover:text-odoo-text"
+          aria-label="Скрыть подсказку"
+          onClick={() => setDismissed(query.trim())}
+          className="text-odoo-text-muted hover:text-odoo-text"
         >
-          <X className="h-3.5 w-3.5" /> вернуться к своей
+          <X className="h-3.5 w-3.5" />
         </button>
       </div>
-    );
-  }
-
-  if (matches.length === 0) return null;
-
-  return (
-    <div className="flex flex-wrap items-center gap-2 border-b border-odoo-border-light bg-odoo-surface px-3 py-1.5">
-      <span className="text-[12px] text-odoo-text-muted">Открыть доску:</span>
       {matches.map((u) => (
         <button
           key={u.id}
           type="button"
-          onClick={() => onChange(u.id)}
-          className="inline-flex items-center gap-1 rounded-[3px] border border-odoo-border px-2 py-0.5 text-[12px] text-odoo-action transition-colors hover:bg-odoo-bg"
+          onClick={() => onPick(u.id)}
+          className="flex w-full items-center gap-2 px-3 py-1.5 text-left text-sm text-odoo-text hover:bg-odoo-bg"
         >
-          <LayoutGrid className="h-3.5 w-3.5" />
-          {`${u.last_name} ${u.first_name}`.trim() || u.email}
+          <LayoutGrid className="h-3.5 w-3.5 shrink-0 text-odoo-text-muted" />
+          <span className="min-w-0 flex-1 truncate">
+            {`${u.last_name} ${u.first_name}`.trim() || u.email}
+          </span>
+          <span className="shrink-0 text-[11px] text-odoo-text-muted">
+            открыть доску
+          </span>
         </button>
       ))}
+    </div>
+  );
+}
+
+/** Плашка «вы на чужой доске» — иначе легко забыть, чьи карточки смотришь. */
+export function BoardBanner({
+  boardUserId,
+  onLeave,
+}: {
+  boardUserId: number;
+  onLeave: () => void;
+}) {
+  const { data: users = [] } = useUsers();
+  const current = users.find((u) => u.id === boardUserId);
+  if (!current) return null;
+
+  return (
+    <div className="flex items-center gap-2 border-b border-odoo-border-light bg-odoo-surface px-3 py-1.5">
+      <span className="rounded-[3px] bg-odoo-accent-soft px-2 py-0.5 text-[12px] font-medium text-odoo-action">
+        Доска сотрудника:{" "}
+        {`${current.last_name} ${current.first_name}`.trim() || current.email}
+      </span>
+      <button
+        type="button"
+        onClick={onLeave}
+        className="inline-flex items-center gap-1 text-[12px] text-odoo-text-muted hover:text-odoo-text"
+      >
+        <X className="h-3.5 w-3.5" /> вернуться к своей
+      </button>
     </div>
   );
 }
