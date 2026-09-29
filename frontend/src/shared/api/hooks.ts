@@ -8,8 +8,6 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type {
-  Activity,
-  ActivityType,
   Attachment,
   Carrier,
   DashboardStats,
@@ -61,8 +59,6 @@ export const keys = {
   attachments: (id: string | number) => ["attachments", String(id)] as const,
   shipmentAttachments: (id: string | number) =>
     ["shipment-attachments", String(id)] as const,
-  activities: (id: string | number) => ["activities", String(id)] as const,
-  myActivities: ["activities", "my"] as const,
   carriers: ["carriers"] as const,
   users: ["users"] as const,
   stats: ["stats"] as const,
@@ -321,74 +317,6 @@ export function useAddNote(id: string | undefined) {
       }),
     onSuccess: () =>
       void qc.invalidateQueries({ queryKey: keys.timeline(id ?? "") }),
-  });
-}
-
-// --- активности --------------------------------------------------------------
-export interface ActivityPayload {
-  type: ActivityType;
-  summary: string;
-  due_date: string;
-  note?: string;
-}
-
-export function useLeadActivities(id: string | number | undefined) {
-  return useQuery({
-    queryKey: keys.activities(id ?? "new"),
-    queryFn: () => api<Activity[]>(`/crm/leads/${id}/activities`),
-    enabled: Boolean(id) && id !== "new",
-  });
-}
-
-export function useMyActivities() {
-  return useQuery({
-    queryKey: keys.myActivities,
-    queryFn: () => api<Activity[]>("/crm/activities/my"),
-  });
-}
-
-function invalidateActivities(
-  qc: ReturnType<typeof useQueryClient>,
-  leadId?: string | number,
-) {
-  void qc.invalidateQueries({ queryKey: keys.activities(leadId ?? "") });
-  void qc.invalidateQueries({ queryKey: keys.myActivities });
-  // Часики на карточках канбана берут состояние из самого лида.
-  void qc.invalidateQueries({ queryKey: ["leads"] });
-  void qc.invalidateQueries({ queryKey: keys.lead(leadId ?? "") });
-  void qc.invalidateQueries({ queryKey: keys.timeline(leadId ?? "") });
-}
-
-export function useCreateActivity(leadId: string | number | undefined) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (body: ActivityPayload) =>
-      api<Activity>(`/crm/leads/${leadId}/activities`, {
-        method: "POST",
-        body,
-      }),
-    onSuccess: () => invalidateActivities(qc, leadId),
-  });
-}
-
-export function useCompleteActivity(leadId: string | number | undefined) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (id: number) =>
-      api<Activity>(`/crm/activities/${id}`, {
-        method: "PATCH",
-        body: { is_done: true },
-      }),
-    onSuccess: () => invalidateActivities(qc, leadId),
-  });
-}
-
-export function useDeleteActivity(leadId: string | number | undefined) {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (id: number) =>
-      api<void>(`/crm/activities/${id}`, { method: "DELETE" }),
-    onSuccess: () => invalidateActivities(qc, leadId),
   });
 }
 

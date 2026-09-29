@@ -17,7 +17,6 @@ class EntryType(enum.StrEnum):
     note = "note"
     history = "history"
     message = "message"
-    activity = "activity"
 
 
 class TimelineEntry(Base, TimestampMixin):

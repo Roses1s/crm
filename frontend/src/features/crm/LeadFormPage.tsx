@@ -3,9 +3,14 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { AppShell, ControlPanel } from "@/app/layout/AppShell";
-import { ActivityPanel } from "@/features/crm/lead-form/ActivityPanel";
 import { TagsField } from "@/features/crm/lead-form/TagsField";
-import { empty, normalized, toForm, toPayload, type FormState } from "@/features/crm/lead-form/form-state";
+import {
+  empty,
+  normalized,
+  toForm,
+  toPayload,
+  type FormState,
+} from "@/features/crm/lead-form/form-state";
 import { ApiError } from "@/shared/api/client";
 import {
   useAddNote,
@@ -94,7 +99,9 @@ function LeadForm({ id }: { id?: string }) {
     }
   }, [isNew, stages, form.stage_id]);
 
-  const dirty = isNew ? form.name.trim() !== "" : normalized(form) !== normalized(pristine);
+  const dirty = isNew
+    ? form.name.trim() !== ""
+    : normalized(form) !== normalized(pristine);
   const saving = createLead.isPending || updateLead.isPending;
 
   // Предупреждение браузера при уходе со страницы с несохранёнными правками.
@@ -111,7 +118,8 @@ function LeadForm({ id }: { id?: string }) {
 
   function describe(err: unknown, fallback: string): string {
     if (err instanceof ApiError) {
-      if (err.status === 422) return "Проверьте поля: ИНН должен быть из 10 или 12 цифр с верной контрольной суммой";
+      if (err.status === 422)
+        return "Проверьте поля: ИНН должен быть из 10 или 12 цифр с верной контрольной суммой";
       if (err.status === 403) return "Недостаточно прав для этого действия";
       return err.message;
     }
@@ -128,7 +136,8 @@ function LeadForm({ id }: { id?: string }) {
 
     if (isNew) {
       createLead.mutate(payload, {
-        onSuccess: (created) => navigate(`/crm/leads/${created.id}`, { replace: true }),
+        onSuccess: (created) =>
+          navigate(`/crm/leads/${created.id}`, { replace: true }),
         onError: (err) => setError(describe(err, "Не удалось создать лид")),
       });
     } else {
@@ -154,7 +163,12 @@ function LeadForm({ id }: { id?: string }) {
 
   function archive() {
     if (!lead) return;
-    if (!window.confirm(`Пометить лид «${lead.name}» проигранным? Он уйдёт в архив.`)) return;
+    if (
+      !window.confirm(
+        `Пометить лид «${lead.name}» проигранным? Он уйдёт в архив.`,
+      )
+    )
+      return;
     archiveLead.mutate(lead.id, {
       onSuccess: () => navigate("/crm"),
       onError: (err) => setError(describe(err, "Не удалось архивировать лид")),
@@ -169,7 +183,8 @@ function LeadForm({ id }: { id?: string }) {
     updateLead.mutate(
       { stage_id: stageId },
       {
-        onSuccess: (updated) => setPristine((p) => ({ ...p, stage_id: updated.stage_id })),
+        onSuccess: (updated) =>
+          setPristine((p) => ({ ...p, stage_id: updated.stage_id })),
         onError: (err) => {
           set("stage_id", pristine.stage_id);
           setError(describe(err, "Не удалось изменить этап"));
@@ -204,7 +219,10 @@ function LeadForm({ id }: { id?: string }) {
             <tbody>
               {shipments.length === 0 && (
                 <tr>
-                  <td colSpan={3} className="px-4 py-6 text-center text-odoo-text-muted lg:px-6">
+                  <td
+                    colSpan={3}
+                    className="px-4 py-6 text-center text-odoo-text-muted lg:px-6"
+                  >
                     Пока нет заявок по этому лиду.
                   </td>
                 </tr>
@@ -215,14 +233,19 @@ function LeadForm({ id }: { id?: string }) {
                   className="border-b border-odoo-border-light hover:bg-odoo-surface-hover"
                 >
                   <td className="px-2 py-1 pl-4 lg:pl-6">
-                    <Link className="text-odoo-action hover:underline" to={`/shipments/${s.id}`}>
+                    <Link
+                      className="text-odoo-action hover:underline"
+                      to={`/shipments/${s.id}`}
+                    >
                       {s.id}
                     </Link>
                   </td>
                   <td className="truncate px-2 py-1" title={s.route}>
                     {s.route}
                   </td>
-                  <td className="truncate px-2 py-1 pr-4 lg:pr-6">{s.status}</td>
+                  <td className="truncate px-2 py-1 pr-4 lg:pr-6">
+                    {s.status}
+                  </td>
                 </tr>
               ))}
             </tbody>
@@ -244,9 +267,17 @@ function LeadForm({ id }: { id?: string }) {
     <AppShell>
       <ControlPanel
         onNew={() => navigate("/crm/leads/new")}
-        crumbs={[{ label: "Лиды", to: "/crm" }, { label: form.name || "Новый лид" }]}
+        crumbs={[
+          { label: "Лиды", to: "/crm" },
+          { label: form.name || "Новый лид" },
+        ]}
         status={
-          <FormStatusIndicator dirty={dirty} saving={saving} onSave={save} onDiscard={discard} />
+          <FormStatusIndicator
+            dirty={dirty}
+            saving={saving}
+            onSave={save}
+            onDiscard={discard}
+          />
         }
         cog={
           !isNew && canManage ? (
@@ -292,7 +323,9 @@ function LeadForm({ id }: { id?: string }) {
               <FileText className="h-4 w-4 text-odoo-text-muted" />
               <span className="flex flex-col items-start leading-[13px]">
                 <span className="text-[12px] text-odoo-text">Все заявки</span>
-                <span className="text-[11px] text-odoo-text-muted">{shipments.length}</span>
+                <span className="text-[11px] text-odoo-text-muted">
+                  {shipments.length}
+                </span>
               </span>
             </span>
           ) : null
@@ -308,7 +341,9 @@ function LeadForm({ id }: { id?: string }) {
                   type="button"
                   aria-label="Предыдущий лид"
                   disabled={!pager.prev_id}
-                  onClick={() => pager.prev_id && navigate(`/crm/leads/${pager.prev_id}`)}
+                  onClick={() =>
+                    pager.prev_id && navigate(`/crm/leads/${pager.prev_id}`)
+                  }
                   className="inline-flex w-7 items-center justify-center text-odoo-text-muted transition-colors hover:bg-odoo-bg disabled:opacity-40"
                 >
                   <ChevronLeft className="h-4 w-4" />
@@ -317,7 +352,9 @@ function LeadForm({ id }: { id?: string }) {
                   type="button"
                   aria-label="Следующий лид"
                   disabled={!pager.next_id}
-                  onClick={() => pager.next_id && navigate(`/crm/leads/${pager.next_id}`)}
+                  onClick={() =>
+                    pager.next_id && navigate(`/crm/leads/${pager.next_id}`)
+                  }
                   className="inline-flex w-7 items-center justify-center border-l border-odoo-border text-odoo-text-muted transition-colors hover:bg-odoo-bg disabled:opacity-40"
                 >
                   <ChevronRight className="h-4 w-4" />
@@ -419,12 +456,17 @@ function LeadForm({ id }: { id?: string }) {
                               <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-odoo-primary text-[9px] font-semibold text-white">
                                 {ownerAvatar}
                               </span>
-                              <span className="truncate" title={lead?.assigned_to_email ?? owner}>
+                              <span
+                                className="truncate"
+                                title={lead?.assigned_to_email ?? owner}
+                              >
                                 {owner}
                               </span>
                             </span>
                           ) : (
-                            <span className="pt-[2px] text-odoo-text-light">Не назначен</span>
+                            <span className="pt-[2px] text-odoo-text-light">
+                              Не назначен
+                            </span>
                           )}
                         </Field>
                       </InnerGroup>
@@ -437,27 +479,39 @@ function LeadForm({ id }: { id?: string }) {
                               type="number"
                               className="max-w-[11ch] text-right"
                               value={form.credit_limit}
-                              onChange={(e) => set("credit_limit", e.target.value)}
+                              onChange={(e) =>
+                                set("credit_limit", e.target.value)
+                              }
                             />
                             <span className="text-odoo-text-muted">₽</span>
                           </span>
                         </Field>
-                        <Field label="Дата первого звонка" htmlFor="lead-first-call">
+                        <Field
+                          label="Дата первого звонка"
+                          htmlFor="lead-first-call"
+                        >
                           <OdooInput
                             id="lead-first-call"
                             type="date"
                             className="max-w-[18ch]"
                             value={form.first_call_date}
-                            onChange={(e) => set("first_call_date", e.target.value)}
+                            onChange={(e) =>
+                              set("first_call_date", e.target.value)
+                            }
                           />
                         </Field>
-                        <Field label="Дата следующего звонка" htmlFor="lead-next-call">
+                        <Field
+                          label="Дата следующего звонка"
+                          htmlFor="lead-next-call"
+                        >
                           <OdooInput
                             id="lead-next-call"
                             type="date"
                             className="max-w-[18ch]"
                             value={form.next_call_date}
-                            onChange={(e) => set("next_call_date", e.target.value)}
+                            onChange={(e) =>
+                              set("next_call_date", e.target.value)
+                            }
                           />
                         </Field>
                       </InnerGroup>
@@ -471,7 +525,9 @@ function LeadForm({ id }: { id?: string }) {
                             type="email"
                             placeholder="info@example.ru"
                             value={form.company_email}
-                            onChange={(e) => set("company_email", e.target.value)}
+                            onChange={(e) =>
+                              set("company_email", e.target.value)
+                            }
                           />
                         </Field>
                         <Field label="Телефон" htmlFor="lead-phone">
@@ -490,14 +546,19 @@ function LeadForm({ id }: { id?: string }) {
                                 type="button"
                                 className="px-px"
                                 aria-label={`Приоритет ${n}`}
-                                onClick={() => set("priority", form.priority === n ? 0 : n)}
+                                onClick={() =>
+                                  set("priority", form.priority === n ? 0 : n)
+                                }
                               >
                                 {form.priority >= n ? "★" : "☆"}
                               </button>
                             ))}
                           </span>
                         </Field>
-                        <Field label="Теги" help="Метки для фильтрации лидов в списке и канбане">
+                        <Field
+                          label="Теги"
+                          help="Метки для фильтрации лидов в списке и канбане"
+                        >
                           <TagsField
                             all={allTags}
                             value={form.tag_ids}
@@ -507,20 +568,30 @@ function LeadForm({ id }: { id?: string }) {
                       </InnerGroup>
 
                       <InnerGroup title="Информация о клиенте">
-                        <Field label="Контакт логиста/ЛПР" htmlFor="lead-contact">
+                        <Field
+                          label="Контакт логиста/ЛПР"
+                          htmlFor="lead-contact"
+                        >
                           <OdooInput
                             id="lead-contact"
                             placeholder="Фамилия Имя"
                             value={form.logist_contact}
-                            onChange={(e) => set("logist_contact", e.target.value)}
+                            onChange={(e) =>
+                              set("logist_contact", e.target.value)
+                            }
                           />
                         </Field>
-                        <Field label="Телефон логиста" htmlFor="lead-logist-phone">
+                        <Field
+                          label="Телефон логиста"
+                          htmlFor="lead-logist-phone"
+                        >
                           <OdooInput
                             id="lead-logist-phone"
                             placeholder="+7 900 000-00-00"
                             value={form.logist_phone}
-                            onChange={(e) => set("logist_phone", e.target.value)}
+                            onChange={(e) =>
+                              set("logist_phone", e.target.value)
+                            }
                           />
                         </Field>
                         <Field label="Email логиста" htmlFor="lead-email">
@@ -529,14 +600,22 @@ function LeadForm({ id }: { id?: string }) {
                             type="email"
                             placeholder="name@example.ru"
                             value={form.logist_email}
-                            onChange={(e) => set("logist_email", e.target.value)}
+                            onChange={(e) =>
+                              set("logist_email", e.target.value)
+                            }
                           />
                         </Field>
                       </InnerGroup>
                     </div>
                   </FormGroup>
 
-                  {!isNew && <Notebook tabs={notebookTabs} active={tab} onSelect={setTab} />}
+                  {!isNew && (
+                    <Notebook
+                      tabs={notebookTabs}
+                      active={tab}
+                      onSelect={setTab}
+                    />
+                  )}
                 </>
               )}
             </FormSheet>
@@ -545,7 +624,6 @@ function LeadForm({ id }: { id?: string }) {
 
         {!isNew && (
           <div className="w-full shrink-0 bg-odoo-surface lg:w-[33%] lg:max-w-[520px] lg:overflow-y-auto">
-            <ActivityPanel leadId={lead?.id} />
             <Chatter
               timeline={timeline}
               attachments={attachments}
@@ -558,7 +636,10 @@ function LeadForm({ id }: { id?: string }) {
                 addNote.mutate(body || "Вложение", {
                   onSuccess: (entry) => {
                     for (const file of files) {
-                      uploadAttachment.mutate({ file, entryId: Number(entry.id) });
+                      uploadAttachment.mutate({
+                        file,
+                        entryId: Number(entry.id),
+                      });
                     }
                   },
                 });
@@ -571,7 +652,9 @@ function LeadForm({ id }: { id?: string }) {
         )}
       </div>
 
-      {preview && <FilePreview file={preview} onClose={() => setPreview(null)} />}
+      {preview && (
+        <FilePreview file={preview} onClose={() => setPreview(null)} />
+      )}
     </AppShell>
   );
 }

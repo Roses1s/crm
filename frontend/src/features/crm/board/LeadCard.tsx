@@ -1,20 +1,12 @@
 import { useSortable } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
-import { Clock3, MoreVertical } from "lucide-react";
+import { MoreVertical } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
 import { ownerInitials, ownerLabel } from "@/shared/lib/owner";
-import type { ActivityState, Lead } from "@/shared/types";
+import type { Lead } from "@/shared/types";
 import { StarRating } from "./StarRating";
-
-/** Цвет часиков: как в Odoo — красный просрочен, оранжевый сегодня, зелёный впереди. */
-const ACTIVITY_COLOR: Record<ActivityState, string> = {
-  overdue: "text-odoo-danger",
-  today: "text-odoo-warning",
-  planned: "text-odoo-success",
-  done: "text-odoo-text-muted",
-};
 
 export function LeadCardBody({
   lead,
@@ -24,10 +16,6 @@ export function LeadCardBody({
   menuSpace?: boolean;
 }) {
   const title = `${lead.name} — ${lead.inn}`;
-  const activityState = lead.activity_state ?? null;
-  const activityHint = activityState
-    ? `${lead.next_activity_summary ?? "Действие"} — ${lead.next_activity_date ?? ""}`
-    : "Действий не запланировано";
 
   return (
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
@@ -63,16 +51,6 @@ export function LeadCardBody({
       <div className="mt-1 flex shrink-0 items-end justify-between gap-2">
         <div className="flex items-center gap-1.5">
           <StarRating value={lead.priority} />
-          <span
-            title={activityHint}
-            className={
-              activityState
-                ? ACTIVITY_COLOR[activityState]
-                : "text-odoo-text-light"
-            }
-          >
-            <Clock3 className="h-4 w-4" />
-          </span>
         </div>
         <span
           title={
