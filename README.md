@@ -62,6 +62,17 @@ docker compose up -d --build
 docker compose exec backend python -m app.cli createsuperuser --email you@example.com --password ...
 ```
 
+## Обновление продакшена
+
+```bash
+ssh crm /opt/crm/deploy.sh      # со своего компьютера
+cd /opt/crm && ./deploy.sh      # или на сервере
+```
+
+`deploy.sh` обновляет код, собирает образы, ждёт готовности контейнеров,
+проверяет сайт снаружи и **откатывается сам**, если релиз не поднялся.
+Подробности и флаги — в [инструкции по деплою](docs/deploy/02-deploy.md).
+
 ## Продакшен
 
 - Домен: https://crmdetroid.ru (+ редирект с `www` и с `http`)
