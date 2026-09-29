@@ -827,13 +827,8 @@ ssl_session_cache shared:SSL:10m;
 ssl_session_timeout 1d;
 ssl_session_tickets off;
 
-ssl_stapling on;
-ssl_stapling_verify on;
-ssl_trusted_certificate /etc/letsencrypt/live/crmdetroid.ru/chain.pem;
-
-resolver 1.1.1.1 8.8.8.8 valid=300s;
-resolver_timeout 5s;
-EOF
+# OCSP stapling НЕ включаем: с 2025 года Let's Encrypt не кладёт OCSP-адрес
+# в сертификаты (перешли на CRL) — nginx на это ругался предупреждением.
 
 cat > /opt/crm/nginx/snippets/security-headers.conf <<'EOF'
 add_header Strict-Transport-Security "max-age=31536000; includeSubDomains" always;
