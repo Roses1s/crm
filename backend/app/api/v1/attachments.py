@@ -1,4 +1,4 @@
-"""Вложения лидов.
+"""Вложения лидов и заявок на перевозку.
 
 Файлы лежат на диске в томе (`ATTACHMENTS_DIR`), а метаданные — в базе.
 На диск попадает обезличенное имя `<uuid>.<расширение>`: так исключены
@@ -20,11 +20,14 @@ from app.api.deps import CurrentUser, SessionDep
 from app.core.config import settings
 from app.core.errors import AppError, NotFoundError, PermissionDeniedError
 from app.core.logging import get_logger
+from app.models.shipment import Shipment
 from app.models.timeline import Attachment, TimelineEntry
 from app.models.user import Role
 from app.schemas.crm import AttachmentRead
 
 router = APIRouter(prefix="/crm", tags=["crm: вложения"])
+# Заявки живут вне префикса /crm, поэтому их вложениям нужен отдельный роутер.
+shipment_router = APIRouter(tags=["заявки: вложения"])
 log = get_logger(__name__)
 
 CHUNK = 1024 * 1024  # читаем файл мегабайтными кусками, не целиком в память
@@ -78,6 +81,18 @@ async def _save_upload(upload: UploadFile, target: Path) -> int:
     return written
 
 
+def _checked_suffix(original: str) -> str:
+    """Проверяет расширение по белому списку и возвращает его в нижнем регистре."""
+    suffix = Path(original).suffix.lower()
+    if suffix not in ALLOWED_EXTENSIONS:
+        raise AppError(
+            f"Тип файла «{suffix or 'без расширения'}» не поддерживается. "
+            f"Разрешены: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
+            code="unsupported_file_type",
+        )
+    return suffix
+
+
 @router.get(
     "/leads/{lead_id}/attachments",
     response_model=list[AttachmentRead],
@@ -86,7 +101,8 @@ async def _save_upload(upload: UploadFile, target: Path) -> int:
 async def list_attachments(lead_id: int, session: SessionDep, _: CurrentUser) -> list[Attachment]:
     stmt = (
         select(Attachment)
-        .where(Attachment.lead_id == lead_id)
+        # Файлы заявок показываются только на самой заявке — решение владельца.
+        .where(Attachment.lead_id == lead_id, Attachment.shipment_id.is_(None))
         .order_by(Attachment.created_at.desc())
     )
     return list((await session.execute(stmt)).unique().scalars().all())
@@ -111,13 +127,7 @@ async def upload_attachment(
             raise NotFoundError(f"Запись ленты {entry_id} не найдена")
 
     original = Path(file.filename or "file").name  # отбрасываем путь целиком
-    suffix = Path(original).suffix.lower()
-    if suffix not in ALLOWED_EXTENSIONS:
-        raise AppError(
-            f"Тип файла «{suffix or 'без расширения'}» не поддерживается. "
-            f"Разрешены: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
-            code="unsupported_file_type",
-        )
+    suffix = _checked_suffix(original)
     relative = Path(str(lead_id)) / f"{uuid.uuid4().hex}{suffix}"
     target = _storage_root() / relative
 
@@ -138,6 +148,65 @@ async def upload_attachment(
     await session.refresh(attachment)
 
     log.info("attachment.uploaded", lead_id=lead_id, size=size, by=user.id)
+    return attachment
+
+
+@shipment_router.get(
+    "/shipments/{shipment_id}/attachments",
+    response_model=list[AttachmentRead],
+    summary="Вложения заявки",
+)
+async def list_shipment_attachments(
+    shipment_id: int, session: SessionDep, _: CurrentUser
+) -> list[Attachment]:
+    stmt = (
+        select(Attachment)
+        .where(Attachment.shipment_id == shipment_id)
+        .order_by(Attachment.created_at.desc())
+    )
+    return list((await session.execute(stmt)).unique().scalars().all())
+
+
+@shipment_router.post(
+    "/shipments/{shipment_id}/attachments",
+    response_model=AttachmentRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Загрузить файл к заявке",
+)
+async def upload_shipment_attachment(
+    shipment_id: int,
+    session: SessionDep,
+    user: CurrentUser,
+    file: Annotated[UploadFile, File(description="Файл до 25 МБ")],
+) -> Attachment:
+    shipment = await session.get(Shipment, shipment_id)
+    if shipment is None:
+        raise NotFoundError(f"Заявка {shipment_id} не найдена")
+
+    original = Path(file.filename or "file").name  # отбрасываем путь целиком
+    suffix = _checked_suffix(original)
+    # Файлы заявки лежат в отдельной папке, чтобы не смешиваться с файлами лида.
+    relative = Path("shipments") / str(shipment_id) / f"{uuid.uuid4().hex}{suffix}"
+    target = _storage_root() / relative
+
+    size = await _save_upload(file, target)
+
+    attachment = Attachment(
+        # lead_id заполняем от заявки: так файл не потеряется при подсчёте
+        # объёма по лиду и удалится вместе с ним.
+        lead_id=shipment.lead_id,
+        shipment_id=shipment_id,
+        uploaded_by_id=user.id,
+        name=original[:255],
+        size=size,
+        content_type=ALLOWED_EXTENSIONS[suffix],
+        storage_path=str(target),
+    )
+    session.add(attachment)
+    await session.commit()
+    await session.refresh(attachment)
+
+    log.info("attachment.uploaded", shipment_id=shipment_id, size=size, by=user.id)
     return attachment
 
 
