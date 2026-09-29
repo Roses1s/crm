@@ -19,9 +19,29 @@ depends_on: str | Sequence[str] | None = None
 
 # Роль хранится как VARCHAR + CHECK (native_enum=False), поэтому смена набора
 # значений — это обновление строк и пересоздание ограничения, без ALTER TYPE.
-# Короткое имя "role" разворачивается соглашением об именах в ck_users_role.
 _SHORT = "role"
-_FULL = "ck_users_role"
+
+# Имя ограничения в боевой базе может отличаться от ожидаемого: его давал
+# SQLAlchemy при создании таблицы. Попытка удалить его по угаданному имени
+# уже один раз уронила деплой, поэтому имя ищем в системном каталоге.
+_FIND_CHECK = sa.text("""
+    SELECT con.conname
+      FROM pg_constraint con
+      JOIN pg_class rel ON rel.oid = con.conrelid
+     WHERE rel.relname = 'users'
+       AND con.contype = 'c'
+       AND strpos(pg_get_constraintdef(con.oid), 'role') > 0
+     LIMIT 1
+""")
+
+
+def _drop_role_check() -> None:
+    """Снимает действующую проверку списка ролей, как бы она ни называлась."""
+    bind = op.get_bind()
+    name = bind.execute(_FIND_CHECK).scalar()
+    if name:
+        # Имя пришло из системного каталога, кавычки защищают от регистра.
+        op.execute(f'ALTER TABLE users DROP CONSTRAINT "{name}"')
 
 
 def upgrade() -> None:
@@ -31,7 +51,7 @@ def upgrade() -> None:
     # Для локальной базы это не важно: она создаётся из моделей, где роли уже
     # две. В продакшене (PostgreSQL) ограничение обновляем честно.
     if op.get_bind().dialect.name != "sqlite":
-        op.execute(f"ALTER TABLE users DROP CONSTRAINT {_FULL}")
+        _drop_role_check()
         op.create_check_constraint(_SHORT, "users", sa.text("role IN ('admin', 'manager')"))
 
 
@@ -39,7 +59,7 @@ def downgrade() -> None:
     # Вернуть операторов невозможно — кто ими был, уже неизвестно;
     # восстанавливаем только допустимый набор значений.
     if op.get_bind().dialect.name != "sqlite":
-        op.execute(f"ALTER TABLE users DROP CONSTRAINT {_FULL}")
+        _drop_role_check()
         op.create_check_constraint(
             _SHORT, "users", sa.text("role IN ('admin', 'manager', 'operator')")
         )
