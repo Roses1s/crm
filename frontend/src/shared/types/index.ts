@@ -113,14 +113,6 @@ export interface Carrier {
   is_active: boolean;
 }
 
-export interface DashboardStats {
-  leads_total: number;
-  leads_archived: number;
-  shipments_total: number;
-  users_total: number;
-  funnel: { id: number; name: string; count: number }[];
-}
-
 export interface Pager {
   position: number;
   total: number;

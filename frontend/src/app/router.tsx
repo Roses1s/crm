@@ -8,28 +8,37 @@ import { LeadFormPage } from "@/features/crm/LeadFormPage";
 
 // Набор маршрутов повторяет исходный router.tsx один в один.
 const AdminLayout = lazy(() =>
-  import("@/features/admin/AdminLayout").then((m) => ({ default: m.AdminLayout })),
+  import("@/features/admin/AdminLayout").then((m) => ({
+    default: m.AdminLayout,
+  })),
 );
 const CarriersPage = lazy(() =>
-  import("@/features/admin/CarriersPage").then((m) => ({ default: m.CarriersPage })),
-);
-const DashboardPage = lazy(() =>
-  import("@/features/admin/DashboardPage").then((m) => ({ default: m.DashboardPage })),
+  import("@/features/admin/CarriersPage").then((m) => ({
+    default: m.CarriersPage,
+  })),
 );
 const SecurityPage = lazy(() =>
-  import("@/features/admin/SecurityPage").then((m) => ({ default: m.SecurityPage })),
+  import("@/features/admin/SecurityPage").then((m) => ({
+    default: m.SecurityPage,
+  })),
 );
 const UsersPage = lazy(() =>
   import("@/features/admin/UsersPage").then((m) => ({ default: m.UsersPage })),
 );
 const LauncherPage = lazy(() =>
-  import("@/features/launcher/LauncherPage").then((m) => ({ default: m.LauncherPage })),
+  import("@/features/launcher/LauncherPage").then((m) => ({
+    default: m.LauncherPage,
+  })),
 );
 const ShipmentFormPage = lazy(() =>
-  import("@/features/shipments/ShipmentFormPage").then((m) => ({ default: m.ShipmentFormPage })),
+  import("@/features/shipments/ShipmentFormPage").then((m) => ({
+    default: m.ShipmentFormPage,
+  })),
 );
 const ShipmentsPage = lazy(() =>
-  import("@/features/shipments/ShipmentsPage").then((m) => ({ default: m.ShipmentsPage })),
+  import("@/features/shipments/ShipmentsPage").then((m) => ({
+    default: m.ShipmentsPage,
+  })),
 );
 
 function RouteFallback() {
@@ -95,7 +104,7 @@ export function AppRouter() {
             </RequireAuth>
           }
         >
-          <Route index element={<DashboardPage />} />
+          <Route index element={<Navigate to="users" replace />} />
           <Route path="users" element={<UsersPage />} />
           <Route path="carriers" element={<CarriersPage />} />
           <Route path="security" element={<SecurityPage />} />

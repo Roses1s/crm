@@ -24,6 +24,6 @@ async def test_openapi_is_served(client: AsyncClient) -> None:
         "/api/v1/crm/leads",
         "/api/v1/crm/leads/{lead_id}/timeline",
         "/api/v1/shipments",
-        "/api/v1/admin/stats",
+        "/api/v1/admin/users",
     ):
         assert path in paths, f"в OpenAPI нет {path}"

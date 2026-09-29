@@ -2,7 +2,6 @@ import { NavLink, Outlet } from "react-router-dom";
 import { AppShell, Breadcrumb } from "@/app/layout/AppShell";
 
 const LINKS = [
-  { to: "/admin", label: "Дашборд", end: true },
   { to: "/admin/users", label: "Пользователи" },
   { to: "/admin/carriers", label: "Перевозчики" },
   { to: "/admin/security", label: "Безопасность" },
@@ -18,7 +17,6 @@ export function AdminLayout() {
             <NavLink
               key={l.to}
               to={l.to}
-              end={l.end}
               className={({ isActive }) =>
                 `block rounded-[4px] px-2 py-1.5 text-sm hover:bg-odoo-bg ${isActive ? "font-semibold text-odoo-action" : "text-odoo-text"}`
               }

@@ -10,7 +10,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   Attachment,
   Carrier,
-  DashboardStats,
   LauncherApp,
   Lead,
   Pager,
@@ -61,7 +60,6 @@ export const keys = {
     ["shipment-attachments", String(id)] as const,
   carriers: ["carriers"] as const,
   users: ["users"] as const,
-  stats: ["stats"] as const,
   backups: ["backups"] as const,
   loginAttempts: ["login-attempts"] as const,
 };
@@ -530,13 +528,6 @@ export function useDeleteUser() {
     mutationFn: (id: number) =>
       api<void>(`/admin/users/${id}`, { method: "DELETE" }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: keys.users }),
-  });
-}
-
-export function useStats() {
-  return useQuery({
-    queryKey: keys.stats,
-    queryFn: () => api<DashboardStats>("/admin/stats"),
   });
 }
 

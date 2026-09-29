@@ -7,7 +7,6 @@ from pathlib import Path
 from typing import Any
 
 from fastapi import APIRouter, status
-from fastapi_cache.decorator import cache
 from sqlalchemy import func, select
 
 from app.api.deps import AdminUser, SessionDep
@@ -15,57 +14,13 @@ from app.core.config import settings
 from app.core.errors import AppError, NotFoundError
 from app.core.logging import get_logger
 from app.core.security import hash_password
-from app.models.crm import Lead, Stage
 from app.models.security import LoginAttempt
-from app.models.shipment import Shipment
 from app.models.user import User
 from app.schemas.user import UserCreate, UserRead, UserUpdate
 
 log = get_logger(__name__)
 
 router = APIRouter(prefix="/admin", tags=["администрирование"])
-
-
-@router.get("/stats", summary="Сводка для дашборда")
-@cache(expire=settings.cache_ttl_seconds)
-async def stats(session: SessionDep, _: AdminUser) -> dict[str, Any]:
-    """Цифры для дашборда. Ответ кешируется в Valkey на минуту."""
-    leads_total = int(
-        (
-            await session.execute(
-                select(func.count()).select_from(Lead).where(Lead.is_archived.is_(False))
-            )
-        ).scalar_one()
-    )
-    leads_archived = int(
-        (
-            await session.execute(
-                select(func.count()).select_from(Lead).where(Lead.is_archived.is_(True))
-            )
-        ).scalar_one()
-    )
-    shipments_total = int(
-        (await session.execute(select(func.count()).select_from(Shipment))).scalar_one()
-    )
-    users_total = int((await session.execute(select(func.count()).select_from(User))).scalar_one())
-
-    funnel_rows = (
-        await session.execute(
-            select(Stage.id, Stage.name, func.count(Lead.id))
-            .select_from(Stage)
-            .outerjoin(Lead, (Lead.stage_id == Stage.id) & (Lead.is_archived.is_(False)))
-            .group_by(Stage.id, Stage.name, Stage.sequence)
-            .order_by(Stage.sequence, Stage.id)
-        )
-    ).all()
-
-    return {
-        "leads_total": leads_total,
-        "leads_archived": leads_archived,
-        "shipments_total": shipments_total,
-        "users_total": users_total,
-        "funnel": [{"id": r[0], "name": r[1], "count": int(r[2])} for r in funnel_rows],
-    }
 
 
 @router.get("/users", response_model=list[UserRead], summary="Пользователи")

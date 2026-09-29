@@ -45,15 +45,9 @@ async def test_status_transition(auth_client: AsyncClient, seeded: dict) -> None
     assert response.json()["status"] == "in_transit"
 
 
-async def test_carriers_and_stats(auth_client: AsyncClient, seeded: dict) -> None:
+async def test_carriers_list(auth_client: AsyncClient, seeded: dict) -> None:
     carriers = await auth_client.get("/api/v1/carriers")
     assert [c["name"] for c in carriers.json()] == ["ООО «АвтоТрансЛайн»"]
-
-    stats = await auth_client.get("/api/v1/admin/stats")
-    body = stats.json()
-    assert body["leads_total"] == 1
-    assert body["users_total"] == 2
-    assert [f["name"] for f in body["funnel"]] == ["Новый", "Переговоры"]
 
 
 async def test_launcher_apps_depend_on_role(auth_client: AsyncClient) -> None:
