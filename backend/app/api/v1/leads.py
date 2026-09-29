@@ -9,13 +9,13 @@ from sqlalchemy import Select, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.api.deps import CurrentUser, ManagerUser, SessionDep
+from app.api.deps import CurrentUser, SessionDep
 from app.core.errors import NotFoundError
 from app.core.logging import get_logger
 from app.core.pagination import Page, PageParams, build_page, page_params, paginate
 from app.models.crm import Lead, Tag, lead_tags
 from app.models.timeline import EntryType, TimelineEntry
-from app.models.user import User
+from app.models.user import Role, User
 from app.schemas.crm import (
     LeadCreate,
     LeadRead,
@@ -30,7 +30,14 @@ log = get_logger(__name__)
 PageParamsDep = Annotated[PageParams, Depends(page_params)]
 
 
-async def get_lead_or_404(session: AsyncSession, lead_id: int) -> Lead:
+def visible_only(stmt: Select[Lead], user: User) -> Select[Lead]:
+    """Менеджер работает только со своими лидами, администратор видит все."""
+    if user.role == Role.admin:
+        return stmt
+    return stmt.where(Lead.assigned_to_id == user.id)
+
+
+async def get_lead_or_404(session: AsyncSession, lead_id: int, user: User | None = None) -> Lead:
     # populate_existing перезаписывает уже загруженные связи: без него после
     # смены этапа в ответе оставался бы старый stage из identity map.
     stmt = (
@@ -41,6 +48,10 @@ async def get_lead_or_404(session: AsyncSession, lead_id: int) -> Lead:
     )
     lead = (await session.execute(stmt)).unique().scalar_one_or_none()
     if lead is None:
+        raise NotFoundError(f"Лид {lead_id} не найден")
+    # Чужой лид для менеджера просто «не существует»: так из ответа нельзя
+    # узнать даже факт, что такая карточка есть у коллеги.
+    if user is not None and user.role != Role.admin and lead.assigned_to_id != user.id:
         raise NotFoundError(f"Лид {lead_id} не найден")
     return lead
 
@@ -87,7 +98,7 @@ async def _fetch_tags(session: AsyncSession, tag_ids: list[int]) -> list[Tag]:
 @router.get("", response_model=Page[LeadRead], summary="Список лидов")
 async def list_leads(
     session: SessionDep,
-    _: CurrentUser,
+    user: CurrentUser,
     params: PageParamsDep,
     search: Annotated[str | None, Query(description="Поиск по названию, ИНН, контакту")] = None,
     stage: int | None = None,
@@ -97,7 +108,9 @@ async def list_leads(
     is_archived: bool = False,
 ) -> dict[str, Any]:
     stmt = _apply_filters(
-        select(Lead).options(selectinload(Lead.tags)).order_by(Lead.updated_at.desc()),
+        visible_only(
+            select(Lead).options(selectinload(Lead.tags)).order_by(Lead.updated_at.desc()), user
+        ),
         search=search,
         stage=stage,
         tag=tag,
@@ -118,7 +131,8 @@ async def create_lead(payload: LeadCreate, session: SessionDep, user: CurrentUse
     # Теги проставляем ДО add/flush: у ещё не сохранённого объекта присваивание
     # коллекции не требует подгрузки старого значения из базы.
     lead.tags = await _fetch_tags(session, payload.tag_ids)
-    if lead.assigned_to_id is None:
+    # Менеджер не может создать лид «на коллегу»: карточка появляется на его доске.
+    if lead.assigned_to_id is None or user.role != Role.admin:
         lead.assigned_to_id = user.id
     session.add(lead)
     await session.commit()
@@ -127,15 +141,15 @@ async def create_lead(payload: LeadCreate, session: SessionDep, user: CurrentUse
 
 
 @router.get("/{lead_id}", response_model=LeadRead, summary="Карточка лида")
-async def get_lead(lead_id: int, session: SessionDep, _: CurrentUser) -> Lead:
-    return await get_lead_or_404(session, lead_id)
+async def get_lead(lead_id: int, session: SessionDep, user: CurrentUser) -> Lead:
+    return await get_lead_or_404(session, lead_id, user)
 
 
 @router.patch("/{lead_id}", response_model=LeadRead, summary="Изменить лид")
 async def update_lead(
     lead_id: int, payload: LeadUpdate, session: SessionDep, user: CurrentUser
 ) -> Lead:
-    lead = await get_lead_or_404(session, lead_id)
+    lead = await get_lead_or_404(session, lead_id, user)
     data = payload.model_dump(exclude_unset=True)
     tag_ids = data.pop("tag_ids", None)
 
@@ -167,8 +181,8 @@ async def update_lead(
 
 
 @router.delete("/{lead_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Архивировать лид")
-async def archive_lead(lead_id: int, session: SessionDep, user: ManagerUser) -> None:
-    lead = await get_lead_or_404(session, lead_id)
+async def archive_lead(lead_id: int, session: SessionDep, user: CurrentUser) -> None:
+    lead = await get_lead_or_404(session, lead_id, user)
     lead.is_archived = True
     await session.commit()
     log.info("lead.archived", lead_id=lead_id, by=user.id)
@@ -179,8 +193,10 @@ async def archive_lead(lead_id: int, session: SessionDep, user: ManagerUser) -> 
     response_model=list[TimelineEntryRead],
     summary="Лента чаттера",
 )
-async def lead_timeline(lead_id: int, session: SessionDep, _: CurrentUser) -> list[TimelineEntry]:
-    await get_lead_or_404(session, lead_id)
+async def lead_timeline(
+    lead_id: int, session: SessionDep, user: CurrentUser
+) -> list[TimelineEntry]:
+    await get_lead_or_404(session, lead_id, user)
     stmt = (
         select(TimelineEntry)
         .where(TimelineEntry.lead_id == lead_id)
@@ -198,7 +214,7 @@ async def lead_timeline(lead_id: int, session: SessionDep, _: CurrentUser) -> li
 async def add_note(
     lead_id: int, payload: NoteCreate, session: SessionDep, user: CurrentUser
 ) -> TimelineEntry:
-    await get_lead_or_404(session, lead_id)
+    await get_lead_or_404(session, lead_id, user)
     entry = TimelineEntry(
         lead_id=lead_id, author_id=user.id, type=EntryType.note, body=payload.body
     )

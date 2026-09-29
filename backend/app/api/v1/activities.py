@@ -47,9 +47,9 @@ async def _get_or_404(session: SessionDep, activity_id: int) -> Activity:
     summary="Действия по лиду",
 )
 async def list_activities(
-    lead_id: int, session: SessionDep, _: CurrentUser, include_done: bool = False
+    lead_id: int, session: SessionDep, user: CurrentUser, include_done: bool = False
 ) -> list[Activity]:
-    await get_lead_or_404(session, lead_id)
+    await get_lead_or_404(session, lead_id, user)
     stmt = select(Activity).where(Activity.lead_id == lead_id)
     if not include_done:
         stmt = stmt.where(Activity.is_done.is_(False))
@@ -66,7 +66,7 @@ async def list_activities(
 async def create_activity(
     lead_id: int, payload: ActivityCreate, session: SessionDep, user: CurrentUser
 ) -> Activity:
-    await get_lead_or_404(session, lead_id)
+    await get_lead_or_404(session, lead_id, user)
     activity = Activity(lead_id=lead_id, **payload.model_dump())
     # По умолчанию действие на том, кто его создал.
     if activity.assigned_to_id is None:

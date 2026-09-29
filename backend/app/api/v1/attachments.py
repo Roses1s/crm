@@ -17,6 +17,7 @@ from fastapi.responses import FileResponse
 from sqlalchemy import select
 
 from app.api.deps import CurrentUser, SessionDep
+from app.api.v1.leads import get_lead_or_404
 from app.core.config import settings
 from app.core.errors import AppError, NotFoundError, PermissionDeniedError
 from app.core.logging import get_logger
@@ -98,7 +99,10 @@ def _checked_suffix(original: str) -> str:
     response_model=list[AttachmentRead],
     summary="Вложения лида",
 )
-async def list_attachments(lead_id: int, session: SessionDep, _: CurrentUser) -> list[Attachment]:
+async def list_attachments(
+    lead_id: int, session: SessionDep, user: CurrentUser
+) -> list[Attachment]:
+    await get_lead_or_404(session, lead_id, user)
     stmt = (
         select(Attachment)
         # Файлы заявок показываются только на самой заявке — решение владельца.
@@ -121,6 +125,7 @@ async def upload_attachment(
     file: Annotated[UploadFile, File(description="Файл до 25 МБ")],
     entry_id: Annotated[int | None, Query(description="Привязать к записи ленты")] = None,
 ) -> Attachment:
+    await get_lead_or_404(session, lead_id, user)
     if entry_id is not None:
         entry = await session.get(TimelineEntry, entry_id)
         if entry is None or entry.lead_id != lead_id:
@@ -157,8 +162,12 @@ async def upload_attachment(
     summary="Вложения заявки",
 )
 async def list_shipment_attachments(
-    shipment_id: int, session: SessionDep, _: CurrentUser
+    shipment_id: int, session: SessionDep, user: CurrentUser
 ) -> list[Attachment]:
+    shipment = await session.get(Shipment, shipment_id)
+    if shipment is None:
+        raise NotFoundError(f"Заявка {shipment_id} не найдена")
+    await get_lead_or_404(session, shipment.lead_id, user)
     stmt = (
         select(Attachment)
         .where(Attachment.shipment_id == shipment_id)
@@ -182,6 +191,8 @@ async def upload_shipment_attachment(
     shipment = await session.get(Shipment, shipment_id)
     if shipment is None:
         raise NotFoundError(f"Заявка {shipment_id} не найдена")
+    # Документы заявки доступны тому же кругу, что и сама заявка.
+    await get_lead_or_404(session, shipment.lead_id, user)
 
     original = Path(file.filename or "file").name  # отбрасываем путь целиком
     suffix = _checked_suffix(original)
@@ -212,11 +223,12 @@ async def upload_shipment_attachment(
 
 @router.get("/attachments/{attachment_id}", summary="Скачать файл")
 async def download_attachment(
-    attachment_id: int, session: SessionDep, _: CurrentUser
+    attachment_id: int, session: SessionDep, user: CurrentUser
 ) -> FileResponse:
     attachment = await session.get(Attachment, attachment_id)
     if attachment is None:
         raise NotFoundError(f"Вложение {attachment_id} не найдено")
+    await get_lead_or_404(session, attachment.lead_id, user)
 
     path = Path(attachment.storage_path)
     if not path.is_file():
@@ -243,6 +255,7 @@ async def delete_attachment(attachment_id: int, session: SessionDep, user: Curre
     attachment = await session.get(Attachment, attachment_id)
     if attachment is None:
         raise NotFoundError(f"Вложение {attachment_id} не найдено")
+    await get_lead_or_404(session, attachment.lead_id, user)
 
     # Свой файл удаляет автор, чужой — только администратор.
     if attachment.uploaded_by_id != user.id and user.role != Role.admin:

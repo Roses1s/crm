@@ -130,11 +130,12 @@ async def test_manager_cannot_delete_foreign_attachment(
     )
     manager_token = login.json()["access_token"]
 
+    # Лид принадлежит админу, поэтому для менеджера его вложения «не существуют».
     denied = await client.delete(
         f"/api/v1/crm/attachments/{attachment_id}",
         headers={"Authorization": f"Bearer {manager_token}"},
     )
-    assert denied.status_code == 403
+    assert denied.status_code == 404
 
     # Автор (админ) удалить может — и файл исчезает с диска.
     path = Path(
