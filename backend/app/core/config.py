@@ -25,7 +25,7 @@ class Settings(BaseSettings):
     )
 
     # --- приложение -------------------------------------------------------
-    app_name: str = "CRM Detroid API"
+    app_name: str = "CRM Детроид API"
     api_prefix: str = "/api/v1"
     environment: Environment = "local"
     debug: bool = False
