@@ -1,5 +1,6 @@
 import {
   DndContext,
+  MeasuringStrategy,
   pointerWithin,
   DragOverlay,
   PointerSensor,
@@ -121,8 +122,21 @@ export function KanbanPage() {
     return pointer.length > 0 ? pointer : closestCorners(args);
   }
 
+  /**
+   * Порядок карточек в колонке.
+   *
+   * Сервер отдаёт лиды по времени изменения, поэтому после переноса карточка
+   * прыгала в начало колонки — это и выглядело рывком. На доске держим
+   * стабильный порядок по номеру: он не меняется от правок.
+   */
+  function columnLeads(stageId: number) {
+    return leads
+      .filter((l) => l.stage_id === stageId)
+      .sort((a, b) => a.id - b.id);
+  }
+
   const sensors = useSensors(
-    useSensor(PointerSensor, { activationConstraint: { distance: 8 } }),
+    useSensor(PointerSensor, { activationConstraint: { distance: 6 } }),
     useSensor(TouchSensor, {
       activationConstraint: { delay: 150, tolerance: 5 },
     }),
@@ -204,6 +218,9 @@ export function KanbanPage() {
           <DndContext
             sensors={sensors}
             collisionDetection={collisionDetection}
+            // Колонки переизмеряются постоянно: при прокрутке доски старые
+            // координаты давали «залипание» подсветки и промахи.
+            measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
             onDragStart={onDragStart}
             onDragCancel={() => setActiveLead(null)}
             onDragEnd={onDragEnd}
@@ -212,7 +229,7 @@ export function KanbanPage() {
               <Column
                 key={stage.id}
                 stage={stage}
-                leads={leads.filter((l) => l.stage_id === stage.id)}
+                leads={columnLeads(stage.id)}
                 canManage={canManage}
                 folded={folded.includes(stage.id)}
                 onFold={() =>
