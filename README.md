@@ -1,60 +1,84 @@
 # CRM Detroid
 
-CRM-система: React 19 + FastAPI + PostgreSQL 18, разворачивается в Docker Compose
-на `crmdetroid.ru`.
+CRM для транспортной компании: лиды и воронка продаж канбаном, заявки на
+перевозку, перевозчики, пользователи и отчёты. Работает на
+**https://crmdetroid.ru**.
+
+> **Новому участнику (человеку или ИИ-агенту):** начните с
+> [`docs/PROJECT.md`](docs/PROJECT.md) — там весь контекст проекта, включая
+> подводные камни и объяснение принятых решений.
+> Короткая выжимка правил — в [`AGENTS.md`](AGENTS.md).
 
 ## Стек
 
 | Слой | Технологии |
 |---|---|
-| ОС | Ubuntu 26.04 LTS |
-| БД | PostgreSQL 18 · Valkey 8 |
-| Backend | Python 3.13 · FastAPI · SQLAlchemy 2.0 (async) · Alembic · Pydantic v2 · Celery 5.5 · structlog |
-| Frontend | React 19 · Vite 6 · Tailwind CSS v4 · Zustand 5 · TanStack Query v5 · zod · react-hook-form |
-| Infra | Docker Compose · Gunicorn 23 + UvicornWorker · Nginx 1.27 · Let's Encrypt |
+| ОС сервера | Ubuntu 26.04 LTS, 2 ГБ RAM, 15 ГБ диск |
+| Хранилища | PostgreSQL 18 · Valkey 8 |
+| Бэкенд | Python 3.13 · FastAPI · SQLAlchemy 2.0 (async) · Alembic · Pydantic v2 · Celery 5.5 · structlog · slowapi · fastapi-cache2 |
+| Фронтенд | React 19 · Vite 6 · Tailwind CSS v4 · TanStack Query v5 · React Router 7 · dnd-kit · Recharts |
+| Инфраструктура | Docker Compose (7 контейнеров) · Gunicorn + UvicornWorker · Nginx 1.27 · Let's Encrypt |
 
-## Этапы работ
+## Что уже работает
 
-| Этап | Что делаем | Статус |
-|---|---|---|
-| 1 | Настройка VPS с нуля: безопасность → Docker → Nginx 1.27 → SSL | ✅ готово — [инструкция](docs/deploy/01-server-setup.md) |
-| 2 | Фронтенд (Vite 6 + Tailwind v4 + React 19) | ✅ готово — [`frontend/`](frontend/README.md) |
-| 3 | Скелет FastAPI (SQLAlchemy async + Alembic + Celery + Valkey) | ✅ готово — [`backend/`](backend/README.md) |
-| 4 | Полный `docker-compose.yml` и деплой на `crmdetroid.ru` | ✅ готово — [инструкция](docs/deploy/02-deploy.md) |
-| 5 | Мутации: формы, канбан drag-and-drop, CRUD справочников | ✅ готово |
+| Раздел | Возможности |
+|---|---|
+| Вход | JWT, роли `admin` / `manager` / `operator`, журнал попыток входа |
+| Канбан лидов | перетаскивание между этапами, поиск, фильтры (этап, тег, приоритет, архив, «мои лиды»), управление этапами, быстрое создание |
+| Карточка лида | все поля с сохранением, теги, приоритет, статусбар этапов, пейджер, архивация |
+| Чаттер | лента изменений, примечания, вложения с превью картинок |
+| Активности | звонки, встречи, задачи со сроком; цветные часики на карточках канбана |
+| Заявки | создание, правка, смена статуса, фильтр, связь с лидом |
+| Админка | дашборд с графиком воронки, пользователи (CRUD), перевозчики, бэкапы, попытки входа |
+
+История по этапам — в разделе 12 [`docs/PROJECT.md`](docs/PROJECT.md).
 
 ## Структура репозитория
 
 ```
-backend/                    # FastAPI: SQLAlchemy 2.0 async, Alembic, Celery, JWT
-├── app/core/               конфиг, безопасность, логи, кеш, лимитер, ошибки
-├── app/models/             11 таблиц: users, stages, tags, leads, activities, ...
-├── app/api/v1/             auth · crm · shipments · carriers · admin · health
-├── app/worker/             Celery: бэкапы, напоминания, чистка вложений
-├── alembic/                миграции (схема + журнал попыток входа)
-└── tests/                  pytest (25 тестов, SQLite в памяти)
+AGENTS.md                   короткие правила для нового участника
+docs/PROJECT.md             ← полный контекст проекта
+docs/deploy/                инструкции: сервер с нуля и деплой
+deploy.sh                   деплой одной командой (с автооткатом)
+docker-compose.yml          весь стек: postgres · valkey · backend · worker · beat · frontend · nginx
 
-docker-compose.yml          # весь стек: postgres · valkey · backend · worker · beat · frontend · nginx
+backend/                    FastAPI
+├── app/core/               конфиг, безопасность, логи, кеш, лимитер, ошибки, пагинация
+├── app/models/             10 таблиц: users, stages, tags, leads, activities, shipments, …
+├── app/api/v1/             auth · launcher · crm · attachments · activities · shipments · carriers · admin · health
+├── app/worker/             Celery: бэкапы, архив вложений, напоминания, чистка
+├── app/cli.py              createsuperuser и демо-данные
+├── alembic/                3 миграции
+└── tests/                  pytest, 42 теста на SQLite в памяти
 
-frontend/                   # React 19 + Vite 6 + Tailwind v4, данные из API
-├── src/app/                # router, providers, layout (AppShell, Navbar, ControlPanel)
-├── src/features/           # auth · launcher · crm · shipments · admin
-└── src/shared/             # ui-компоненты, моковые данные, типы, утилиты
+frontend/                   React 19
+├── src/app/                router, providers, layout (AppShell, Navbar, ControlPanel)
+├── src/features/           auth · launcher · crm (board, list, lead-form) · shipments · admin
+└── src/shared/             api (клиент, токены, хуки), ui, lib, types
 
-deploy/                     # инфраструктура (зеркало каталога /opt/crm на сервере)
-├── docker-compose.yml      # этап 1: nginx-шлюз; этап 4: весь стек
-├── nginx/
-│   ├── conf.d/             # боевые конфиги (общие настройки + сайт с HTTPS)
-│   ├── bootstrap/          # временный HTTP-конфиг для первичного выпуска сертификата
-│   └── snippets/           # TLS-параметры и заголовки безопасности
-├── www/                    # статическая заглушка до появления фронтенда
-└── scripts/                # deploy-hook Certbot (reload nginx после продления)
-
-docs/deploy/                # пошаговые инструкции по развёртыванию
-└── 01-server-setup.md      # этап 1: настройка сервера с нуля
+deploy/                     инфраструктура сервера
+├── nginx/conf.d/           боевые конфиги сайта
+├── nginx/snippets/         TLS-параметры и заголовки безопасности
+├── nginx/bootstrap/        временный HTTP-конфиг для первого выпуска сертификата
+├── systemd/crm.service     автозапуск стека после перезагрузки
+└── scripts/                deploy-hook Certbot (мягкая перезагрузка nginx)
 ```
 
-## Запуск всего стека
+## Запуск локально
+
+```bash
+cd backend
+python -m venv .venv && .venv/bin/pip install -e ".[dev]"
+export DATABASE_URL="sqlite+aiosqlite:///./crm.db"     # Postgres не нужен
+.venv/bin/alembic upgrade head
+.venv/bin/python -m app.cli createsuperuser --email admin@crmdetroid.ru --password DemoPass12345
+.venv/bin/python -m app.cli seed
+.venv/bin/uvicorn app.main:app --reload                # http://localhost:8000/docs
+
+cd ../frontend && npm install && npm run dev           # http://localhost:5173
+```
+
+## Запуск всего стека в Docker
 
 ```bash
 cp .env.example .env     # заполнить SECRET_KEY и POSTGRES_PASSWORD
@@ -71,12 +95,12 @@ cd /opt/crm && ./deploy.sh      # или на сервере
 
 `deploy.sh` обновляет код, собирает образы, ждёт готовности контейнеров,
 проверяет сайт снаружи и **откатывается сам**, если релиз не поднялся.
-Подробности и флаги — в [инструкции по деплою](docs/deploy/02-deploy.md).
+Флаги: `--status`, `--no-build`, `--skip-pull`, `--rollback`, `--help`.
 
 ## Продакшен
 
-- Домен: https://crmdetroid.ru (+ редирект с `www` и с `http`)
+- Домен: https://crmdetroid.ru (редиректы с `www` и с `http`)
 - Сервер: vps.sweb.ru, `77.222.38.191`, Ubuntu 26.04 LTS
-- Каталог приложения на сервере: `/opt/crm`
+- Каталог приложения: `/opt/crm` (клон этого репозитория)
 - Автозапуск: `systemctl status crm.service`
-- Стек на сервере: Docker 29.8.1 · Compose v5.5.1 · Nginx 1.27.5 · TLS Let's Encrypt
+- Бэкапы: `pg_dump` ежедневно в 03:00, хранение 14 дней; архив вложений — еженедельно

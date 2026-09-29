@@ -1,0 +1,429 @@
+# CRM Detroid — полный контекст проекта
+
+> Этот документ — точка входа для того, кто видит проект впервые: человека или
+> ИИ-агента. Здесь собрано всё: архитектура, доменная модель, соглашения,
+> эксплуатация и — главное — **подводные камни**, на которых проект уже
+> спотыкался. Читать сверху вниз; остальные документы дополняют этот.
+
+Состояние на 29.09.2026 · ветка `arena/01a0eb16-crm` · продакшен работает.
+
+---
+
+## 1. Что это
+
+CRM для транспортной компании: лиды (потенциальные клиенты-грузоотправители),
+воронка продаж канбаном, заявки на перевозку, справочник перевозчиков,
+пользователи и отчёты.
+
+| | |
+|---|---|
+| Продакшен | **https://crmdetroid.ru** |
+| Сервер | vps.sweb.ru, `77.222.38.191`, Ubuntu 26.04 LTS, 2 ГБ RAM, 15 ГБ диск |
+| Доступ | SSH только по ключу, пользователь `deploy`, алиас `ssh crm` |
+| Каталог на сервере | `/opt/crm` — это клон **этого** репозитория |
+| Репозиторий | `Roses1s/crm`, рабочая ветка `arena/01a0eb16-crm` |
+| Владелец | не администратор: объяснения нужны простым языком, команды — готовыми к копированию |
+
+Владелец проекта общается по-русски. **Вся документация, комментарии в коде,
+сообщения коммитов и ответы в чате — на русском.**
+
+---
+
+## 2. Быстрый старт (локально, без Docker)
+
+```bash
+# бэкенд на SQLite — Postgres не нужен
+cd backend
+python -m venv .venv && .venv/bin/pip install -e ".[dev]"
+export DATABASE_URL="sqlite+aiosqlite:///./crm.db"
+.venv/bin/alembic upgrade head
+.venv/bin/python -m app.cli createsuperuser --email admin@crmdetroid.ru --password DemoPass12345
+.venv/bin/python -m app.cli seed          # этапы, теги, демо-лиды
+.venv/bin/uvicorn app.main:app --reload   # http://localhost:8000/docs
+
+# фронтенд (в другом терминале)
+cd frontend && npm install && npm run dev  # http://localhost:5173
+```
+
+Vite проксирует `/api` на `http://127.0.0.1:8000` (`VITE_API_TARGET` переопределяет).
+В продакшене прокси не нужен: nginx отдаёт фронтенд и `/api/` с одного домена.
+
+Проверки перед коммитом:
+
+```bash
+cd backend && .venv/bin/ruff check . && .venv/bin/ruff format . \
+  && .venv/bin/mypy app && .venv/bin/python -m pytest      # 42 теста
+cd frontend && npx tsc -b && npm run build
+```
+
+---
+
+## 3. Архитектура
+
+```
+                    интернет
+                       │ 80/443
+             ┌─────────▼──────────┐
+             │   crm-nginx 1.27   │  сеть edge
+             │  TLS, редиректы    │
+             └───┬────────────┬───┘
+        /api/    │            │  /
+      ┌──────────▼───┐   ┌────▼───────────┐
+      │ crm-backend  │   │ crm-frontend   │
+      │ Gunicorn+    │   │ nginx + статика│
+      │ UvicornWorker│   └────────────────┘
+      └───┬──────────┘
+          │ сеть internal (наружу закрыта)
+    ┌─────┴─────┬──────────────┬───────────────┐
+┌───▼────────┐ ┌▼───────────┐ ┌▼───────────┐ ┌─▼──────────┐
+│crm-postgres│ │ crm-valkey │ │ crm-worker │ │  crm-beat  │
+│    18      │ │     8      │ │  Celery    │ │ расписание │
+└────────────┘ └────────────┘ └────────────┘ └────────────┘
+```
+
+**Семь контейнеров, наружу опубликован только nginx (80/443).** Это принципиально:
+Docker пишет правила в обход UFW, поэтому любой `ports:` у базы сделал бы её
+публичной. Postgres и Valkey недоступны даже с самого хоста.
+
+Тома: `pgdata` (база), `valkeydata`, `backups` (дампы), `attachments` (файлы лидов).
+
+| Компонент | Версия |
+|---|---|
+| Python | 3.13 (в образе), код совместим с 3.11 |
+| FastAPI / SQLAlchemy / Pydantic | 0.115+ / 2.0+ (async) / 2.10+ |
+| PostgreSQL / Valkey | 18 / 8 |
+| Celery | 5.5+, брокер Valkey (`redis://valkey:6379/1`) |
+| React / Vite / Tailwind | 19 / 6 / **4** |
+| Nginx | 1.27 (контейнером, не из apt) |
+
+---
+
+## 4. Доменная модель
+
+Десять таблиц (`backend/app/models/`):
+
+| Таблица | Смысл | Важные детали |
+|---|---|---|
+| `users` | сотрудники | роли `admin` / `manager` / `operator` |
+| `stages` | колонки канбана | `sequence` — порядок, `is_closed` — закрывающий этап, `color` |
+| `tags` | метки лидов | цвет из фиксированной палитры |
+| `leads` | потенциальные клиенты | ИНН с контрольной суммой, `priority` 0–3, `is_archived` |
+| `lead_tags` | связь лид↔тег | many-to-many |
+| `activities` | запланированные действия | звонок/встреча/задача/письмо, срок, исполнитель |
+| `timeline_entries` | лента чаттера | примечания и история изменений полей |
+| `attachments` | файлы | на диске в томе, в базе только карточка |
+| `shipments` | заявки на перевозку | статус, маршрут, перевозчик, груз |
+| `carriers` | перевозчики | справочник |
+| `login_attempts` | журнал входов | для раздела «Безопасность» |
+
+**Бизнес-правила, зашитые в код:**
+
+- **ИНН** — 10 или 12 цифр **с проверкой контрольной суммы ФНС**
+  (`backend/app/schemas/crm.py::_inn_checksum_ok`). Придуманные «красивые» номера
+  вроде `7451234567` её не проходят — в тестах и демо-данных используйте
+  пересчитанные значения.
+- **Смена этапа лида** автоматически пишет запись в `timeline_entries`
+  (`field_label="Этапы лидов"`), поэтому история движения видна в чаттере.
+- **Закрытие активности** тоже пишет запись в ленту (`type=activity`).
+- **Удаление лида** = архивация (`is_archived=True`), физически ничего не удаляется.
+- **`activity_state` лида** (`overdue` / `today` / `planned` / `null`) вычисляется
+  из ближайшего незакрытого действия и отдаётся **вместе с лидом** — на нём
+  строятся цветные часики на канбане. Связь грузится `selectin`: один
+  дополнительный запрос на страницу, а не по запросу на карточку.
+
+---
+
+## 5. API
+
+Префикс `/api/v1`. Документация `/docs` доступна только когда `ENVIRONMENT != production`.
+
+**Соглашения:**
+
+- **Авторизация** — JWT в заголовке `Authorization: Bearer <access>`.
+  `access` живёт 30 минут, `refresh` — 14 дней (`POST /auth/refresh`).
+- **Роли** проверяются зависимостями `AdminUser` / `ManagerUser` из
+  `app/api/deps.py` — права видно прямо в сигнатуре обработчика.
+- **Списки** отдаются как `{count, next, previous, results}` — формат выбран
+  так, чтобы фронтенд читал одинаково все ручки.
+- **Ошибки** всегда `{detail, code, request_id}`; у 422 добавляется `errors[]`.
+  Обработчики в `app/core/errors.py`.
+- **Каждый ответ** несёт `X-Request-ID`, он же попадает в структурные логи.
+
+**Карта маршрутов:**
+
+```
+POST   /auth/login                      вход (лимит 10/мин, пишет в login_attempts)
+POST   /auth/refresh                    обновление пары токенов
+GET    /auth/me                         текущий пользователь
+GET    /launcher/apps                   плитки приложений (фильтр по роли)
+
+GET    /crm/stages                      этапы (POST — создать, manager+)
+PATCH  /crm/stages/{id}                 переименовать, цвет, is_closed (manager+)
+DELETE /crm/stages/{id}                 удалить; ?fallback_stage_id= — куда перенести лиды
+GET    /crm/tags                        теги (POST — создать, manager+)
+DELETE /crm/tags/{id}                   удалить тег (manager+)
+GET    /crm/leads                       список: search, stage, tag, priority,
+                                        assigned_to, is_archived, page, page_size
+POST   /crm/leads                       создание
+GET    /crm/leads/{id}                  карточка
+PATCH  /crm/leads/{id}                  правка (смена этапа пишется в ленту)
+DELETE /crm/leads/{id}                  архивация (manager+)
+GET    /crm/leads/{id}/timeline         лента чаттера
+POST   /crm/leads/{id}/notes            примечание
+GET    /crm/leads/{id}/pager            позиция N/M и соседние записи
+GET    /crm/leads/{id}/activities       действия; POST — запланировать
+PATCH  /crm/activities/{id}             изменить / закрыть
+DELETE /crm/activities/{id}             удалить (исполнитель или manager+)
+GET    /crm/activities/my               мои незакрытые действия
+GET    /crm/leads/{id}/attachments      файлы; POST — загрузка (multipart)
+GET    /crm/attachments/{id}/content    выдача файла (?download=true — принудительно)
+DELETE /crm/attachments/{id}            удалить (автор или manager+)
+
+GET    /shipments                       заявки (фильтр status); POST — создать
+GET    /shipments/{id}                  карточка; PATCH — правка
+PATCH  /shipments/{id}/status           смена статуса
+GET    /leads/{id}/shipments            заявки конкретного лида
+
+GET    /carriers                        перевозчики (?only_active=true)
+POST   /carriers                        добавить (manager+)
+PATCH  /carriers/{id}                   изменить (manager+)
+GET    /admin/stats                     сводка дашборда (кеш 60 с)
+GET    /admin/users                     пользователи (admin)
+POST   /admin/users                     создать (admin)
+PATCH  /admin/users/{id}                изменить, в т. ч. сменить пароль (admin)
+DELETE /admin/users/{id}                удалить; себя удалить нельзя (admin)
+GET    /admin/backups                   список дампов + признак «устарел»
+POST   /admin/backup                    поставить задачу бэкапа в очередь
+GET    /admin/login-attempts            неудачные входы, сгруппированы по email+IP
+
+GET    /health                          жив ли процесс (без префикса /api/v1)
+GET    /health/ready                    готовность: проверяет БД и Valkey
+```
+
+---
+
+## 6. Фронтенд
+
+Маршруты (`frontend/src/app/router.tsx`) повторяют исходный проект-образец
+**один в один**: `/login`, `/` (лаунчер), `/crm` (канбан + список),
+`/crm/leads/:id`, `/shipments`, `/shipments/:id`, `/admin` (+ `users`,
+`carriers`, `security`), `*` → редирект на `/`.
+
+**Организация по фичам:** `features/auth`, `features/launcher`, `features/crm`
+(+ `board`, `list`, `lead-form`), `features/shipments`, `features/admin`,
+общее — в `shared/{api,ui,lib,types}`.
+
+**Работа с данными.** Компоненты не знают про `fetch` и адреса — только про хуки
+из `shared/api/hooks.ts`. Ключи кеша собраны в объекте `keys`, инвалидация после
+мутаций предсказуема. `shared/api/client.ts` подставляет токен, разбирает единый
+формат ошибок и при 401 чистит токены и уводит на `/login`.
+
+**Дизайн-система.** Перенесена из референсного проекта (Odoo-подобный интерфейс)
+и переведена на Tailwind v4:
+
+- все токены — в `src/index.css`: `@theme inline` даёт имена утилит
+  (`bg-odoo-surface`, `text-odoo-text-muted`), значения лежат в `:root` и `.dark`;
+- тёмная тема — класс `.dark` на `<html>`, объявлена через
+  `@custom-variant dark (&:where(.dark, .dark *))`; `public/theme.js` применяет
+  её до первой отрисовки, иначе тёмный пользователь видит белую вспышку;
+- шрифт Inter, базовый размер 13px — как в оригинале.
+
+**Состояние интерфейса в адресной строке.** Фильтры канбана, режим (канбан/список),
+группировка и фильтр заявок живут в query-параметрах: ссылкой на отфильтрованную
+доску можно поделиться, и она переживает перезагрузку.
+
+---
+
+## 7. Эксплуатация
+
+**Обновление продакшена — одна команда:**
+
+```bash
+ssh crm /opt/crm/deploy.sh      # или deploy-crm, если настроена функция PowerShell
+```
+
+`deploy.sh` (в корне репозитория): блокировка от параллельного запуска, проверка
+чистоты каталога, `git pull --ff-only`, пометка образов `:previous`, сборка,
+`up -d`, ожидание `healthy` до 180 с, внешняя проверка `https://crmdetroid.ru/health`,
+**автооткат** при неудаче, `docker image prune`. Флаги: `--status`, `--no-build`,
+`--skip-pull`, `--rollback`, `--help`. Журнал: `/opt/crm/.deploy.log`.
+
+**Миграции** накатываются автоматически при старте контейнера `backend`
+(`alembic upgrade head && gunicorn ...`). Откат образов **не отменяет миграции** —
+скрипт предупреждает об этом в конце вывода.
+
+**Автозапуск** — systemd-юнит `crm.service` (`deploy/systemd/crm.service`),
+он надёжнее, чем `restart: unless-stopped` (см. подводные камни).
+
+**Сертификат** — Let's Encrypt, certbot **на хосте** в режиме `--webroot`
+(`/opt/crm/certbot/www`), `/etc/letsencrypt` монтируется в nginx только на чтение.
+Автопродление — штатный `certbot.timer` + deploy-hook
+`/etc/letsencrypt/renewal-hooks/deploy/reload-nginx.sh`, который шлёт контейнеру
+сигнал HUP (мягкая перезагрузка, без простоя).
+
+**Фоновые задачи** (`backend/app/worker/tasks.py`, расписание в `celery_app.py`):
+
+| Задача | Когда | Что делает |
+|---|---|---|
+| `backup_database` | 03:00 ежедневно | `pg_dump` в том `backups`, хранение 14 дней |
+| `backup_attachments` | воскресенье | архив тома вложений |
+| `send_call_reminders` | 09:00 ежедневно | напоминания о запланированных звонках (пока в журнал) |
+| `cleanup_orphan_attachments` | воскресенье | чистит записи о пропавших файлах |
+
+**Служебные команды:**
+
+```bash
+docker compose exec backend python -m app.cli createsuperuser --email ... --password ...
+docker compose exec backend python -m app.cli seed
+docker compose exec backend alembic current
+docker compose exec postgres psql -U crm -d crm -c "\dt"
+```
+
+---
+
+## 8. Соглашения разработки
+
+**Язык.** Русский везде: комментарии, docstring'и, сообщения ошибок, коммиты,
+документация. Комментарии объясняют **почему**, а не что делает строка.
+
+**Бэкенд:** ruff (line-length 100, правила `E,F,I,B,UP,SIM,C4,RUF`; `RUF001-003`
+отключены — проект на кириллице), mypy `strict`, pytest с `asyncio_mode=auto`.
+
+**Фронтенд:** TypeScript strict + `noUnusedLocals`, сборка `tsc -b && vite build`.
+
+**Тесты бэкенда** идут на SQLite в памяти — ни Postgres, ни Valkey не нужны,
+прогон ~30 секунд. Схема создаётся из моделей (`Base.metadata.create_all`),
+миграции проверяются отдельно.
+
+**Миграции Alembic.** Автогенерация выполняется на SQLite (Postgres в песочнице
+нет), поэтому **сгенерированный файл всегда нужно причесать**:
+
+1. `sa.text("(CURRENT_TIMESTAMP)")` → `sa.func.now()` (иначе в Postgres будет
+   несовпадение server_default, а `CURRENT_TIMESTAMP` в тексте ломает SQLite);
+2. блоки `with op.batch_alter_table(...)` (обходной приём для SQLite) развернуть
+   в обычные `op.create_index(..., "таблица", ...)` / `op.drop_index(..., table_name=...)`.
+
+После правки обязательно прогнать `alembic upgrade head` на пустой базе.
+
+**Коммиты** — осмысленные, по-русски, одно изменение = один коммит.
+**Ветка всегда `arena/01a0eb16-crm`**, в другие ветки не пушить.
+
+---
+
+## 9. Подводные камни (собраны на практике)
+
+Каждый пункт здесь стоил отладки — не наступайте повторно.
+
+### Инфраструктура
+
+| Симптом | Причина | Решение |
+|---|---|---|
+| `container crm-postgres is unhealthy`, в логе `in 18+, these Docker images...` | В Postgres 18 данные лежат в `/var/lib/postgresql/18/docker`, том монтируется на уровень выше | `pgdata:/var/lib/postgresql` (**без** `/data`) |
+| Контейнеры не поднялись после перезагрузки сервера | `live-restore: true` в `daemon.json` мешает применению политик перезапуска | Убрать `live-restore`, автозапуск через systemd-юнит `crm.service` |
+| `celery beat` в цикле `Restarting (1)`, в логе `Permission denied: 'celerybeat-schedule'` | `WORKDIR /app` создаёт каталог от root; `COPY --chown` меняет владельца файлов, но **не каталога** | `RUN chown app:app /app` + `--schedule /tmp/celerybeat-schedule` |
+| Загрузка вложений падает по правам | Пустой именованный том берёт владельца из образа; если каталога в образе нет — том остаётся root'овым | Создавать `/var/lib/crm/attachments` **в Dockerfile** с `chown app:app` |
+| Ночной бэкап не снимается | `pg_dump` 17 из Debian не умеет дампить сервер 18 | Ставить `postgresql-client-18` из репозитория PGDG |
+| Сборка фронтенда падает с `killed` | Не хватило памяти на 2 ГБ VPS | Временно увеличить swap до 4 ГБ |
+| `nginx: host not found in upstream "backend"` | nginx стартовал раньше бэкенда | `docker compose up -d nginx` после подъёма остальных |
+| В логах nginx `ssl_stapling ignored, no OCSP responder URL` | Let's Encrypt с 2025 года не кладёт OCSP-адрес в сертификаты | Не включать `ssl_stapling` |
+
+### Бэкенд
+
+| Симптом | Причина | Решение |
+|---|---|---|
+| Воркер Celery падает при старте | В задачах синхронный движок SQLAlchemy, а стоит только `asyncpg` (асинхронный) | `psycopg[binary]`, отдельный `settings.sync_dsn`; движок создавать **лениво** |
+| `pg_dump` получает DSN с `+asyncpg` | Один DSN на все случаи | Три свойства в настройках: `sqlalchemy_dsn` (async), `sync_dsn` (psycopg), `plain_dsn` (для pg_dump/psql) |
+| Ответ 422 падает с `Object of type ValueError is not JSON serializable` | В `exc.errors()` лежат объекты исключений (`ctx`) | Приводить ошибки к `{loc, msg, type}` вручную |
+| После PATCH в ответе старые данные | SQLAlchemy отдаёт объект из identity map | `.execution_options(populate_existing=True)` в запросе после мутации |
+| `MissingGreenlet` при присваивании `lead.tags` | Присваивание коллекции после `flush()` тянет старое значение из БД синхронно | Задавать связь **до** `add()/flush()`, либо на уже загруженном (`selectinload`) объекте |
+| `passlib` падает с `AttributeError: module 'bcrypt' has no attribute '__about__'` | bcrypt 5.0 несовместим с passlib 1.7.4 | Пин `bcrypt>=4.0,<5` |
+| Конфликт зависимостей при установке | extra `fastapi-cache2[redis]` требует `redis<5` | Ставить `fastapi-cache2` без extra + `redis>=5.2`; плюс нужен `jinja2` |
+| В тестах `You must call init first!` | lifespan приложения в тестах не выполняется, кеш не инициализирован | Инициализировать `FastAPICache` фикстурой (autouse) |
+
+### Фронтенд
+
+| Симптом | Причина | Решение |
+|---|---|---|
+| Утилиты Tailwind выглядят не так, как в исходнике | v4 переименовал шкалу: v3 `shadow-sm`→v4 `shadow-xs`, v3 `rounded`→v4 `rounded-sm` | Использовать `shadow-xs` и явные `rounded-[4px]` |
+| Тема не переключается | В v4 нет `darkMode: "class"` | `@custom-variant dark (&:where(.dark, .dark *))` + значения в `:root`/`.dark`, имена — через `@theme inline` |
+| Поля формы пустые после загрузки данных | `defaultValue` не обновляется после прихода ответа | Либо контролируемые поля, либо `key={id}` на контейнере для пересоздания |
+| Часики/данные не обновляются после мутации | Не инвалидирован нужный ключ | Инвалидация собрана в хелперах в `hooks.ts` (`invalidateActivities` и т. п.) |
+
+### Окружение разработки (песочница Arena)
+
+- **Нет Docker, Postgres, Valkey и прав `sudo`.** Проверять можно только тем, что
+  работает локально: pytest на SQLite, `tsc`, `vite build`, запуск uvicorn с
+  `DATABASE_URL=sqlite+aiosqlite:...`.
+- **`.venv` и `node_modules` не переживают перезапуск песочницы** — при «модуль
+  не найден» просто пересоздайте их.
+- **Локальная git-история может откатиться** к базовому коммиту, хотя на GitHub
+  всё на месте. Лечится так:
+  ```bash
+  git fetch origin arena/01a0eb16-crm
+  git reset FETCH_HEAD          # индекс и HEAD на удалённое состояние, файлы не трогаются
+  git status --short            # пусто = рабочее дерево совпадает с GitHub
+  ```
+  Если рабочее дерево содержит новую работу — `git reset --soft FETCH_HEAD`,
+  затем обычный коммит поверх.
+- **Скачивание браузеров Playwright заблокировано**, поэтому UI проверяется
+  сборкой, типами и SSR-прогоном, а не автотестами в браузере.
+- Полезный приём: подставные бинарники в `PATH` (например, фальшивый `docker`)
+  позволяют прогнать логику скриптов вроде `deploy.sh` целиком, включая ветку отката.
+
+---
+
+## 10. Почему сделано именно так
+
+| Решение | Причина | Что отвергнуто |
+|---|---|---|
+| Nginx 1.27 контейнером | Нужна фиксированная версия и обращение к бэкенду по имени сервиса | apt-пакет Ubuntu (там другая версия), репозиторий nginx.org (нет сборок под `resolute`) |
+| Certbot на хосте, режим `--webroot` | Nginx в контейнере; webroot не требует плагина и остановки сервера | `--nginx` плагин, standalone-режим |
+| Enum'ы как VARCHAR + CHECK (`native_enum=False`) | Новый статус добавляется обычной миграцией, без `ALTER TYPE`; работает и в SQLite | Нативные типы Postgres |
+| Формат списков `{count, next, previous, results}` | Совместим с тем, что уже умеет читать фронтенд | Голый массив, конверты вида `{data, meta}` |
+| Вложения на томе сервера | Решение владельца: проще, без внешних аккаунтов | S3-совместимое хранилище (обсуждалось, отложено) |
+| Белый список расширений для вложений | `.svg` и `.html` браузер исполняет как разметку — это XSS на своём домене | Доверять `Content-Type` клиента |
+| Тесты на SQLite | Быстро, без инфраструктуры | Поднимать Postgres в CI (пока не нужно) |
+| `deploy.sh` вместо CI/CD | Сборка в GitHub Actions требует реестра и перестройки compose; сейчас не окупается | GitHub Actions + GHCR (обсуждалось, отложено), Watchtower (отклонён: обновляет вслепую) |
+
+---
+
+## 11. Чего нет и что решено не делать
+
+**Не реализовано (бэкенд готов не везде):**
+
+- вложения к заявкам (у лидов есть, у заявок лента пустая);
+- экспорт лидов в Excel/CSV;
+- дашборд по активностям (сколько просрочено и у кого);
+- уведомления пользователям (задача напоминаний пока только пишет в журнал);
+- тесты фронтенда и CI-проверки на pull request.
+
+**Решено не делать (явный отказ владельца 29.09.2026):**
+
+- мониторинг с уведомлением в Telegram;
+- автоматическая выгрузка бэкапов за пределы сервера.
+
+> ⚠️ Отсюда следует главный остаточный риск: **резервные копии лежат на том же
+> диске, что и база**. Потеря сервера = потеря данных. Владелец предупреждён
+> дважды и решил оставить как есть; без его запроса тему не поднимать,
+> но при вопросах о надёжности — упоминать честно.
+
+---
+
+## 12. Как проект развивался
+
+Работа шла этапами, каждый закрывался проверкой на живом сервере:
+
+1. **Сервер с нуля** — SSH-ключи, UFW, fail2ban, автообновления, swap, Docker,
+   Nginx 1.27, TLS Let's Encrypt с автопродлением. Подробности:
+   [`docs/deploy/01-server-setup.md`](deploy/01-server-setup.md).
+2. **Фронтенд-макет** — вся визуальная система и страницы, полностью на моках.
+3. **Скелет бэкенда** — модели, API, JWT, Alembic, Celery, тесты.
+4. **Деплой** — полный `docker-compose.yml`, фронтенд подключён к API.
+   Подробности: [`docs/deploy/02-deploy.md`](deploy/02-deploy.md).
+5. **Мутации** — формы, drag-and-drop, CRUD справочников.
+6. **Вложения** — файлы на томе сервера.
+7. **Активности** — действия по лидам, часики на канбане.
+8. **`deploy.sh`** — деплой одной командой с автооткатом.
+
+Три поломки нашлись только в продакшене (Postgres 18, драйвер Celery, права
+`/app`) — все три описаны в разделе 9 и закрыты тестами или правками образа.
