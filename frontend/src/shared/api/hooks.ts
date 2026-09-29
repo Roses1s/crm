@@ -224,16 +224,9 @@ export function useLeadPager(id: string | undefined) {
 export interface LeadPayload {
   name: string;
   inn: string;
-  kpp?: string;
-  timezone?: string;
-  company_email?: string | null;
-  phone?: string;
   logist_contact?: string;
   logist_phone?: string;
   logist_email?: string | null;
-  credit_limit?: string;
-  first_call_date?: string | null;
-  next_call_date?: string | null;
   priority?: number;
   stage_id?: number;
   tag_ids?: number[];

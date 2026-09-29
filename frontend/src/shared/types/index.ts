@@ -39,16 +39,9 @@ export interface Lead {
   id: number;
   name: string;
   inn: string;
-  kpp: string;
-  timezone: string;
-  company_email: string | null;
-  phone: string;
   logist_contact: string;
   logist_phone: string;
   logist_email: string | null;
-  credit_limit: string;
-  first_call_date: string | null;
-  next_call_date: string | null;
   priority: number;
   is_archived: boolean;
   stage_id: number;

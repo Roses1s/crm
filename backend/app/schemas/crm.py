@@ -1,7 +1,6 @@
 from __future__ import annotations
 
-from datetime import date, datetime
-from decimal import Decimal
+from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
@@ -48,16 +47,9 @@ class TagCreate(BaseModel):
 class LeadBase(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     inn: str = Field(min_length=10, max_length=12)
-    kpp: str = ""
-    timezone: str = ""
-    company_email: EmailStr | None = None
-    phone: str = ""
     logist_contact: str = ""
     logist_phone: str = ""
     logist_email: EmailStr | None = None
-    credit_limit: Decimal = Decimal("0")
-    first_call_date: date | None = None
-    next_call_date: date | None = None
     priority: int = Field(default=0, ge=0, le=3)
 
     @field_validator("inn")
@@ -87,16 +79,9 @@ class LeadTransfer(BaseModel):
 class LeadUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
     inn: str | None = None
-    kpp: str | None = None
-    timezone: str | None = None
-    company_email: EmailStr | None = None
-    phone: str | None = None
     logist_contact: str | None = None
     logist_phone: str | None = None
     logist_email: EmailStr | None = None
-    credit_limit: Decimal | None = None
-    first_call_date: date | None = None
-    next_call_date: date | None = None
     priority: int | None = Field(default=None, ge=0, le=3)
     stage_id: int | None = None
     tag_ids: list[int] | None = None
@@ -109,16 +94,9 @@ class LeadRead(ORMModel):
     id: int
     name: str
     inn: str
-    kpp: str
-    timezone: str
-    company_email: str | None
-    phone: str
     logist_contact: str
     logist_phone: str
     logist_email: str | None
-    credit_limit: Decimal
-    first_call_date: date | None
-    next_call_date: date | None
     priority: int
     is_archived: bool
     stage_id: int

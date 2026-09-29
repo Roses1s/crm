@@ -75,7 +75,7 @@ def _apply_filters(
                 Lead.name.ilike(pattern),
                 Lead.inn.ilike(pattern),
                 Lead.logist_contact.ilike(pattern),
-                Lead.phone.ilike(pattern),
+                Lead.logist_phone.ilike(pattern),
             )
         )
     if stage is not None:

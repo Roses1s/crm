@@ -9,7 +9,7 @@ from __future__ import annotations
 import shutil
 import subprocess
 import tarfile
-from datetime import UTC, date, datetime, timedelta
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any
 
@@ -19,7 +19,6 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.logging import configure_logging, get_logger
-from app.models.crm import Lead
 from app.models.timeline import Attachment
 
 configure_logging()
@@ -103,32 +102,6 @@ def backup_attachments() -> dict[str, Any]:
     size = target.stat().st_size
     log.info("backup.files.ok", file=target.name, size=size, removed_old=removed)
     return {"ok": True, "file": target.name, "size": size}
-
-
-@shared_task(name="app.worker.tasks.send_call_reminders")
-def send_call_reminders() -> dict[str, Any]:
-    """Напоминания о звонках, запланированных на сегодня."""
-    today = date.today()
-    with _session() as session:
-        leads = list(
-            session.execute(
-                select(Lead).where(
-                    Lead.next_call_date == today,
-                    Lead.is_archived.is_(False),
-                )
-            )
-            .unique()
-            .scalars()
-        )
-    for lead in leads:
-        # Здесь появится отправка в почту/телеграм — пока только журнал.
-        log.info(
-            "reminder.call",
-            lead_id=lead.id,
-            lead=lead.name,
-            assigned_to=lead.assigned_to_id,
-        )
-    return {"reminders": len(leads), "date": today.isoformat()}
 
 
 @shared_task(name="app.worker.tasks.cleanup_orphan_attachments")

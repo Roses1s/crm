@@ -440,26 +440,6 @@ function LeadForm({ id }: { id?: string }) {
                             onChange={(e) => set("inn", e.target.value)}
                           />
                         </Field>
-                        <Field label="КПП" htmlFor="lead-kpp">
-                          <OdooInput
-                            id="lead-kpp"
-                            inputMode="numeric"
-                            maxLength={9}
-                            placeholder="9 цифр"
-                            className="max-w-[14ch]"
-                            value={form.kpp}
-                            onChange={(e) => set("kpp", e.target.value)}
-                          />
-                        </Field>
-                        <Field label="Часовой пояс" htmlFor="lead-tz">
-                          <OdooInput
-                            id="lead-tz"
-                            placeholder="МСК+2"
-                            className="max-w-[14ch]"
-                            value={form.timezone}
-                            onChange={(e) => set("timezone", e.target.value)}
-                          />
-                        </Field>
                         <Field label="Продавец">
                           {/* Щелчок по имени открывает передачу лида коллеге. */}
                           <button
@@ -491,74 +471,10 @@ function LeadForm({ id }: { id?: string }) {
                           </button>
                         </Field>
                       </InnerGroup>
-
-                      <InnerGroup>
-                        <Field label="Лимит" htmlFor="lead-limit">
-                          <span className="flex items-baseline gap-1">
-                            <OdooInput
-                              id="lead-limit"
-                              type="number"
-                              className="max-w-[11ch] text-right"
-                              value={form.credit_limit}
-                              onChange={(e) =>
-                                set("credit_limit", e.target.value)
-                              }
-                            />
-                            <span className="text-odoo-text-muted">₽</span>
-                          </span>
-                        </Field>
-                        <Field
-                          label="Дата первого звонка"
-                          htmlFor="lead-first-call"
-                        >
-                          <OdooInput
-                            id="lead-first-call"
-                            type="date"
-                            className="max-w-[18ch]"
-                            value={form.first_call_date}
-                            onChange={(e) =>
-                              set("first_call_date", e.target.value)
-                            }
-                          />
-                        </Field>
-                        <Field
-                          label="Дата следующего звонка"
-                          htmlFor="lead-next-call"
-                        >
-                          <OdooInput
-                            id="lead-next-call"
-                            type="date"
-                            className="max-w-[18ch]"
-                            value={form.next_call_date}
-                            onChange={(e) =>
-                              set("next_call_date", e.target.value)
-                            }
-                          />
-                        </Field>
-                      </InnerGroup>
                     </div>
 
                     <div>
                       <InnerGroup>
-                        <Field label="Email" htmlFor="lead-company-email">
-                          <OdooInput
-                            id="lead-company-email"
-                            type="email"
-                            placeholder="info@example.ru"
-                            value={form.company_email}
-                            onChange={(e) =>
-                              set("company_email", e.target.value)
-                            }
-                          />
-                        </Field>
-                        <Field label="Телефон" htmlFor="lead-phone">
-                          <OdooInput
-                            id="lead-phone"
-                            placeholder="+7 351 000-00-00"
-                            value={form.phone}
-                            onChange={(e) => set("phone", e.target.value)}
-                          />
-                        </Field>
                         <Field label="Приоритет">
                           <span className="inline-flex items-center pt-[2px] text-[16px] leading-none text-odoo-warning">
                             {[1, 2, 3].map((n) => (

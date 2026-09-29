@@ -9,8 +9,6 @@ from __future__ import annotations
 
 import argparse
 import asyncio
-from datetime import date, timedelta
-from decimal import Decimal
 
 from sqlalchemy import func, select
 
@@ -163,8 +161,6 @@ async def seed() -> None:
                     logist_contact=contact,
                     priority=priority,
                     stage_id=stage.id,
-                    credit_limit=Decimal("250000"),
-                    next_call_date=date.today() + timedelta(days=i),
                     assigned_to_id=owner.id if owner else None,
                 )
                 lead.tags = tags[: (i % 3) + 1]

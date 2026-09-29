@@ -1,17 +1,13 @@
 from __future__ import annotations
 
-from datetime import date
-from decimal import Decimal
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
     Boolean,
     CheckConstraint,
     Column,
-    Date,
     ForeignKey,
     Integer,
-    Numeric,
     String,
     Table,
 )
@@ -75,19 +71,10 @@ class Lead(Base, TimestampMixin):
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(255), nullable=False, index=True)
     inn: Mapped[str] = mapped_column(String(12), nullable=False, index=True)
-    kpp: Mapped[str] = mapped_column(String(9), default="", nullable=False)
-    timezone: Mapped[str] = mapped_column(String(16), default="", nullable=False)
-
-    company_email: Mapped[str | None] = mapped_column(String(255))
-    phone: Mapped[str] = mapped_column(String(32), default="", nullable=False)
-
     logist_contact: Mapped[str] = mapped_column(String(255), default="", nullable=False)
     logist_phone: Mapped[str] = mapped_column(String(32), default="", nullable=False)
     logist_email: Mapped[str | None] = mapped_column(String(255))
 
-    credit_limit: Mapped[Decimal] = mapped_column(Numeric(12, 2), default=Decimal("0"))
-    first_call_date: Mapped[date | None] = mapped_column(Date)
-    next_call_date: Mapped[date | None] = mapped_column(Date)
     priority: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
 

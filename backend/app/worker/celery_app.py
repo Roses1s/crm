@@ -39,10 +39,6 @@ celery.conf.beat_schedule = {
         "task": "app.worker.tasks.backup_database",
         "schedule": crontab(hour=3, minute=0),
     },
-    "call-reminders": {
-        "task": "app.worker.tasks.send_call_reminders",
-        "schedule": crontab(hour=9, minute=0),
-    },
     "weekly-files-backup": {
         "task": "app.worker.tasks.backup_attachments",
         "schedule": crontab(hour=4, minute=0, day_of_week="sun"),
