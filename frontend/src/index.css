@@ -235,3 +235,23 @@
     border-radius: 9999px;
   }
 }
+
+/*
+ * Экран входа всегда светлый, даже если у сотрудника включена тёмная тема.
+ * Без принудительного color-scheme браузер подставляет сохранённый логин
+ * своим «тёмным» оформлением: голубая заливка и почти белые буквы на белом.
+ * Заливку автозаполнения перекрываем внутренней тенью — цвет фона у :-webkit-autofill
+ * иначе не меняется.
+ */
+.login-screen {
+  color-scheme: light;
+}
+
+.login-screen input:-webkit-autofill,
+.login-screen input:-webkit-autofill:hover,
+.login-screen input:-webkit-autofill:focus {
+  -webkit-text-fill-color: #1b1d21;
+  caret-color: #1b1d21;
+  box-shadow: 0 0 0 1000px #ffffff inset;
+  transition: background-color 9999s ease-in-out 0s;
+}

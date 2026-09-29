@@ -47,25 +47,25 @@ export function LoginPage() {
   }
 
   const fieldCls =
-    "h-11 w-full rounded-lg border border-[#e3e3e6] bg-white px-3.5 text-[15px] text-[#1b1d21] " +
+    "h-10 w-full rounded-lg border border-[#e3e3e6] bg-white px-3 text-[14px] text-[#1b1d21] " +
     "placeholder:text-[#b4b4ba] transition-colors focus:border-[#714b67] focus:outline-none " +
     "focus:ring-2 focus:ring-[#714b67]/15";
-  const labelCls = "mb-1.5 block text-[13px] font-medium text-[#5c5c66]";
+  const labelCls = "mb-1 block text-[12.5px] font-medium text-[#5c5c66]";
 
   return (
-    <div className="flex min-h-screen flex-col bg-white">
+    <div className="login-screen flex min-h-screen flex-col bg-white">
       <main className="flex flex-1 items-center justify-center px-5 py-10">
-        <div className="w-full max-w-[380px]">
+        <div className="w-full max-w-[320px]">
           <div className="flex flex-col items-center text-center">
             {/* Логотип компании; alt пустой — рядом идёт текстовое название. */}
-            <img src="/logo.svg" alt="" className="h-16 w-16" />
-            <h1 className="mt-5 text-[26px] font-semibold tracking-tight text-[#1b1d21]">
+            <img src="/logo.svg" alt="" className="h-14 w-14" />
+            <h1 className="mt-4 text-[22px] font-semibold tracking-tight text-[#1b1d21]">
               Detroid
             </h1>
-            <p className="mt-1.5 text-[14px] text-[#8a8a94]">Вход в систему</p>
+            <p className="mt-1 text-[13px] text-[#8a8a94]">Вход в систему</p>
           </div>
 
-          <form onSubmit={onSubmit} className="mt-9">
+          <form onSubmit={onSubmit} className="mt-7">
             <label className="block">
               <span className={labelCls}>Email</span>
               <input
@@ -92,7 +92,7 @@ export function LoginPage() {
                   placeholder="••••••••"
                   value={password}
                   onChange={(e) => setPassword(e.target.value)}
-                  className={`${fieldCls} pr-11`}
+                  className={`${fieldCls} pr-10`}
                 />
                 <button
                   type="button"
@@ -100,7 +100,7 @@ export function LoginPage() {
                   aria-label={
                     showPassword ? "Скрыть пароль" : "Показать пароль"
                   }
-                  className="absolute right-1 top-1 inline-flex h-9 w-9 items-center justify-center rounded-md text-[#a0a0a8] transition-colors hover:bg-[#f4f4f6] hover:text-[#5c5c66]"
+                  className="absolute right-0.5 top-0.5 inline-flex h-9 w-9 items-center justify-center rounded-md text-[#a0a0a8] transition-colors hover:bg-[#f4f4f6] hover:text-[#5c5c66]"
                 >
                   {showPassword ? (
                     <EyeOff className="h-4 w-4" />
@@ -114,7 +114,7 @@ export function LoginPage() {
             {error && (
               <p
                 role="alert"
-                className="mt-4 rounded-lg bg-[#fdf1f1] px-3.5 py-2.5 text-[13px] text-[#b3403f]"
+                className="mt-4 rounded-lg bg-[#fdf1f1] px-3 py-2 text-[12.5px] text-[#b3403f]"
               >
                 {error}
               </p>
@@ -123,14 +123,14 @@ export function LoginPage() {
             <button
               type="submit"
               disabled={login.isPending}
-              className="mt-6 inline-flex h-11 w-full items-center justify-center gap-2 rounded-lg bg-[#714b67] text-[15px] font-medium text-white transition-colors hover:bg-[#5f3f57] focus:outline-none focus:ring-2 focus:ring-[#714b67]/30 disabled:cursor-not-allowed disabled:opacity-70"
+              className="mt-5 inline-flex h-10 w-full items-center justify-center gap-2 rounded-lg bg-[#714b67] text-[14px] font-medium text-white transition-colors hover:bg-[#5f3f57] focus:outline-none focus:ring-2 focus:ring-[#714b67]/30 disabled:cursor-not-allowed disabled:opacity-70"
             >
               {login.isPending && <Loader2 className="h-4 w-4 animate-spin" />}
               {login.isPending ? "Входим…" : "Войти"}
             </button>
           </form>
 
-          <p className="mt-7 text-center text-[12.5px] leading-relaxed text-[#a0a0a8]">
+          <p className="mt-6 text-center text-[12px] leading-relaxed text-[#a0a0a8]">
             Доступ выдаёт администратор компании.
             <br />
             Забыли пароль — обратитесь к нему.
