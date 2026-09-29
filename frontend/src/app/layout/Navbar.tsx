@@ -1,7 +1,7 @@
 import { LayoutGrid, Menu, X } from "lucide-react";
 import { useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
-import { currentUser } from "@/shared/mock/users";
+import { logout, useMe } from "@/shared/api/hooks";
 import { toggleTheme, useTheme } from "@/shared/lib/theme";
 
 /**
@@ -14,8 +14,8 @@ export function Navbar() {
   const [sheet, setSheet] = useState(false);
   const navigate = useNavigate();
   const theme = useTheme();
-  const user = currentUser;
-  const letter = (user.first_name || user.email || "U").slice(0, 1).toUpperCase();
+  const { data: user } = useMe();
+  const letter = (user?.first_name || user?.email || "U").slice(0, 1).toUpperCase();
 
   const links = (
     <NavLink
@@ -62,13 +62,13 @@ export function Navbar() {
             type="button"
             onClick={() => setMenu((v) => !v)}
             className="flex h-7 w-7 items-center justify-center rounded-sm bg-[#2aa198] text-[12px] font-semibold text-white hover:brightness-95"
-            title={user.email}
+            title={user?.email}
           >
             {letter}
           </button>
           {menu && (
             <div className="absolute right-0 mt-2 min-w-[200px] rounded-md border border-odoo-border bg-odoo-surface py-1 text-odoo-text shadow-lg">
-              <div className="px-3 py-1.5 text-xs text-odoo-text-muted">{user.email}</div>
+              <div className="px-3 py-1.5 text-xs text-odoo-text-muted">{user?.email}</div>
               <button
                 type="button"
                 className="block w-full px-3 py-1.5 text-left text-sm hover:bg-odoo-bg"
@@ -105,7 +105,8 @@ export function Navbar() {
                 className="block w-full px-3 py-1.5 text-left text-sm hover:bg-odoo-bg"
                 onClick={() => {
                   setMenu(false);
-                  navigate("/login");
+                  logout();
+                  navigate("/login", { replace: true });
                 }}
               >
                 Выйти

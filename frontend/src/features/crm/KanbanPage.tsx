@@ -3,17 +3,14 @@ import { useState } from "react";
 import { AppShell, ControlPanel } from "@/app/layout/AppShell";
 import { Column } from "@/features/crm/board/Column";
 import { LeadListView } from "@/features/crm/list/LeadListView";
-import { activeLeads } from "@/shared/mock/leads";
-import { stages } from "@/shared/mock/stages";
-import { tags } from "@/shared/mock/tags";
+import { useLeads, useStages, useTags } from "@/shared/api/hooks";
 
 /**
  * Канбан лидов.
  *
- * Что осталось от оригинала: разметка панели управления, колонок и карточек,
- * переключатель канбан/список, сворачивание колонок, выпадашки фильтров.
- * Что убрано: загрузка данных, drag-and-drop и смена этапа, фильтрация через
- * query-параметры, создание этапов. Колонки заполняются моковым массивом.
+ * Данные приходят из API (TanStack Query). Drag-and-drop и серверная
+ * фильтрация пока не подключены: перетаскивание карточек и фильтры в панели —
+ * следующий шаг после запуска.
  */
 
 function Dropdown({
@@ -61,7 +58,9 @@ export function KanbanPage() {
   const [settingsOpen, setSettingsOpen] = useState(false);
   const [folded, setFolded] = useState<number[]>([]);
 
-  const leads = activeLeads;
+  const { data: leads = [] } = useLeads();
+  const { data: stages = [] } = useStages();
+  const { data: tags = [] } = useTags();
 
   const groupColumns =
     group === "assigned"
@@ -160,7 +159,7 @@ export function KanbanPage() {
                 <Column
                   key={stage.id}
                   stage={stage}
-                  leads={leads.filter((l) => l.stage === stage.id)}
+                  leads={leads.filter((l) => l.stage_id === stage.id)}
                   folded={folded.includes(stage.id)}
                   onFold={() =>
                     setFolded((f) =>

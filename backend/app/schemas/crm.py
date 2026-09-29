@@ -138,6 +138,8 @@ class AttachmentRead(ORMModel):
 class TimelineEntryRead(ORMModel):
     id: int
     type: EntryType
+    author_name: str
+    author_initials: str
     body: str
     field_label: str | None
     old_value: str | None

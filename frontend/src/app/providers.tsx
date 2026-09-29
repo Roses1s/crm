@@ -1,10 +1,21 @@
+import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import type { ReactNode } from "react";
 import { BrowserRouter } from "react-router-dom";
 
-/**
- * Макет-заглушка: никаких клиентов данных здесь нет.
- * На следующем этапе сюда вернётся QueryClientProvider (TanStack Query).
- */
+const queryClient = new QueryClient({
+  defaultOptions: {
+    queries: {
+      retry: 1,
+      refetchOnWindowFocus: false,
+      staleTime: 30_000,
+    },
+  },
+});
+
 export function Providers({ children }: { children: ReactNode }) {
-  return <BrowserRouter>{children}</BrowserRouter>;
+  return (
+    <QueryClientProvider client={queryClient}>
+      <BrowserRouter>{children}</BrowserRouter>
+    </QueryClientProvider>
+  );
 }

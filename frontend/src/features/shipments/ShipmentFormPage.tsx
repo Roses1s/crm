@@ -1,8 +1,6 @@
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AppShell, Breadcrumb, Toolbar } from "@/app/layout/AppShell";
-import { carriers } from "@/shared/mock/carriers";
-import { leads } from "@/shared/mock/leads";
-import { shipmentById } from "@/shared/mock/shipments";
+import { useCarriers, useLeads, useShipment } from "@/shared/api/hooks";
 import { Button } from "@/shared/ui/button";
 import { Chatter } from "@/shared/ui/chatter";
 import { FormSection } from "@/shared/ui/form-section";
@@ -20,15 +18,17 @@ const inputCls = "w-full rounded-[4px] border border-odoo-border px-2.5 py-1.5 t
 const labelCls = "mb-1 block text-xs font-medium uppercase text-odoo-text-muted";
 
 /**
- * Карточка заявки. Поля редактируемые, но ничего не сохраняют:
- * сохранение, смена статуса и подстановка данных лида убраны.
+ * Карточка заявки. Данные читаются из API; сохранение и смена статуса
+ * подключаются следующим шагом — сейчас поля редактируются локально.
  */
 export function ShipmentFormPage() {
   const { id } = useParams();
   const isNew = !id || id === "new";
   const navigate = useNavigate();
-  const shipment = isNew ? null : shipmentById(id);
-  const selectedLead = shipment ? leads.find((l) => l.id === shipment.lead) : undefined;
+  const { data: shipment } = useShipment(id);
+  const { data: carriers = [] } = useCarriers();
+  const { data: leads = [] } = useLeads();
+  const selectedLead = shipment ? leads.find((l) => l.id === shipment.lead_id) : undefined;
 
   return (
     <AppShell>
@@ -68,7 +68,7 @@ export function ShipmentFormPage() {
             <FormSection title="Лид">
               <label className="col-span-2">
                 <span className={labelCls}>Компания</span>
-                <select className={inputCls} defaultValue={shipment?.lead ?? ""}>
+                <select className={inputCls} defaultValue={shipment?.lead_id ?? ""}>
                   <option value="">Выберите лид</option>
                   {leads.map((l) => (
                     <option key={l.id} value={l.id}>
@@ -89,38 +89,38 @@ export function ShipmentFormPage() {
               </label>
               <label>
                 <span className={labelCls}>Адрес погрузки</span>
-                <input className={inputCls} defaultValue={isNew ? "" : "ул. Промышленная, 14"} />
+                <input className={inputCls} defaultValue={shipment?.address_loading ?? ""} />
               </label>
               <label>
                 <span className={labelCls}>Адрес выгрузки</span>
-                <input className={inputCls} defaultValue={isNew ? "" : "пр. Заводской, 5, склад 3"} />
+                <input className={inputCls} defaultValue={shipment?.address_unloading ?? ""} />
               </label>
             </FormSection>
             <FormSection title="Контакты на погрузке">
               <label>
                 <span className={labelCls}>Контактное лицо</span>
-                <input className={inputCls} defaultValue={isNew ? "" : "Громов Сергей"} />
+                <input className={inputCls} defaultValue={shipment?.contact_loading_name ?? ""} />
               </label>
               <label>
                 <span className={labelCls}>Телефон</span>
-                <input className={inputCls} defaultValue={isNew ? "" : "+7 912 300-14-20"} />
+                <input className={inputCls} defaultValue={shipment?.contact_loading_phone ?? ""} />
               </label>
             </FormSection>
             <FormSection title="Контакты на выгрузке">
               <label>
                 <span className={labelCls}>Контактное лицо</span>
-                <input className={inputCls} defaultValue={isNew ? "" : "Литвинова Ольга"} />
+                <input className={inputCls} defaultValue={shipment?.contact_unloading_name ?? ""} />
               </label>
               <label>
                 <span className={labelCls}>Телефон</span>
-                <input className={inputCls} defaultValue={isNew ? "" : "+7 913 555-01-14"} />
+                <input className={inputCls} defaultValue={shipment?.contact_unloading_phone ?? ""} />
               </label>
             </FormSection>
             <FormSection title="Перевозчик и груз">
               <label>
                 <span className={labelCls}>Перевозчик</span>
                 <input className={`${inputCls} mb-1`} placeholder="Поиск..." />
-                <select className={inputCls} defaultValue={shipment?.carrier ?? ""}>
+                <select className={inputCls} defaultValue={shipment?.carrier_id ?? ""}>
                   <option value="">—</option>
                   {carriers.map((c) => (
                     <option key={c.id} value={c.id}>
@@ -131,7 +131,7 @@ export function ShipmentFormPage() {
               </label>
               <label>
                 <span className={labelCls}>Тип транспорта</span>
-                <select className={inputCls} defaultValue="tent">
+                <select className={inputCls} defaultValue={shipment?.transport_type ?? "tent"}>
                   <option value="ft_20">Фура 20т</option>
                   <option value="ft_40">Фура 40т</option>
                   <option value="ref">Рефрижератор</option>
@@ -142,18 +142,18 @@ export function ShipmentFormPage() {
               </label>
               <label>
                 <span className={labelCls}>Вес</span>
-                <input className={inputCls} defaultValue={isNew ? "" : "18.5"} />
+                <input className={inputCls} defaultValue={shipment?.cargo_weight ?? ""} />
               </label>
               <label>
                 <span className={labelCls}>Объём</span>
-                <input className={inputCls} defaultValue={isNew ? "" : "62"} />
+                <input className={inputCls} defaultValue={shipment?.cargo_volume ?? ""} />
               </label>
               <label className="col-span-1 md:col-span-2">
                 <span className={labelCls}>Комментарий</span>
                 <textarea
                   className={inputCls}
                   rows={3}
-                  defaultValue={isNew ? "" : "Выгрузка строго до 16:00, пропуск заказать заранее."}
+                  defaultValue={shipment?.comment ?? ""}
                 />
               </label>
             </FormSection>

@@ -48,6 +48,17 @@ class TimelineEntry(Base, TimestampMixin):
 
     lead: Mapped[Lead] = relationship(back_populates="timeline")
     author: Mapped[User | None] = relationship(lazy="joined")
+
+    @property
+    def author_name(self) -> str:
+        return self.author.full_name or self.author.email if self.author else "Система"
+
+    @property
+    def author_initials(self) -> str:
+        name = self.author_name.strip()
+        parts = [p for p in name.replace("@", " ").split() if p]
+        return "".join(p[0] for p in parts[:2]).upper() or "—"
+
     attachments: Mapped[list[Attachment]] = relationship(
         back_populates="entry", cascade="all, delete-orphan", lazy="selectin"
     )

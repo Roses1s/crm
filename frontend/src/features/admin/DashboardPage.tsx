@@ -1,6 +1,6 @@
 import { Bar, BarChart, CartesianGrid, ResponsiveContainer, Tooltip, XAxis, YAxis } from "recharts";
 import { useTheme } from "@/shared/lib/theme";
-import { dashboardStats } from "@/shared/mock/dashboard";
+import { useStats } from "@/shared/api/hooks";
 
 export function DashboardPage() {
   // Recharts рисует по пропсам, поэтому тему графику передаём явно.
@@ -9,17 +9,17 @@ export function DashboardPage() {
   const bar = theme === "dark" ? "#825676" : "#714B67";
   const axis = theme === "dark" ? "#9A9AA0" : "#6C757D";
 
-  const data = dashboardStats;
+  const { data } = useStats();
 
   return (
     <div>
       <h2 className="mb-4 text-odoo-text">Дашборд</h2>
       <div className="mb-6 grid grid-cols-2 gap-3 md:grid-cols-4">
         {[
-          ["Лиды", data.leads_total],
-          ["Архив", data.leads_archived],
-          ["Заявки", data.shipments_total],
-          ["Пользователи", data.users_total],
+          ["Лиды", data?.leads_total],
+          ["Архив", data?.leads_archived],
+          ["Заявки", data?.shipments_total],
+          ["Пользователи", data?.users_total],
         ].map(([label, val]) => (
           <div
             key={String(label)}
@@ -33,7 +33,7 @@ export function DashboardPage() {
       <div className="h-72 rounded-md border border-odoo-border-light bg-odoo-surface p-4">
         <h3 className="mb-2">Воронка</h3>
         <ResponsiveContainer width="100%" height="90%">
-          <BarChart data={data.funnel}>
+          <BarChart data={data?.funnel ?? []}>
             <CartesianGrid strokeDasharray="3 3" stroke={grid} />
             <XAxis dataKey="name" tick={{ fontSize: 11, fill: axis }} stroke={grid} />
             <YAxis tick={{ fontSize: 11, fill: axis }} stroke={grid} />

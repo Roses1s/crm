@@ -1,17 +1,40 @@
-import type { FormEvent } from "react";
-import { useNavigate } from "react-router-dom";
+import { type FormEvent, useState } from "react";
+import { Navigate, useLocation, useNavigate } from "react-router-dom";
+
+import { useIsAuthenticated } from "@/shared/api/auth";
+import { ApiError } from "@/shared/api/client";
+import { useLogin } from "@/shared/api/hooks";
 import { Button } from "@/shared/ui/button";
 
-/**
- * Страница входа — только вёрстка.
- * Никакой авторизации нет: «Войти» просто переходит на главную.
- */
 export function LoginPage() {
   const navigate = useNavigate();
+  const location = useLocation() as { state?: { from?: string } };
+  const authenticated = useIsAuthenticated();
+  const login = useLogin();
+  const [email, setEmail] = useState("");
+  const [password, setPassword] = useState("");
+  const [error, setError] = useState("");
 
-  function onSubmit(e: FormEvent) {
-    e.preventDefault();
-    navigate("/");
+  if (authenticated) return <Navigate to="/" replace />;
+
+  function onSubmit(event: FormEvent) {
+    event.preventDefault();
+    setError("");
+    login.mutate(
+      { email, password },
+      {
+        onSuccess: () => navigate(location.state?.from ?? "/", { replace: true }),
+        onError: (err) => {
+          if (err instanceof ApiError && err.status === 429) {
+            setError("Слишком много попыток входа. Подождите минуту.");
+          } else if (err instanceof ApiError && err.status >= 500) {
+            setError("Сервер недоступен. Попробуйте позже.");
+          } else {
+            setError("Неверный email или пароль");
+          }
+        },
+      },
+    );
   }
 
   return (
@@ -30,7 +53,9 @@ export function LoginPage() {
           </span>
           <input
             type="email"
-            defaultValue="a.sokolov@detroid.ru"
+            required
+            value={email}
+            onChange={(e) => setEmail(e.target.value)}
             className="w-full rounded-[4px] border border-odoo-border px-2.5 py-1.5 text-sm focus:border-odoo-primary focus:outline-none focus:ring-1 focus:ring-odoo-primary"
           />
         </label>
@@ -40,12 +65,15 @@ export function LoginPage() {
           </span>
           <input
             type="password"
-            defaultValue="demo"
+            required
+            value={password}
+            onChange={(e) => setPassword(e.target.value)}
             className="w-full rounded-[4px] border border-odoo-border px-2.5 py-1.5 text-sm focus:border-odoo-primary focus:outline-none focus:ring-1 focus:ring-odoo-primary"
           />
         </label>
-        <Button type="submit" className="w-full">
-          Войти
+        {error && <p className="mb-3 text-sm text-odoo-danger">{error}</p>}
+        <Button type="submit" className="w-full" disabled={login.isPending}>
+          {login.isPending ? "Вход…" : "Войти"}
         </Button>
       </form>
     </div>

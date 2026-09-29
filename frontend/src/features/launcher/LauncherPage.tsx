@@ -1,6 +1,6 @@
 import { Kanban, LayoutGrid, Package, Settings } from "lucide-react";
 import { Link } from "react-router-dom";
-import { launcherApps } from "@/shared/mock/launcher";
+import { useLauncherApps } from "@/shared/api/hooks";
 
 const ICONS: Record<string, typeof LayoutGrid> = {
   Kanban,
@@ -9,13 +9,15 @@ const ICONS: Record<string, typeof LayoutGrid> = {
   LayoutGrid,
 };
 
-/** Экран «Приложения». Список берётся из мока, ролей и прав нет. */
+/** Экран «Приложения». Список приходит из API и зависит от роли. */
 export function LauncherPage() {
+  const { data: apps = [] } = useLauncherApps();
+
   return (
     <div className="min-h-[calc(100vh-56px)] bg-odoo-bg px-6 py-10">
       <h1 className="mb-6 text-center text-odoo-text">Приложения</h1>
       <div className="mx-auto grid max-w-4xl grid-cols-2 gap-4 md:grid-cols-3 lg:grid-cols-4">
-        {launcherApps.map((app) => {
+        {apps.map((app) => {
           const Icon = ICONS[app.icon] ?? LayoutGrid;
           return (
             <Link

@@ -3,12 +3,17 @@ import { useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 import { AppShell, ControlPanel } from "@/app/layout/AppShell";
 import { TagsField } from "@/features/crm/lead-form/TagsField";
+import {
+  useAddNote,
+  useLead,
+  useLeadPager,
+  useLeadShipments,
+  useLeadTimeline,
+  useSetLeadStage,
+  useStages,
+  useTags,
+} from "@/shared/api/hooks";
 import { ownerInitials, ownerLabel } from "@/shared/lib/owner";
-import { activeLeads, leadById } from "@/shared/mock/leads";
-import { shipmentsByLead } from "@/shared/mock/shipments";
-import { stages } from "@/shared/mock/stages";
-import { tags as allTags } from "@/shared/mock/tags";
-import { attachments, timeline } from "@/shared/mock/timeline";
 import { Chatter } from "@/shared/ui/chatter";
 import {
   Field,
@@ -25,9 +30,8 @@ import {
 /**
  * Карточка лида.
  *
- * Вёрстка полностью повторяет исходную: статусбар этапов, плашка заголовка,
- * две группы полей, вкладка «Заявки» и чаттер справа. Сохранения, валидации
- * ИНН, архивации и загрузки вложений нет — поля просто редактируемые.
+ * Данные, лента и смена этапа работают через API. Поля формы пока
+ * редактируются локально: сохранение карточки — следующий шаг.
  */
 export function LeadFormPage() {
   const { id } = useParams();
@@ -39,21 +43,28 @@ export function LeadFormPage() {
 function LeadForm({ id }: { id?: string }) {
   const isNew = id === "new" || !id;
   const navigate = useNavigate();
-  const lead = isNew ? null : leadById(id);
 
-  const [stage, setStage] = useState(lead?.stage ?? stages[0].id);
-  const [priority, setPriority] = useState(lead?.priority ?? 0);
+  const { data: lead } = useLead(id);
+  const { data: stages = [] } = useStages();
+  const { data: allTags = [] } = useTags();
+  const { data: timeline = [] } = useLeadTimeline(id);
+  const { data: shipments = [] } = useLeadShipments(lead?.id);
+  const { data: pager } = useLeadPager(id);
+  const setStageMutation = useSetLeadStage(id);
+  const addNote = useAddNote(id);
+
+  // Данные приходят асинхронно, поэтому приоритет — производное значение
+  // с локальным переопределением на время клика по звёздам.
+  const [priorityOverride, setPriorityOverride] = useState<number | null>(null);
+  const priority = priorityOverride ?? lead?.priority ?? 0;
   const [tab, setTab] = useState("shipments");
   const [actionsOpen, setActionsOpen] = useState(false);
 
-  const shipments = lead ? shipmentsByLead(lead.id) : [];
+  const stage = lead?.stage_id ?? stages[0]?.id;
   const owner = lead ? ownerLabel(lead) : "";
   const ownerAvatar = lead ? ownerInitials(lead) : "—";
-
-  // Пейджер «N / M» с соседними записями — как в панели управления Odoo.
-  const index = lead ? activeLeads.findIndex((l) => l.id === lead.id) : -1;
-  const prevId = index > 0 ? activeLeads[index - 1].id : null;
-  const nextId = index >= 0 && index < activeLeads.length - 1 ? activeLeads[index + 1].id : null;
+  const prevId = pager?.prev_id ?? null;
+  const nextId = pager?.next_id ?? null;
 
   const notebookTabs = [
     {
@@ -165,10 +176,10 @@ function LeadForm({ id }: { id?: string }) {
           ) : null
         }
         pager={
-          !isNew && index >= 0 ? (
+          !isNew && pager ? (
             <span className="mr-1 flex items-center gap-1">
               <span className="whitespace-nowrap text-[13px] text-odoo-text-muted [font-variant-numeric:tabular-nums]">
-                {index + 1} / {activeLeads.length}
+                {pager.position} / {pager.total}
               </span>
               <span className="inline-flex h-7 overflow-hidden rounded-[4px] border border-odoo-border bg-odoo-surface">
                 <button
@@ -202,7 +213,10 @@ function LeadForm({ id }: { id?: string }) {
               <FormStatusbar
                 items={stages}
                 current={stage}
-                onSelect={setStage}
+                disabled={setStageMutation.isPending}
+                onSelect={(stageId) => {
+                  if (!isNew && stageId !== stage) setStageMutation.mutate(stageId);
+                }}
                 left={
                   !isNew ? (
                     <>
@@ -338,7 +352,7 @@ function LeadForm({ id }: { id?: string }) {
                               type="button"
                               className="px-px"
                               aria-label={`Приоритет ${n}`}
-                              onClick={() => setPriority(priority === n ? 0 : n)}
+                              onClick={() => setPriorityOverride(priority === n ? 0 : n)}
                             >
                               {priority >= n ? "★" : "☆"}
                             </button>
@@ -385,7 +399,11 @@ function LeadForm({ id }: { id?: string }) {
 
         {!isNew && (
           <div className="w-full shrink-0 bg-odoo-surface lg:w-[33%] lg:max-w-[520px] lg:overflow-y-auto">
-            <Chatter timeline={timeline} attachments={attachments} />
+            <Chatter
+              timeline={timeline}
+              onSubmit={(body) => addNote.mutate(body)}
+              posting={addNote.isPending}
+            />
           </div>
         )}
       </div>

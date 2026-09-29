@@ -1,3 +1,5 @@
+/** Типы повторяют схемы бэкенда (backend/app/schemas). */
+
 export type Role = "admin" | "manager" | "operator";
 
 export interface User {
@@ -25,7 +27,6 @@ export interface Stage {
   sequence: number;
   is_closed: boolean;
   color: string;
-  leads_count?: number;
 }
 
 export interface Tag {
@@ -42,35 +43,22 @@ export interface Lead {
   timezone: string;
   company_email: string | null;
   phone: string;
-  logist_email: string | null;
   logist_contact: string;
   logist_phone: string;
+  logist_email: string | null;
   credit_limit: string;
   first_call_date: string | null;
   next_call_date: string | null;
   priority: number;
-  stage: number;
-  stage_name: string;
-  tags: Tag[];
-  assigned_to: number | null;
-  assigned_to_email?: string;
-  assigned_to_name?: string;
   is_archived: boolean;
-}
-
-export interface TimelineEntry {
-  id: string;
-  type: "note" | "history" | "message" | "activity";
-  author_name: string;
-  author_initials: string;
-  body: string;
-  /** Подпись отслеживаемого поля, например «Этапы лидов» (только для истории). */
-  field_label?: string;
-  old_value?: string;
-  new_value?: string;
-  /** Файлы, приложенные к записи. */
-  attachments?: Attachment[];
-  created_at: string;
+  stage_id: number;
+  stage_name: string;
+  assigned_to_id: number | null;
+  assigned_to_email?: string | null;
+  assigned_to_name?: string | null;
+  tags: Tag[];
+  created_at?: string;
+  updated_at?: string;
 }
 
 export interface Attachment {
@@ -78,22 +66,44 @@ export interface Attachment {
   name: string;
   size: number;
   content_type: string;
-  uploaded_by: number | null;
-  uploaded_by_name: string;
   created_at: string;
+}
+
+export interface TimelineEntry {
+  id: number | string;
+  type: "note" | "history" | "message" | "activity";
+  body: string;
+  field_label?: string | null;
+  old_value?: string | null;
+  new_value?: string | null;
+  attachments?: Attachment[];
+  created_at: string;
+  /** Заполняется бэкендом не всегда — подписи автора может не быть. */
+  author_name?: string;
+  author_initials?: string;
 }
 
 export interface Shipment {
   id: number;
-  lead: number;
+  lead_id: number;
   lead_name: string;
   status: string;
-  city_loading: string;
-  city_unloading: string;
   route: string;
-  carrier: number | null;
-  carrier_name?: string;
+  carrier_id: number | null;
+  carrier_name?: string | null;
   created_at: string;
+  city_loading?: string;
+  city_unloading?: string;
+  address_loading?: string;
+  address_unloading?: string;
+  contact_loading_name?: string;
+  contact_loading_phone?: string;
+  contact_unloading_name?: string;
+  contact_unloading_phone?: string;
+  transport_type?: string;
+  cargo_weight?: string | null;
+  cargo_volume?: string | null;
+  comment?: string;
 }
 
 export interface Carrier {
@@ -101,4 +111,19 @@ export interface Carrier {
   name: string;
   inn: string;
   is_active: boolean;
+}
+
+export interface DashboardStats {
+  leads_total: number;
+  leads_archived: number;
+  shipments_total: number;
+  users_total: number;
+  funnel: { id: number; name: string; count: number }[];
+}
+
+export interface Pager {
+  position: number;
+  total: number;
+  prev_id: number | null;
+  next_id: number | null;
 }

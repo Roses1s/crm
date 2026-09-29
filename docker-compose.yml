@@ -1,0 +1,155 @@
+# =============================================================================
+#  CRM Detroid — полный стек (этап 4)
+#  На сервере лежит в /opt/crm/docker-compose.yml (каталог = клон репозитория).
+#
+#  Запуск:   docker compose up -d --build
+#  Логи:     docker compose logs -f backend
+#  Остановка: docker compose down
+#
+#  Наружу торчит только nginx (80/443). Postgres, Valkey, backend и frontend
+#  доступны исключительно внутри docker-сетей — это важно, потому что Docker
+#  умеет обходить UFW, и любой опубликованный порт стал бы публичным.
+# =============================================================================
+
+name: crm
+
+services:
+  # --- база данных ----------------------------------------------------------
+  postgres:
+    image: postgres:18-alpine
+    container_name: crm-postgres
+    restart: unless-stopped
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-crm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?задайте POSTGRES_PASSWORD в .env}
+      POSTGRES_DB: ${POSTGRES_DB:-crm}
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    volumes:
+      - pgdata:/var/lib/postgresql/data
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-crm} -d ${POSTGRES_DB:-crm}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks: [internal]
+
+  # --- кеш и брокер Celery --------------------------------------------------
+  valkey:
+    image: valkey/valkey:8-alpine
+    container_name: crm-valkey
+    restart: unless-stopped
+    command: ["valkey-server", "--appendonly", "yes", "--save", "60", "1"]
+    volumes:
+      - valkeydata:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [internal]
+
+  # --- API ------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+    image: crm-backend:latest
+    container_name: crm-backend
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      POSTGRES_HOST: postgres
+      VALKEY_URL: redis://valkey:6379/0
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}
+    # Миграции накатываются один раз при старте API — до приёма трафика.
+    command: >
+      sh -c "alembic upgrade head &&
+             gunicorn app.main:app -c gunicorn.conf.py"
+    volumes:
+      - backups:/var/backups/crm
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    networks: [internal, edge]
+
+  # --- фоновые задачи -------------------------------------------------------
+  worker:
+    image: crm-backend:latest
+    container_name: crm-worker
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      POSTGRES_HOST: postgres
+      VALKEY_URL: redis://valkey:6379/0
+    # concurrency=1: на 2 ГБ памяти больше одного процесса держать незачем.
+    command: celery -A app.worker.celery_app.celery worker -l info --concurrency 1
+    volumes:
+      - backups:/var/backups/crm
+    depends_on:
+      backend:
+        condition: service_started
+      valkey:
+        condition: service_healthy
+    networks: [internal]
+
+  beat:
+    image: crm-backend:latest
+    container_name: crm-beat
+    restart: unless-stopped
+    env_file: [.env]
+    environment:
+      POSTGRES_HOST: postgres
+      VALKEY_URL: redis://valkey:6379/0
+    command: celery -A app.worker.celery_app.celery beat -l info
+    depends_on:
+      worker:
+        condition: service_started
+    networks: [internal]
+
+  # --- собранный фронтенд ---------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+    image: crm-frontend:latest
+    container_name: crm-frontend
+    restart: unless-stopped
+    networks: [edge]
+
+  # --- публичный вход -------------------------------------------------------
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: crm-nginx
+    restart: unless-stopped
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./deploy/nginx/snippets:/etc/nginx/snippets:ro
+      - ./certbot/www:/var/www/certbot:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      - backend
+      - frontend
+    networks: [edge]
+
+volumes:
+  pgdata:
+  valkeydata:
+  backups:
+
+networks:
+  # internal — без выхода наружу: база, кеш, воркеры
+  internal:
+    name: crm_internal
+  # edge — nginx, фронтенд и API
+  edge:
+    name: crm_edge

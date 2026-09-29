@@ -1,7 +1,9 @@
-import { carriers } from "@/shared/mock/carriers";
+import { useCarriers } from "@/shared/api/hooks";
 import { Button } from "@/shared/ui/button";
 
 export function CarriersPage() {
+  const { data: carriers = [] } = useCarriers();
+
   return (
     <div>
       <h2 className="mb-4">Перевозчики</h2>

@@ -7,8 +7,8 @@ import type { Attachment, TimelineEntry } from "@/shared/types";
 /**
  * Чаттер (правая колонка карточки).
  *
- * Вёрстка перенесена один в один. Отправка примечаний, загрузка и удаление
- * вложений вырезаны: поля и кнопки на месте, но ничего никуда не уходит.
+ * Лента и отправка примечаний работают с API. Загрузка и удаление вложений
+ * пока только в вёрстке — ручки файлов появятся следующим шагом.
  */
 
 const MODES: { id: string; label: string; placeholder: string; action: string }[] = [
@@ -49,9 +49,12 @@ export function formatSize(bytes: number): string {
 interface ChatterProps {
   timeline: TimelineEntry[];
   attachments?: Attachment[];
+  /** Отправка примечания. Если не передана — форма только отображается. */
+  onSubmit?: (body: string) => void;
+  posting?: boolean;
 }
 
-export function Chatter({ timeline, attachments }: ChatterProps) {
+export function Chatter({ timeline, attachments, onSubmit, posting = false }: ChatterProps) {
   const [text, setText] = useState("");
   const [mode, setMode] = useState("note");
   const [searchOpen, setSearchOpen] = useState(false);
@@ -202,7 +205,15 @@ export function Chatter({ timeline, attachments }: ChatterProps) {
         </div>
       )}
 
-      <div className="border-b border-odoo-border-light px-3 pb-2">
+      <form
+        className="border-b border-odoo-border-light px-3 pb-2"
+        onSubmit={(event) => {
+          event.preventDefault();
+          if (!text.trim() || !onSubmit) return;
+          onSubmit(text.trim());
+          setText("");
+        }}
+      >
         <textarea
           rows={2}
           value={text}
@@ -220,13 +231,14 @@ export function Chatter({ timeline, attachments }: ChatterProps) {
             <Paperclip className="h-4 w-4" />
           </button>
           <button
-            type="button"
-            className="h-7 rounded-[4px] bg-odoo-primary px-3 text-[13px] font-medium text-white transition-colors hover:bg-odoo-primary-hover"
+            type="submit"
+            disabled={posting || !text.trim() || !onSubmit}
+            className="h-7 rounded-[4px] bg-odoo-primary px-3 text-[13px] font-medium text-white transition-colors hover:bg-odoo-primary-hover disabled:opacity-50"
           >
-            {current.action}
+            {posting ? "Отправка…" : current.action}
           </button>
         </div>
-      </div>
+      </form>
 
       <div className="flex-1 overflow-y-auto px-3 pb-3">
         {groups.length === 0 && (
@@ -244,11 +256,13 @@ export function Chatter({ timeline, attachments }: ChatterProps) {
             {entries.map((entry) => (
               <div key={entry.id} className="flex items-start gap-2 py-1.5">
                 <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-odoo-avatar text-[11px] font-semibold text-white">
-                  {entry.author_initials}
+                  {entry.author_initials ?? "—"}
                 </span>
                 <div className="min-w-0 flex-1">
                   <div className="flex flex-wrap items-baseline gap-1.5">
-                    <span className="text-[13px] font-bold text-odoo-text">{entry.author_name}</span>
+                    <span className="text-[13px] font-bold text-odoo-text">
+                      {entry.author_name ?? "Система"}
+                    </span>
                     <span
                       className="text-[12px] text-odoo-text-muted"
                       title={absoluteTime(entry.created_at)}

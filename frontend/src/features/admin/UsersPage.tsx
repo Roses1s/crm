@@ -1,4 +1,4 @@
-import { users } from "@/shared/mock/users";
+import { useUsers } from "@/shared/api/hooks";
 import { Button } from "@/shared/ui/button";
 
 const ROLE_ORDER: Record<string, number> = { admin: 0, manager: 1, operator: 2 };
@@ -15,8 +15,9 @@ function fullName(user: { first_name?: string; last_name?: string }): string {
 const inputCls = "rounded-[4px] border border-odoo-border px-2 py-1.5 text-sm";
 const capCls = "mb-1 block text-[11px] uppercase text-odoo-text-muted";
 
-/** Пользователи. Форма и таблица — только вёрстка, CRUD не подключён. */
+/** Пользователи из API. Форма создания пока только вёрстка. */
 export function UsersPage() {
+  const { data: users = [] } = useUsers();
   const rows = [...users].sort(
     (a, b) => (ROLE_ORDER[a.role] ?? 9) - (ROLE_ORDER[b.role] ?? 9) || a.id - b.id,
   );

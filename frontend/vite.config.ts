@@ -13,8 +13,16 @@ export default defineConfig({
   server: {
     host: "0.0.0.0",
     port: 5173,
-    // Макет открывается через проброшенный домен предпросмотра.
+    // Приложение открывается через проброшенный домен предпросмотра.
     allowedHosts: true,
+    // В разработке запросы /api/* уходят на локальный бэкенд.
+    // В продакшене то же самое делает nginx (см. deploy/nginx/conf.d).
+    proxy: {
+      "/api": {
+        target: process.env.VITE_API_TARGET ?? "http://127.0.0.1:8000",
+        changeOrigin: true,
+      },
+    },
   },
   preview: {
     host: "0.0.0.0",

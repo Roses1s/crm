@@ -1,6 +1,6 @@
 import { Link } from "react-router-dom";
 import { AppShell, Breadcrumb, Toolbar } from "@/app/layout/AppShell";
-import { shipments } from "@/shared/mock/shipments";
+import { useShipments } from "@/shared/api/hooks";
 import { Button } from "@/shared/ui/button";
 
 const STATUS: Record<string, { label: string; cls: string }> = {
@@ -11,8 +11,10 @@ const STATUS: Record<string, { label: string; cls: string }> = {
   cancelled: { label: "Отменена", cls: "bg-odoo-tag-red-bg text-odoo-tag-red-text" },
 };
 
-/** Список заявок. Фильтр по статусу — визуальный, данные статичные. */
+/** Список заявок из API. Фильтр по статусу пока визуальный. */
 export function ShipmentsPage() {
+  const { data: shipments = [] } = useShipments();
+
   return (
     <AppShell>
       <Breadcrumb items={["Заявки", "Все"]} />
