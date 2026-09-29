@@ -10,7 +10,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.api.deps import CurrentUser, SessionDep
-from app.core.errors import NotFoundError
+from app.api.v1.stages import board_stage_for
+from app.core.errors import AppError, NotFoundError
 from app.core.logging import get_logger
 from app.core.pagination import Page, PageParams, build_page, page_params, paginate
 from app.models.crm import Lead, Tag, lead_tags
@@ -19,6 +20,7 @@ from app.models.user import Role, User
 from app.schemas.crm import (
     LeadCreate,
     LeadRead,
+    LeadTransfer,
     LeadUpdate,
     NoteCreate,
     TimelineEntryRead,
@@ -222,6 +224,48 @@ async def add_note(
     await session.commit()
     await session.refresh(entry)
     return entry
+
+
+@router.post(
+    "/{lead_id}/transfer",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Передать лид другому сотруднику",
+)
+async def transfer_lead(
+    lead_id: int, payload: LeadTransfer, session: SessionDep, user: CurrentUser
+) -> None:
+    """Меняет продавца и переставляет карточку на доску получателя.
+
+    Одно без другого не имеет смысла: этапы личные, и лид с чужим stage_id
+    не попал бы ни в одну колонку новой доски.
+    """
+    lead = await get_lead_or_404(session, lead_id, user)
+
+    target = await session.get(User, payload.user_id)
+    if target is None or not target.is_active:
+        raise NotFoundError(f"Сотрудник {payload.user_id} не найден")
+    if target.id == lead.assigned_to_id:
+        raise AppError("Лид уже закреплён за этим сотрудником", code="already_assigned")
+
+    previous = lead.assigned_to.full_name if lead.assigned_to else "Не назначен"
+    stage_name = lead.stage.name if lead.stage else None
+    stage = await board_stage_for(session, target.id, stage_name)
+
+    lead.assigned_to_id = target.id
+    lead.stage_id = stage.id
+    # Передача попадает в ленту: по истории видно, кто и кому отдал клиента.
+    session.add(
+        TimelineEntry(
+            lead_id=lead.id,
+            author_id=user.id,
+            type=EntryType.history,
+            field_label="Продавец",
+            old_value=previous[:255],
+            new_value=target.full_name[:255],
+        )
+    )
+    await session.commit()
+    log.info("lead.transferred", lead_id=lead.id, to=target.id, by=user.id)
 
 
 @router.get("/{lead_id}/pager", summary="Позиция записи и соседи")

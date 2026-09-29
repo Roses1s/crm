@@ -15,6 +15,15 @@ class UserRead(ORMModel):
     is_active: bool
 
 
+class ColleagueRead(ORMModel):
+    """Минимум о сотруднике — для выбора получателя лида."""
+
+    id: int
+    first_name: str
+    last_name: str
+    full_name: str
+
+
 class UserCreate(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)

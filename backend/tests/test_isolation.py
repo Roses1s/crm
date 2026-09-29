@@ -118,3 +118,57 @@ async def test_pager_counts_only_own_leads(
     # Админ видит обе карточки.
     admin_pager = await auth_client.get(f"/api/v1/crm/leads/{foreign_id}/pager")
     assert admin_pager.json()["total"] == 2
+
+
+async def test_lead_transfer_moves_card_to_colleague_board(
+    client: AsyncClient, auth_client: AsyncClient, seeded: dict
+) -> None:
+    """Передача меняет продавца и переставляет карточку на доску получателя."""
+    headers = await manager_headers(client)
+    stages = (await client.get("/api/v1/crm/stages", headers=headers)).json()
+    stage = next(s for s in stages if s["name"] == "Перезвонить")
+    lead_id = (
+        await client.post(
+            "/api/v1/crm/leads",
+            json={"name": "ООО «Пион»", "inn": "7451234565", "stage_id": stage["id"]},
+            headers=headers,
+        )
+    ).json()["id"]
+
+    admin_id = seeded["admin"].id  # type: ignore[attr-defined]
+    transfer = await client.post(
+        f"/api/v1/crm/leads/{lead_id}/transfer", json={"user_id": admin_id}, headers=headers
+    )
+    assert transfer.status_code == 204
+
+    # У бывшего владельца карточки больше нет.
+    assert (await client.get(f"/api/v1/crm/leads/{lead_id}", headers=headers)).status_code == 404
+
+    moved = (await auth_client.get(f"/api/v1/crm/leads/{lead_id}")).json()
+    assert moved["assigned_to_id"] == admin_id
+    admin_stages = (await auth_client.get("/api/v1/crm/stages")).json()
+    # Этап подобран по названию на доске получателя.
+    assert moved["stage_id"] in [s["id"] for s in admin_stages]
+
+    # Передача видна в ленте.
+    timeline = (await auth_client.get(f"/api/v1/crm/leads/{lead_id}/timeline")).json()
+    assert any(entry["field_label"] == "Продавец" for entry in timeline)
+
+
+async def test_cannot_transfer_foreign_lead(client: AsyncClient, seeded: dict) -> None:
+    headers = await manager_headers(client)
+    foreign_id = seeded["lead"].id  # type: ignore[attr-defined]
+    admin_id = seeded["admin"].id  # type: ignore[attr-defined]
+
+    response = await client.post(
+        f"/api/v1/crm/leads/{foreign_id}/transfer", json={"user_id": admin_id}, headers=headers
+    )
+    assert response.status_code == 404
+
+
+async def test_colleagues_list_hides_self(client: AsyncClient, seeded: dict) -> None:
+    headers = await manager_headers(client)
+    rows = (await client.get("/api/v1/users/colleagues", headers=headers)).json()
+    names = [row["full_name"] for row in rows]
+    assert "Артём Соколов" in names
+    assert "Денис Кузнецов" not in names

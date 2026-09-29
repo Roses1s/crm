@@ -61,6 +61,7 @@ export const keys = {
   carriers: ["carriers"] as const,
   users: ["users"] as const,
   backups: ["backups"] as const,
+  colleagues: ["colleagues"] as const,
   loginAttempts: ["login-attempts"] as const,
 };
 
@@ -312,6 +313,39 @@ export function useAddNote(id: string | undefined) {
       }),
     onSuccess: () =>
       void qc.invalidateQueries({ queryKey: keys.timeline(id ?? "") }),
+  });
+}
+
+// --- передача лида -----------------------------------------------------------
+export interface Colleague {
+  id: number;
+  first_name: string;
+  last_name: string;
+  full_name: string;
+}
+
+/** Активные сотрудники, кроме себя, — для выбора нового продавца. */
+export function useColleagues() {
+  return useQuery({
+    queryKey: keys.colleagues,
+    queryFn: () => api<Colleague[]>("/users/colleagues"),
+    staleTime: 5 * 60_000,
+  });
+}
+
+export function useTransferLead(leadId: string | number | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (userId: number) =>
+      api<void>(`/crm/leads/${leadId}/transfer`, {
+        method: "POST",
+        body: { user_id: userId },
+      }),
+    onSuccess: () => {
+      // Карточка ушла с нашей доски — обновляем и список, и саму карточку.
+      void qc.invalidateQueries({ queryKey: ["leads"] });
+      void qc.invalidateQueries({ queryKey: keys.lead(leadId ?? "") });
+    },
   });
 }
 

@@ -39,6 +39,28 @@ async def ensure_default_stages(session: AsyncSession, owner_id: int) -> None:
     await session.commit()
 
 
+async def board_stage_for(session: AsyncSession, owner_id: int, name: str | None) -> Stage:
+    """Этап доски сотрудника: с тем же названием, иначе первый.
+
+    Нужен при передаче карточки другому человеку. Этапы личные, поэтому
+    оставить прежний stage_id нельзя — лид оказался бы на колонке, которой нет
+    на доске получателя, и просто пропал бы из интерфейса.
+    """
+    await ensure_default_stages(session, owner_id)
+    stages = list(
+        (
+            await session.execute(
+                select(Stage).where(Stage.owner_id == owner_id).order_by(Stage.sequence, Stage.id)
+            )
+        ).scalars()
+    )
+    if name:
+        for stage in stages:
+            if stage.name == name:
+                return stage
+    return stages[0]
+
+
 async def owned_stage(session: AsyncSession, stage_id: int, user: User) -> Stage:
     """Этап сотрудника: чужой доступен только администратору."""
     stage = await session.get(Stage, stage_id)

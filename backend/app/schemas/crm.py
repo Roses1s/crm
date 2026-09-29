@@ -78,6 +78,12 @@ class LeadCreate(LeadBase):
     tag_ids: list[int] = Field(default_factory=list)
 
 
+class LeadTransfer(BaseModel):
+    """Кому передаём карточку."""
+
+    user_id: int
+
+
 class LeadUpdate(BaseModel):
     name: str | None = Field(default=None, min_length=1, max_length=255)
     inn: str | None = None
@@ -93,7 +99,6 @@ class LeadUpdate(BaseModel):
     next_call_date: date | None = None
     priority: int | None = Field(default=None, ge=0, le=3)
     stage_id: int | None = None
-    assigned_to_id: int | None = None
     tag_ids: list[int] | None = None
     is_archived: bool | None = None
 

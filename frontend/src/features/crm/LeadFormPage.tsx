@@ -25,10 +25,12 @@ import {
   useStages,
   useTags,
   useUpdateLead,
+  useTransferLead,
   useUploadAttachment,
 } from "@/shared/api/hooks";
 import { ownerInitials, ownerLabel } from "@/shared/lib/owner";
 import type { Attachment } from "@/shared/types";
+import { TransferDialog } from "@/features/crm/lead-form/TransferDialog";
 import { Chatter } from "@/shared/ui/chatter";
 import { FilePreview } from "@/shared/ui/file-preview";
 import {
@@ -69,6 +71,7 @@ function LeadForm({ id }: { id?: string }) {
   const archiveLead = useArchiveLead();
   const addNote = useAddNote(id);
   const uploadAttachment = useUploadAttachment(lead?.id);
+  const transferLead = useTransferLead(lead?.id);
   const deleteAttachment = useDeleteAttachment(lead?.id);
 
   const [form, setForm] = useState<FormState>(empty);
@@ -77,6 +80,9 @@ function LeadForm({ id }: { id?: string }) {
   const [tab, setTab] = useState("shipments");
   const [actionsOpen, setActionsOpen] = useState(false);
   const [preview, setPreview] = useState<Attachment | null>(null);
+  // Передача лида коллеге: диалог выбора и подтверждения.
+  const [transferOpen, setTransferOpen] = useState(false);
+  const [transferError, setTransferError] = useState("");
   const loadedId = useRef<number | null>(null);
 
   // Загруженную карточку кладём в форму один раз: фоновое обновление
@@ -455,23 +461,34 @@ function LeadForm({ id }: { id?: string }) {
                           />
                         </Field>
                         <Field label="Продавец">
-                          {owner ? (
-                            <span className="flex items-center gap-1.5 pt-[2px]">
-                              <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-odoo-primary text-[9px] font-semibold text-white">
-                                {ownerAvatar}
+                          {/* Щелчок по имени открывает передачу лида коллеге. */}
+                          <button
+                            type="button"
+                            disabled={isNew}
+                            onClick={() => {
+                              setTransferError("");
+                              setTransferOpen(true);
+                            }}
+                            title={
+                              isNew
+                                ? "Сначала сохраните лид"
+                                : "Передать лид другому сотруднику"
+                            }
+                            className="flex w-full items-center gap-1.5 rounded-[4px] pt-[2px] text-left transition-colors hover:bg-odoo-bg disabled:cursor-default disabled:hover:bg-transparent"
+                          >
+                            {owner ? (
+                              <>
+                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-odoo-primary text-[9px] font-semibold text-white">
+                                  {ownerAvatar}
+                                </span>
+                                <span className="truncate">{owner}</span>
+                              </>
+                            ) : (
+                              <span className="text-odoo-text-light">
+                                Не назначен
                               </span>
-                              <span
-                                className="truncate"
-                                title={lead?.assigned_to_email ?? owner}
-                              >
-                                {owner}
-                              </span>
-                            </span>
-                          ) : (
-                            <span className="pt-[2px] text-odoo-text-light">
-                              Не назначен
-                            </span>
-                          )}
+                            )}
+                          </button>
                         </Field>
                       </InnerGroup>
 
@@ -659,6 +676,26 @@ function LeadForm({ id }: { id?: string }) {
           </div>
         )}
       </div>
+
+      {transferOpen && lead && (
+        <TransferDialog
+          leadName={lead.name}
+          pending={transferLead.isPending}
+          error={transferError}
+          onCancel={() => setTransferOpen(false)}
+          onConfirm={(userId) =>
+            transferLead.mutate(userId, {
+              onSuccess: () => {
+                setTransferOpen(false);
+                // Карточка больше не наша — возвращаемся на доску.
+                navigate("/crm");
+              },
+              onError: (err: Error) =>
+                setTransferError(err.message || "Не удалось передать лид"),
+            })
+          }
+        />
+      )}
 
       {preview && (
         <FilePreview file={preview} onClose={() => setPreview(null)} />

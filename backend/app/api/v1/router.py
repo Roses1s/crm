@@ -14,6 +14,7 @@ from app.api.v1 import (
     shipments,
     stages,
     tags,
+    users,
 )
 
 api_router = APIRouter()
@@ -26,4 +27,5 @@ api_router.include_router(attachments.router)
 api_router.include_router(shipments.router)
 api_router.include_router(attachments.shipment_router)
 api_router.include_router(carriers.router)
+api_router.include_router(users.router)
 api_router.include_router(admin.router)
