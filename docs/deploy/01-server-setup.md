@@ -508,15 +508,16 @@ sudo tee /etc/docker/daemon.json > /dev/null <<'EOF'
   "log-opts": {
     "max-size": "10m",
     "max-file": "3"
-  },
-  "live-restore": true
+  }
 }
 EOF
 
 sudo systemctl restart docker
 ```
 
-*`live-restore`* — контейнеры продолжают работать, даже когда сам Docker перезапускается.
+> ⚠️ Опцию `"live-restore": true` сюда специально **не** добавляем: она позволяет контейнерам
+> пережить перезапуск демона Docker, но при этом мешает применению политик автозапуска
+> после перезагрузки сервера — контейнеры могут не подняться сами.
 
 ### 8.4. Разрешаем `deploy` работать с Docker без sudo
 
@@ -1010,8 +1011,41 @@ sudo certbot renew --dry-run
 
 ### 13.4. Автозапуск после перезагрузки сервера
 
-Всё уже настроено (`restart: unless-stopped` у контейнера + `systemctl enable docker`),
-но лучше убедиться лично:
+Политики `restart: unless-stopped` для этого мало: после перезагрузки хоста Docker
+не всегда поднимает контейнеры сам. Поэтому добавляем системную службу, которая
+гарантированно выполняет `docker compose up -d` при загрузке (файл также лежит
+в репозитории: `deploy/systemd/crm.service`).
+
+```bash
+cat > /tmp/crm.service <<'EOF'
+[Unit]
+Description=CRM Detroid stack (docker compose)
+Requires=docker.service
+After=docker.service network-online.target
+Wants=network-online.target
+
+[Service]
+Type=oneshot
+RemainAfterExit=yes
+WorkingDirectory=/opt/crm
+ExecStart=/usr/bin/docker compose up -d --remove-orphans
+ExecStop=/usr/bin/docker compose down
+TimeoutStartSec=0
+
+[Install]
+WantedBy=multi-user.target
+EOF
+
+sudo mv /tmp/crm.service /etc/systemd/system/crm.service
+sudo systemctl daemon-reload
+sudo systemctl enable --now crm.service
+systemctl status crm.service --no-pager | head -8
+```
+
+Для `Type=oneshot` правильный статус — `Active: active (exited)`: команда отработала,
+контейнеры запущены.
+
+Теперь проверяем перезагрузкой:
 
 ```bash
 sudo reboot
@@ -1044,7 +1078,8 @@ curl -I https://crmdetroid.ru
 | 10 | HTTPS | `curl -I https://crmdetroid.ru` | HTTP/2 200 |
 | 11 | Редирект | `curl -I http://crmdetroid.ru` | 301 на https |
 | 12 | Автопродление | `sudo certbot renew --dry-run` | simulated renewals succeeded |
-| 13 | После ребута | `sudo reboot`, затем `curl -I https://crmdetroid.ru` | HTTP/2 200 |
+| 13 | Автозапуск | `systemctl is-enabled crm.service` | enabled |
+| 14 | После ребута | `sudo reboot`, затем `curl -I https://crmdetroid.ru` | HTTP/2 200 |
 
 ---
 
