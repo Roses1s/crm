@@ -5,7 +5,7 @@ from __future__ import annotations
 from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, status
-from sqlalchemy import Select, or_, select
+from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -225,25 +225,75 @@ async def add_note(
 
 
 @router.get("/{lead_id}/pager", summary="Позиция записи и соседи")
-async def lead_pager(lead_id: int, session: SessionDep, _: CurrentUser) -> dict[str, int | None]:
-    """Данные для переключателя «N / M» в карточке лида."""
-    ids = list(
+async def lead_pager(lead_id: int, session: SessionDep, user: CurrentUser) -> dict[str, int | None]:
+    """Данные для переключателя «N / M» в карточке лида.
+
+    Считаем только по видимым лидам: раньше сюда попадала вся база, и менеджер
+    узнавал количество чужих карточек и номера соседних записей.
+    Позиция и соседи берутся запросами с ограничением, без выгрузки всех
+    идентификаторов в память — на большой базе это заметно быстрее.
+    """
+    lead = await get_lead_or_404(session, lead_id, user)
+
+    base = visible_only(select(Lead).where(Lead.is_archived.is_(False)), user)
+
+    total = int(
         (
             await session.execute(
-                select(Lead.id).where(Lead.is_archived.is_(False)).order_by(Lead.updated_at.desc())
+                select(func.count()).select_from(base.with_only_columns(Lead.id).subquery())
             )
-        )
-        .scalars()
-        .all()
+        ).scalar_one()
     )
-    if lead_id not in ids:
-        raise NotFoundError(f"Лид {lead_id} не найден")
-    position = ids.index(lead_id)
+
+    # Порядок тот же, что в списке: сначала недавно изменённые. Время у двух
+    # карточек может совпасть до миллисекунды, поэтому при равенстве сравниваем
+    # ещё и номер — иначе запись находит сама себя как соседнюю.
+    # Время берём подзапросом, а не из объекта: SQLite хранит дату без часового
+    # пояса, и сравнение с «питоновским» значением уводило запрос в никуда —
+    # запись находила сама себя как соседнюю.
+    marker = select(Lead.updated_at).where(Lead.id == lead.id).scalar_subquery()
+    after = or_(
+        Lead.updated_at < marker,
+        and_(Lead.updated_at == marker, Lead.id < lead.id),
+    )
+    before = or_(
+        Lead.updated_at > marker,
+        and_(Lead.updated_at == marker, Lead.id > lead.id),
+    )
+
+    newer = int(
+        (
+            await session.execute(
+                select(func.count()).select_from(
+                    base.with_only_columns(Lead.id).where(before).subquery()
+                )
+            )
+        ).scalar_one()
+    )
+
+    prev_id = (
+        await session.execute(
+            base.with_only_columns(Lead.id)
+            .where(before)
+            .order_by(Lead.updated_at, Lead.id)
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
+    next_id = (
+        await session.execute(
+            base.with_only_columns(Lead.id)
+            .where(after)
+            .order_by(Lead.updated_at.desc(), Lead.id.desc())
+            .limit(1)
+        )
+    ).scalar_one_or_none()
+
     return {
-        "position": position + 1,
-        "total": len(ids),
-        "prev_id": ids[position - 1] if position > 0 else None,
-        "next_id": ids[position + 1] if position < len(ids) - 1 else None,
+        "position": newer + 1,
+        "total": total,
+        "prev_id": prev_id,
+        "next_id": next_id,
     }
 
 

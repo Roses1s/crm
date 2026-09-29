@@ -86,3 +86,35 @@ async def test_admin_sees_everything(auth_client: AsyncClient, client: AsyncClie
         lead["name"] for lead in (await auth_client.get("/api/v1/crm/leads")).json()["results"]
     ]
     assert "ООО «Василёк»" in names
+
+
+async def test_pager_counts_only_own_leads(
+    client: AsyncClient, auth_client: AsyncClient, seeded: dict
+) -> None:
+    """Переключатель «N из M» не должен выдавать количество чужих карточек."""
+    headers = await manager_headers(client)
+    stage_id = (await client.get("/api/v1/crm/stages", headers=headers)).json()[0]["id"]
+    mine = await client.post(
+        "/api/v1/crm/leads",
+        json={"name": "ООО «Тюльпан»", "inn": "7451234565", "stage_id": stage_id},
+        headers=headers,
+    )
+    lead_id = mine.json()["id"]
+
+    pager = await client.get(f"/api/v1/crm/leads/{lead_id}/pager", headers=headers)
+    assert pager.status_code == 200
+    body = pager.json()
+    # У менеджера ровно один свой лид, лид админа сюда попадать не должен.
+    assert body["total"] == 1
+    assert body["position"] == 1
+    assert body["prev_id"] is None
+    assert body["next_id"] is None
+
+    # Чужую карточку через переключатель тоже не посмотреть.
+    foreign_id = seeded["lead"].id  # type: ignore[attr-defined]
+    denied = await client.get(f"/api/v1/crm/leads/{foreign_id}/pager", headers=headers)
+    assert denied.status_code == 404
+
+    # Админ видит обе карточки.
+    admin_pager = await auth_client.get(f"/api/v1/crm/leads/{foreign_id}/pager")
+    assert admin_pager.json()["total"] == 2
