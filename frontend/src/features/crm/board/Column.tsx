@@ -1,5 +1,8 @@
 import { useDroppable } from "@dnd-kit/core";
-import { SortableContext, verticalListSortingStrategy } from "@dnd-kit/sortable";
+import {
+  SortableContext,
+  verticalListSortingStrategy,
+} from "@dnd-kit/sortable";
 import { MoreHorizontal, Plus } from "lucide-react";
 import { useState } from "react";
 
@@ -39,6 +42,9 @@ export function Column({
   const [name, setName] = useState(stage.name);
   const [menu, setMenu] = useState(false);
   const [quick, setQuick] = useState(false);
+  // Диалог удаления: у непустого этапа спрашиваем, куда переложить карточки.
+  const [confirmDelete, setConfirmDelete] = useState(false);
+  const [moveTo, setMoveTo] = useState<number | null>(null);
   const color = stageColor(stage.color);
 
   const patch = useUpdateStage();
@@ -88,7 +94,9 @@ export function Column({
                 title={canManage ? "Двойной клик — переименовать" : undefined}
               >
                 {stage.name}
-                <span className="ml-1 font-normal text-odoo-text-muted">{leads.length}</span>
+                <span className="ml-1 font-normal text-odoo-text-muted">
+                  {leads.length}
+                </span>
               </button>
             )}
           </div>
@@ -139,10 +147,15 @@ export function Column({
                       className="block w-full px-3 py-1.5 text-left text-sm hover:bg-odoo-bg"
                       onClick={() => {
                         setMenu(false);
-                        patch.mutate({ id: stage.id, is_closed: !stage.is_closed });
+                        patch.mutate({
+                          id: stage.id,
+                          is_closed: !stage.is_closed,
+                        });
                       }}
                     >
-                      {stage.is_closed ? "Открывающий этап" : "Закрывающий этап"}
+                      {stage.is_closed
+                        ? "Открывающий этап"
+                        : "Закрывающий этап"}
                     </button>
                     <div className="flex flex-wrap gap-1 px-3 py-1.5">
                       {Object.keys(STAGE_COLORS).map((c) => (
@@ -164,17 +177,10 @@ export function Column({
                       className="block w-full px-3 py-1.5 text-left text-sm text-odoo-danger hover:bg-odoo-bg"
                       onClick={() => {
                         setMenu(false);
-                        const other = allStages.find((s) => s.id !== stage.id);
-                        if (leads.length && !other) return;
-                        const question = leads.length
-                          ? `Удалить этап «${stage.name}»? ${leads.length} лид(ов) переедут в «${other?.name}».`
-                          : `Удалить этап «${stage.name}»?`;
-                        if (window.confirm(question)) {
-                          remove.mutate({
-                            id: stage.id,
-                            fallbackId: leads.length ? other?.id : undefined,
-                          });
-                        }
+                        setMoveTo(
+                          allStages.find((s) => s.id !== stage.id)?.id ?? null,
+                        );
+                        setConfirmDelete(true);
                       }}
                     >
                       Удалить
@@ -197,6 +203,70 @@ export function Column({
           </div>
         </div>
       </div>
+      {confirmDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+          <div className="w-full max-w-sm rounded-lg bg-odoo-surface p-4 shadow-lg">
+            <h3 className="text-[15px] font-semibold text-odoo-text">
+              Удалить этап «{stage.name}»?
+            </h3>
+            {leads.length > 0 ? (
+              <>
+                <p className="mt-2 text-[13px] text-odoo-text-muted">
+                  В этапе {leads.length} лид(ов). Выберите, куда их перенести —
+                  без этого удалить нельзя.
+                </p>
+                <select
+                  className="mt-3 w-full rounded-[4px] border border-odoo-border px-2.5 py-1.5 text-sm"
+                  value={moveTo ?? ""}
+                  onChange={(e) => setMoveTo(Number(e.target.value))}
+                >
+                  {allStages
+                    .filter((s) => s.id !== stage.id)
+                    .map((s) => (
+                      <option key={s.id} value={s.id}>
+                        {s.name}
+                      </option>
+                    ))}
+                </select>
+              </>
+            ) : (
+              <p className="mt-2 text-[13px] text-odoo-text-muted">
+                Этап пустой, лиды не пострадают.
+              </p>
+            )}
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                className="h-8 rounded-[4px] border border-odoo-border px-3 text-sm text-odoo-text hover:bg-odoo-bg"
+                onClick={() => setConfirmDelete(false)}
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                disabled={
+                  remove.isPending || (leads.length > 0 && moveTo === null)
+                }
+                className="h-8 rounded-[4px] bg-odoo-danger px-3 text-sm font-medium text-white disabled:opacity-60"
+                onClick={() => {
+                  remove.mutate(
+                    {
+                      id: stage.id,
+                      fallbackId: leads.length
+                        ? (moveTo ?? undefined)
+                        : undefined,
+                    },
+                    { onSuccess: () => setConfirmDelete(false) },
+                  );
+                }}
+              >
+                Удалить
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
+
       <div
         ref={setNodeRef}
         className={`flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain [scrollbar-gutter:stable] ${isOver ? "bg-odoo-drop" : "bg-odoo-surface"}`}
