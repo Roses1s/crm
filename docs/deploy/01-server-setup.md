@@ -1253,3 +1253,58 @@ docker system prune -f                  # почистить мусор Docker (
 
 Файлы конфигурации из этого этапа лежат в репозитории в папке `deploy/` — на этапе 4
 мы будем расширять именно их.
+
+
+## Как дать доступ с нового компьютера
+
+Сервер пускает только по ключам и только пользователя `deploy`
+(`/etc/ssh/sshd_config.d/00-crm-hardening.conf`). Добавить второе рабочее
+место можно двумя путями.
+
+**Простой — с компьютера, который уже имеет доступ.** Одна команда, ничего
+отключать не нужно:
+
+```powershell
+type $env:USERPROFILE\.ssh\id_ed25519.pub | ssh crm "cat >> ~/.ssh/authorized_keys"
+```
+
+**Если доступа нет ни с одного компьютера** — через веб-консоль хостинга
+(SpaceWeb: карточка VPS → консоль, вход под `root` с паролем из письма).
+Порядок такой:
+
+1. Задать временный пароль: `passwd deploy`.
+2. Временно ослабить правила. Важно: файлы в `sshd_config.d` читаются по
+   алфавиту и побеждает **первое** значение, а `00-crm-hardening.conf`
+   запрещает и пароли, и вход чем-либо кроме ключа. Поэтому временный файл
+   должен идти раньше по имени и снимать оба запрета:
+
+   ```bash
+   echo "PasswordAuthentication yes" > /etc/ssh/sshd_config.d/00-0temp.conf
+   echo "AuthenticationMethods publickey password" >> /etc/ssh/sshd_config.d/00-0temp.conf
+   sshd -t && systemctl restart ssh
+   ```
+
+3. С нового компьютера залить ключ:
+
+   ```powershell
+   type $env:USERPROFILE\.ssh\id_ed25519.pub | ssh deploy@77.222.38.191 "mkdir -p ~/.ssh && cat >> ~/.ssh/authorized_keys && chmod 700 ~/.ssh && chmod 600 ~/.ssh/authorized_keys"
+   ```
+
+4. Вернуть защиту и заблокировать пароль:
+
+   ```bash
+   rm /etc/ssh/sshd_config.d/00-0temp.conf
+   sshd -t && systemctl restart ssh
+   passwd -l deploy
+   ```
+
+5. На новом компьютере завести короткое имя `crm` (Блокнот добавляет `.txt`
+   и метку кодировки, поэтому надёжнее командой):
+
+   ```powershell
+   Set-Content -Path "$env:USERPROFILE\.ssh\config" -Encoding ascii -Value @("Host crm","    HostName 77.222.38.191","    User deploy","    IdentityFile ~/.ssh/id_ed25519")
+   ```
+
+**Главное правило:** перед каждым `systemctl restart ssh` выполняйте `sshd -t`.
+Опечатка в настройках роняет службу, и без консоли хостинга вернуться будет
+некуда.
