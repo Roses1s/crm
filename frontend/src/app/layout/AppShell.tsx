@@ -90,7 +90,7 @@ export function ControlPanel({
           <button
             type="button"
             onClick={onNew}
-            className="inline-flex h-8 shrink-0 items-center rounded-[4px] border border-odoo-border bg-odoo-surface px-3 text-[13px] text-odoo-text transition-colors hover:bg-odoo-bg"
+            className="inline-flex h-8 shrink-0 items-center rounded-[3px] bg-odoo-primary-soft px-3 text-[13px] font-medium text-odoo-primary-soft-text transition-colors hover:opacity-90"
           >
             Новый
           </button>

@@ -254,7 +254,7 @@ export function FormGroup({ children }: { children: ReactNode }) {
 /** Плашка заголовка записи во всю ширину листа. */
 export function FormTitle({ children }: { children: ReactNode }) {
   return (
-    <div className="mb-4 rounded-[3px] border border-odoo-border-light bg-odoo-title-band px-3 py-1.5">
+    <div className="mb-4 rounded-[2px] bg-odoo-title-band px-3 py-1.5">
       <h1 className="text-[24px] font-normal leading-[34px] text-odoo-text">{children}</h1>
     </div>
   );
