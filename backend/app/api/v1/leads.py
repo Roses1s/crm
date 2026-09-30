@@ -206,7 +206,7 @@ async def lead_timeline(
     await get_lead_or_404(session, lead_id, user)
     stmt = (
         select(TimelineEntry)
-        .where(TimelineEntry.lead_id == lead_id)
+        .where(TimelineEntry.lead_id == lead_id, TimelineEntry.shipment_id.is_(None))
         .order_by(TimelineEntry.created_at.desc())
     )
     return list((await session.execute(stmt)).unique().scalars().all())

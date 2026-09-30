@@ -28,6 +28,12 @@ class TimelineEntry(Base, TimestampMixin):
     lead_id: Mapped[int] = mapped_column(
         ForeignKey("leads.id", ondelete="CASCADE"), nullable=False, index=True
     )
+    # Лента заявки: запись принадлежит и заявке (shipment_id), и её лиду
+    # (lead_id остаётся заполненным для каскадного удаления). У записей лида
+    # shipment_id пуст — так две ленты не смешиваются.
+    shipment_id: Mapped[int | None] = mapped_column(
+        ForeignKey("shipments.id", ondelete="CASCADE"), index=True
+    )
     author_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
 
     type: Mapped[EntryType] = mapped_column(

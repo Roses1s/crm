@@ -195,12 +195,18 @@ async def upload_shipment_attachment(
     session: SessionDep,
     user: CurrentUser,
     file: Annotated[UploadFile, File(description="Файл до 25 МБ")],
+    entry_id: Annotated[int | None, Query(description="Привязать файл к записи ленты")] = None,
 ) -> Attachment:
     shipment = await session.get(Shipment, shipment_id)
     if shipment is None:
         raise NotFoundError(f"Заявка {shipment_id} не найдена")
     # Документы заявки доступны тому же кругу, что и сама заявка.
     await get_lead_or_404(session, shipment.lead_id, user)
+
+    if entry_id is not None:
+        entry = await session.get(TimelineEntry, entry_id)
+        if entry is None or entry.shipment_id != shipment_id:
+            raise NotFoundError(f"Запись {entry_id} не найдена")
 
     # Файлы заявки лежат в отдельной папке, чтобы не смешиваться с файлами лида.
     name, content_type, size, target = await _store_upload(
@@ -212,6 +218,7 @@ async def upload_shipment_attachment(
         # объёма по лиду и удалится вместе с ним.
         lead_id=shipment.lead_id,
         shipment_id=shipment_id,
+        entry_id=entry_id,
         uploaded_by_id=user.id,
         name=name,
         size=size,
