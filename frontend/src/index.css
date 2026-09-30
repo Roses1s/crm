@@ -31,6 +31,10 @@
   --color-odoo-surface-sunken: rgb(var(--odoo-surface-sunken));
   --color-odoo-skeleton: rgb(var(--odoo-skeleton));
   --color-odoo-column-head: rgb(var(--odoo-column-head));
+  --color-odoo-board-canvas: rgb(var(--odoo-board-canvas));
+  --color-odoo-board-column: rgb(var(--odoo-board-column));
+  --color-odoo-board-card: rgb(var(--odoo-board-card));
+  --color-odoo-board-card-hover: rgb(var(--odoo-board-card-hover));
   --color-odoo-track: rgb(var(--odoo-track));
 
   --color-odoo-border: rgb(var(--odoo-border));
@@ -106,7 +110,11 @@
   --odoo-surface-hover: 248 243 247; /* #F8F3F7 */
   --odoo-surface-sunken: 240 238 241; /* #F0EEF1 */
   --odoo-skeleton: 229 225 231;
-  --odoo-column-head: 247 246 248; /* #F7F6F8 */
+  --odoo-column-head: 240 238 241; /* #F0EEF1 */
+  --odoo-board-canvas: 247 246 248;
+  --odoo-board-column: 240 238 241;
+  --odoo-board-card: 255 255 255;
+  --odoo-board-card-hover: 248 243 247;
   --odoo-track: 221 217 223; /* #DDD9DF */
 
   --odoo-border: 221 217 223; /* #DDD9DF */
@@ -196,7 +204,11 @@
   --odoo-surface-hover: 48 52 66; /* #303442 */
   --odoo-surface-sunken: 32 35 44; /* #20232C */
   --odoo-skeleton: 61 65 80;
-  --odoo-column-head: 38 42 54; /* #262A36 */
+  --odoo-column-head: 30 33 43; /* #1E212B */
+  --odoo-board-canvas: 27 29 38;
+  --odoo-board-column: 30 33 43;
+  --odoo-board-card: 36 39 51;
+  --odoo-board-card-hover: 43 47 61;
   --odoo-track: 60 62 75; /* #3C3E4B */
 
   --odoo-border: 60 62 75; /* #3C3E4B */

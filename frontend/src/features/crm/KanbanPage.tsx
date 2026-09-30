@@ -212,7 +212,7 @@ export function KanbanPage() {
       {view === "list" && <LeadListView leads={leads} groupBy="stage" />}
 
       {view !== "list" && (
-        <div className="flex h-[calc(100dvh-90px)] min-h-0 snap-x snap-mandatory gap-0 overflow-x-auto overflow-y-hidden overscroll-x-contain border-t border-odoo-border-light bg-odoo-surface md:snap-none">
+        <div className="flex h-[calc(100dvh-90px)] min-h-0 snap-x snap-mandatory gap-0 overflow-x-auto overflow-y-hidden overscroll-x-contain bg-odoo-board-canvas md:snap-none">
           <DndContext
             sensors={sensors}
             collisionDetection={collisionDetection}

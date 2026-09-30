@@ -53,7 +53,7 @@ export function Column({
       <button
         type="button"
         onClick={onFold}
-        className="flex h-full w-10 shrink-0 flex-col items-center border-r border-odoo-border-light bg-odoo-surface py-3"
+        className="flex h-full w-10 shrink-0 flex-col items-center border-r border-odoo-border-light bg-odoo-board-column py-3"
         style={{ borderTop: `3px solid ${color}` }}
       >
         <span className="mt-8 origin-center rotate-180 text-[12px] font-semibold tracking-wide text-odoo-text [writing-mode:vertical-rl]">
@@ -70,7 +70,7 @@ export function Column({
     <div
       ref={setNodeRef}
       className={`flex h-full w-[min(100vw-1rem,325px)] shrink-0 snap-center flex-col border-r border-odoo-border-light transition-colors duration-200 md:w-[325px] ${
-        isOver ? "bg-odoo-drop" : "bg-odoo-surface"
+        isOver ? "bg-odoo-drop" : "bg-odoo-board-column"
       }`}
     >
       <div className="shrink-0 bg-odoo-column-head px-2.5 pb-2 pt-2">

@@ -26,7 +26,7 @@ export function QuickCreate({
 
   return (
     <form
-      className="border-b border-odoo-border-light bg-odoo-surface px-2.5 py-2"
+      className="border-b border-odoo-border-light bg-odoo-board-card px-2.5 py-2"
       onSubmit={(event) => {
         event.preventDefault();
         if (!name.trim() || !inn.trim()) return;

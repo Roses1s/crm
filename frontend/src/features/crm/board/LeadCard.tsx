@@ -104,12 +104,12 @@ export function LeadCard({
 
   const inner = (
     <div
-      className={`overflow-hidden border-b border-odoo-border-light bg-odoo-surface px-2.5 py-2 ${
+      className={`overflow-hidden border-b border-odoo-border-light bg-odoo-board-card px-2.5 py-2 ${
         isOverlay
           ? "w-[325px] rotate-2 scale-[1.02] cursor-grabbing rounded-[4px] border border-odoo-primary shadow-2xl transition-transform"
           : isDragging
             ? "cursor-grabbing opacity-40 transition-opacity duration-150"
-            : "cursor-grab transition-colors duration-150 hover:bg-odoo-surface-hover"
+            : "cursor-grab transition-colors duration-150 hover:bg-odoo-board-card-hover"
       }`}
     >
       <LeadCardBody lead={lead} menuSpace={!isOverlay} />
