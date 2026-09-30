@@ -1,10 +1,11 @@
 from __future__ import annotations
 
 import enum
+from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import Enum, ForeignKey, Numeric, String, Text
+from sqlalchemy import JSON, Boolean, Date, Enum, ForeignKey, Numeric, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
@@ -68,6 +69,43 @@ class Shipment(Base, TimestampMixin):
     cargo_volume: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     comment: Mapped[str] = mapped_column(Text, default="", nullable=False)
 
+    # --- Заказчик (шапка) ---
+    customer_address: Mapped[str] = mapped_column(Text, default="", nullable=False)
+    customer_contact: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    customer_signer: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+
+    # --- Погрузка (мультигорода — список тегов) ---
+    loading_cities: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    loading_date_from: Mapped[date | None] = mapped_column(Date)
+    loading_date_to: Mapped[date | None] = mapped_column(Date)
+    loading_time_from: Mapped[str] = mapped_column(String(40), default="", nullable=False)
+    loading_time_to: Mapped[str] = mapped_column(String(40), default="", nullable=False)
+
+    # --- Выгрузка ---
+    unloading_cities: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+    unloading_date_from: Mapped[date | None] = mapped_column(Date)
+    unloading_date_to: Mapped[date | None] = mapped_column(Date)
+    unloading_time_from: Mapped[str] = mapped_column(String(40), default="", nullable=False)
+    unloading_time_to: Mapped[str] = mapped_column(String(40), default="", nullable=False)
+
+    # --- Перевозчик ---
+    carrier_contact: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    vehicle: Mapped[str] = mapped_column(String(120), default="", nullable=False)
+    vehicle_number: Mapped[str] = mapped_column(String(40), default="", nullable=False)
+    has_trailer: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
+    trailer_number: Mapped[str] = mapped_column(String(40), default="", nullable=False)
+    driver_name: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    driver_phone: Mapped[str] = mapped_column(String(40), default="", nullable=False)
+    driver_passport: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    carrier_signer: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+
+    # --- Груз ---
+    cargo_type: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    cargo_packaging: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    capacity: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
+    body_type: Mapped[str] = mapped_column(String(120), default="", nullable=False)
+    loading_method: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
+
     lead: Mapped[Lead] = relationship(back_populates="shipments", lazy="joined")
     carrier: Mapped[Carrier | None] = relationship(back_populates="shipments", lazy="joined")
 
@@ -86,6 +124,10 @@ class Shipment(Base, TimestampMixin):
 
     @property
     def route(self) -> str:
-        if self.city_loading and self.city_unloading:
-            return f"{self.city_loading} → {self.city_unloading}"
-        return self.city_loading or self.city_unloading or "—"
+        # Маршрут для списка: сначала берём мультигорода-теги, иначе — старые
+        # одиночные поля города.
+        start = ", ".join(self.loading_cities) if self.loading_cities else self.city_loading
+        end = ", ".join(self.unloading_cities) if self.unloading_cities else self.city_unloading
+        if start and end:
+            return f"{start} → {end}"
+        return start or end or "—"
