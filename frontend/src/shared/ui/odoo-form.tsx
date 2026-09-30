@@ -265,7 +265,7 @@ export function InnerGroup({ title, children }: { title?: string; children: Reac
   return (
     <div className="mb-[var(--odoo-form-section-gap)]">
       {title && (
-        <h3 className="mb-3 text-[12px] font-bold uppercase leading-[16px] tracking-[0.02em] text-odoo-text">
+        <h3 className="mb-3 border-b border-odoo-border pb-1.5 text-[12px] font-bold uppercase leading-[16px] tracking-[0.02em] text-odoo-text">
           {title}
         </h3>
       )}
@@ -297,7 +297,7 @@ export function Field({
     <>
       <label
         htmlFor={htmlFor}
-        className={`pr-2 pt-[3px] text-[13px] font-medium leading-[19px] text-odoo-text ${
+        className={`pr-2 pt-[3px] text-[13px] font-medium leading-[19px] text-odoo-text-muted ${
           muted ? "opacity-[0.66]" : ""
         }`}
       >

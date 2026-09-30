@@ -196,7 +196,7 @@
   /* Три уровня slate-поверхностей отделяют приложение, панели и hover без чёрных провалов. */
   --odoo-primary: 113 75 103; /* #714B67 — фирменный фиолетовый Odoo (manifest) */
   --odoo-primary-hover: 138 95 126; /* #8A5F7E — светлее для наведения на тёмной теме */
-  --odoo-secondary: 2 199 181; /* #02C7B5 */
+  --odoo-secondary: 31 166 160; /* #1FA6A0 — приглушённый бирюзовый под образец Odoo */
 
   --odoo-bg: 27 29 38; /* #1B1D26 */
   --odoo-surface: 38 42 54; /* #262A36 */
@@ -224,18 +224,18 @@
   --odoo-info: 71 187 220; /* #47BBDC */
 
   --odoo-nav: 38 42 54;
-  --odoo-focus: 2 199 181;
+  --odoo-focus: 31 166 160;
   --odoo-overlay: 5 7 12;
   --odoo-title-band: 48 36 48;
   --odoo-statusbar: 60 62 75;
   --odoo-statusbar-segment: 48 52 66;
   --odoo-statusbar-text: 228 228 230;
   --odoo-statusbar-current: 31 70 73;
-  --odoo-statusbar-current-border: 2 199 181;
+  --odoo-statusbar-current-border: 31 166 160;
   --odoo-statusbar-current-text: 228 228 230;
   --odoo-drop: 34 39 50;
   --odoo-accent-soft: 27 57 58;
-  --odoo-accent-line: 2 146 135;
+  --odoo-accent-line: 31 166 160;
   --odoo-search-divider: 58 89 87;
   --odoo-search-icon: 163 177 180;
   --odoo-search-placeholder: 139 149 153;
@@ -244,8 +244,8 @@
   --odoo-chip: 61 48 62;
   --odoo-chip-text: 211 198 211;
   --odoo-avatar: 66 70 82;
-  --odoo-link: 2 199 181;
-  --odoo-action: 2 199 181;
+  --odoo-link: 31 166 160;
+  --odoo-action: 31 166 160;
   --odoo-tag-blue-bg: 40 71 92;
   --odoo-tag-blue-text: 142 207 240;
   --odoo-tag-green-bg: 34 82 58;
