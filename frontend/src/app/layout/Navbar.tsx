@@ -32,7 +32,7 @@ export function Navbar() {
   );
 
   return (
-    <nav className="sticky top-0 z-50 flex h-10 shrink-0 items-center border-b border-odoo-nav-border bg-odoo-nav px-3 text-odoo-text">
+    <nav className="sticky top-0 z-50 flex h-10 shrink-0 items-center bg-odoo-nav px-3 text-odoo-text">
       <button
         type="button"
         className="mr-2 inline-flex h-10 items-center md:hidden"

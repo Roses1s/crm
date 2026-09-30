@@ -61,7 +61,6 @@
   --color-odoo-link: rgb(var(--odoo-link));
   --color-odoo-action: rgb(var(--odoo-action));
   --color-odoo-nav: rgb(var(--odoo-nav));
-  --color-odoo-nav-border: rgb(var(--odoo-nav-border));
   --color-odoo-focus: rgb(var(--odoo-focus));
   --color-odoo-overlay: rgb(var(--odoo-overlay));
   --color-odoo-chatter-divider: rgb(var(--odoo-chatter-divider));
@@ -125,7 +124,6 @@
 
   /* Контекстные роли, чтобы экран не зависел от случайных локальных HEX. */
   --odoo-nav: 255 255 255;
-  --odoo-nav-border: 221 217 223;
   --odoo-focus: 107 62 102;
   --odoo-overlay: 42 32 42;
   --odoo-title-band: 249 241 247;
@@ -214,8 +212,7 @@
   --odoo-danger: 232 87 101; /* #E85765 */
   --odoo-info: 71 187 220; /* #47BBDC */
 
-  --odoo-nav: 27 29 38;
-  --odoo-nav-border: 60 62 75;
+  --odoo-nav: 38 42 54;
   --odoo-focus: 2 199 181;
   --odoo-overlay: 5 7 12;
   --odoo-title-band: 48 36 48;
