@@ -53,7 +53,7 @@ export function Column({
       <button
         type="button"
         onClick={onFold}
-        className="flex h-full w-10 shrink-0 flex-col items-center bg-odoo-board-column py-3"
+        className="flex h-full w-10 shrink-0 flex-col items-center bg-odoo-board-canvas py-3"
         style={{ borderTop: `3px solid ${color}` }}
       >
         <span className="mt-8 origin-center rotate-180 text-[12px] font-semibold tracking-wide text-odoo-text [writing-mode:vertical-rl]">
@@ -69,11 +69,11 @@ export function Column({
     // проходил мимо — карточка возвращалась на место.
     <div
       ref={setNodeRef}
-      className={`flex h-full w-[min(100vw-1rem,340px)] shrink-0 snap-center flex-col transition-colors duration-200 md:w-[340px] ${
-        isOver ? "bg-odoo-drop" : "bg-odoo-board-column"
+      className={`flex h-full w-[var(--odoo-kanban-group-width)] shrink-0 snap-center flex-col transition-colors duration-200 ${
+        isOver ? "bg-odoo-drop" : "bg-odoo-board-canvas"
       }`}
     >
-      <div className="shrink-0 bg-odoo-column-head px-3 pb-2 pt-2">
+      <div className="shrink-0 bg-odoo-board-canvas px-3 pb-2 pt-2">
         <div className="flex items-start justify-between gap-1">
           <div className="min-w-0">
             {editing ? (

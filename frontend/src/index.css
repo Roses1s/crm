@@ -263,6 +263,38 @@
   --border: 230 10% 24%;
 }
 
+/*
+ * Геометрия сгруппированного канбана повторяет модель Odoo: на телефоне этап
+ * занимает 90% окна, а на широком экране его ширина складывается из записи и
+ * двух внутренних полей. Сам этап не рисует отдельную поверхность — тёмный
+ * фон доски остаётся виден между карточками и группами.
+ */
+.crm-kanban-renderer {
+  --odoo-kanban-group-padding-x: 8px;
+  --odoo-kanban-record-width: 240px;
+  --odoo-kanban-record-small-width: 216px;
+  --odoo-kanban-group-width: 90vw;
+  --odoo-kanban-record-current-width: calc(
+    90vw - (var(--odoo-kanban-group-padding-x) * 2)
+  );
+}
+
+@media (min-width: 768px) {
+  .crm-kanban-renderer {
+    --odoo-kanban-record-current-width: var(--odoo-kanban-record-small-width);
+    --odoo-kanban-group-width: calc(
+      var(--odoo-kanban-record-current-width) +
+        (var(--odoo-kanban-group-padding-x) * 2)
+    );
+  }
+}
+
+@media (min-width: 1024px) {
+  .crm-kanban-renderer {
+    --odoo-kanban-record-current-width: var(--odoo-kanban-record-width);
+  }
+}
+
 @layer base {
   *,
   ::before,
