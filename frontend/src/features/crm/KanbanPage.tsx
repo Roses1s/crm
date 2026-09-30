@@ -3,17 +3,25 @@ import {
   MeasuringStrategy,
   pointerWithin,
   DragOverlay,
+  KeyboardSensor,
   PointerSensor,
   TouchSensor,
   closestCorners,
   defaultDropAnimationSideEffects,
   useSensor,
   useSensors,
+  type Announcements,
   type DragEndEvent,
   type DragStartEvent,
   type DropAnimation,
+  type ScreenReaderInstructions,
+  type UniqueIdentifier,
 } from "@dnd-kit/core";
-import { horizontalListSortingStrategy, SortableContext } from "@dnd-kit/sortable";
+import {
+  horizontalListSortingStrategy,
+  SortableContext,
+  sortableKeyboardCoordinates,
+} from "@dnd-kit/sortable";
 import { Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -143,7 +151,45 @@ export function KanbanPage() {
     useSensor(TouchSensor, {
       activationConstraint: { delay: 150, tolerance: 5 },
     }),
+    // Клавиатурный сенсор: доской можно управлять без мыши. Пробел/Enter —
+    // поднять карточку или этап, стрелки — выбрать место, ещё раз пробел/Enter —
+    // отпустить, Escape — отменить.
+    useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
+
+  // Описание элемента для голосовых объявлений скринридера.
+  function describeDragItem(id: UniqueIdentifier): string {
+    if (isStageDragId(id)) {
+      const stageId = Number(String(id).replace("stage-", ""));
+      const stage = stages.find((s) => s.id === stageId);
+      return stage ? `этап «${stage.name}»` : "этап";
+    }
+    const leadId = Number(String(id).replace("lead-", ""));
+    const lead = leads.find((l) => l.id === leadId);
+    return lead ? `лид «${lead.name}»` : "лид";
+  }
+
+  // Объявления для скринридера на русском — что происходит при перетаскивании.
+  const announcements: Announcements = {
+    onDragStart: ({ active }) =>
+      `Поднят ${describeDragItem(active.id)}. Стрелками выберите новое место.`,
+    onDragOver: ({ active, over }) =>
+      over
+        ? `Перемещается ${describeDragItem(active.id)} к ${describeDragItem(over.id)}.`
+        : undefined,
+    onDragEnd: ({ active, over }) =>
+      over
+        ? `Готово: ${describeDragItem(active.id)} перемещён к ${describeDragItem(over.id)}.`
+        : `Перемещение отменено: ${describeDragItem(active.id)} остался на месте.`,
+    onDragCancel: ({ active }) =>
+      `Перемещение отменено: ${describeDragItem(active.id)} остался на месте.`,
+  };
+
+  const screenReaderInstructions: ScreenReaderInstructions = {
+    draggable:
+      "Чтобы поднять элемент, нажмите пробел или Enter. Двигайте стрелками. " +
+      "Пробел или Enter — отпустить в выбранном месте, Escape — отменить.",
+  };
 
   function onDragStart(event: DragStartEvent) {
     if (isStageDragId(event.active.id)) {
@@ -226,6 +272,7 @@ export function KanbanPage() {
         <div className="crm-kanban-renderer flex h-[calc(100dvh-var(--odoo-record-control-panel-height))] min-h-0 snap-x snap-mandatory gap-0 overflow-x-auto overflow-y-hidden overscroll-x-contain bg-odoo-board-canvas pl-2 md:snap-none">
           <DndContext
             sensors={sensors}
+            accessibility={{ announcements, screenReaderInstructions }}
             collisionDetection={collisionDetection}
             // Колонки переизмеряются постоянно: при прокрутке доски старые
             // координаты давали «залипание» подсветки и промахи.
