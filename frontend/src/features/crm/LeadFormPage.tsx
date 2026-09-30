@@ -411,39 +411,42 @@ function LeadForm({ id }: { id?: string }) {
       */}
       <FormWorkspace aside={chatter}>
         <main className="min-w-0 flex-1 lg:overflow-y-auto">
+          {/*
+            Кнопки действий и лента этапов вынесены на отдельную панель НАД
+            листом карточки — как в Odoo 17, где статусбар и кнопки живут в
+            панели управления, а не на самом листе.
+          */}
+          <FormStatusbar
+            items={stages}
+            current={form.stage_id}
+            disabled={saving}
+            onSelect={selectStage}
+            left={
+              !isNew ? (
+                <>
+                  <Link
+                    to={`/shipments/new?lead=${lead?.id ?? ""}`}
+                    className="inline-flex h-[30px] items-center rounded-[4px] bg-odoo-primary px-3 text-[13px] font-medium text-white transition-colors hover:bg-odoo-primary-hover"
+                  >
+                    Создать заявку
+                  </Link>
+                  <button
+                    type="button"
+                    disabled={archiveLead.isPending}
+                    onClick={archive}
+                    className="h-[30px] rounded-[4px] border border-odoo-border bg-odoo-surface px-3 text-[13px] text-odoo-text transition-colors hover:bg-odoo-bg disabled:opacity-60"
+                  >
+                    Проигрыш
+                  </button>
+                </>
+              ) : null
+            }
+          />
+
           <FormSheetBg>
             {error && <FormAlert>{error}</FormAlert>}
 
             <FormSheet>
-              <FormStatusbar
-                items={stages}
-                current={form.stage_id}
-                disabled={saving}
-                onSelect={selectStage}
-                left={
-                  !isNew ? (
-                    <>
-                      <Link
-                        to={`/shipments/new?lead=${lead?.id ?? ""}`}
-                        className="inline-flex h-[30px] items-center rounded-[4px] bg-odoo-primary px-3 text-[13px] font-medium text-white transition-colors hover:bg-odoo-primary-hover"
-                      >
-                        Создать заявку
-                      </Link>
-                      {
-                        <button
-                          type="button"
-                          disabled={archiveLead.isPending}
-                          onClick={archive}
-                          className="h-[30px] rounded-[4px] border border-odoo-border bg-odoo-surface px-3 text-[13px] text-odoo-text transition-colors hover:bg-odoo-bg disabled:opacity-60"
-                        >
-                          Проигрыш
-                        </button>
-                      }
-                    </>
-                  ) : null
-                }
-              />
-
               {isLoading ? (
                 <FormSkeleton />
               ) : (

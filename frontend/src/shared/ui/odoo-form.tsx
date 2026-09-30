@@ -146,7 +146,7 @@ export function FormStatusbar({
   ];
 
   return (
-    <div className="-mx-4 -mt-4 mb-4 flex min-h-[41px] flex-wrap items-center justify-between gap-2 border-b border-odoo-border px-4 py-1 lg:-mx-6 lg:-mt-6 lg:px-6">
+    <div className="sticky top-0 z-20 flex min-h-[46px] flex-wrap items-center justify-between gap-2 border-b border-odoo-border bg-odoo-surface px-4 py-1.5 lg:px-6">
       <div className="flex flex-wrap items-center gap-1">{left}</div>
       <div className="relative flex min-w-0 flex-nowrap items-stretch justify-end overflow-x-auto py-px">
         {segments.map((segment, index) => {
