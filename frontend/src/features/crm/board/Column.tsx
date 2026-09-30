@@ -69,17 +69,17 @@ export function Column({
     // проходил мимо — карточка возвращалась на место.
     <div
       ref={setNodeRef}
-      className={`flex h-full w-[min(100vw-1rem,325px)] shrink-0 snap-center flex-col border-r border-odoo-border-light transition-colors duration-200 md:w-[325px] ${
+      className={`flex h-full w-[min(100vw-1rem,340px)] shrink-0 snap-center flex-col border-r border-odoo-border-light transition-colors duration-200 md:w-[340px] ${
         isOver ? "bg-odoo-drop" : "bg-odoo-board-column"
       }`}
     >
-      <div className="shrink-0 bg-odoo-column-head px-2.5 pb-2 pt-2">
+      <div className="shrink-0 bg-odoo-column-head px-3 pb-2 pt-2">
         <div className="flex items-start justify-between gap-1">
           <div className="min-w-0">
             {editing ? (
               <input
                 autoFocus
-                className="w-full rounded-[4px] border border-odoo-primary px-1 text-[15px] font-semibold"
+                className="w-full rounded-[3px] border border-odoo-primary px-1 text-[13px] font-semibold leading-[18px]"
                 value={name}
                 onChange={(e) => setName(e.target.value)}
                 onBlur={() => {
@@ -95,7 +95,7 @@ export function Column({
             ) : (
               <button
                 type="button"
-                className="truncate text-[15px] font-semibold leading-5 text-odoo-text"
+                className="truncate text-[13px] font-semibold leading-[18px] text-odoo-text"
                 onDoubleClick={() => setEditing(true)}
                 title="Двойной клик — переименовать"
               >
@@ -296,7 +296,7 @@ export function Column({
         ) : (
           <button
             type="button"
-            className="flex w-full items-center gap-1 px-2.5 py-2 text-left text-[13px] text-odoo-text-muted hover:bg-odoo-surface-hover hover:text-odoo-text"
+            className="flex w-full items-center gap-1 px-3 py-1.5 text-left text-[12px] text-odoo-text-muted hover:bg-odoo-surface-hover hover:text-odoo-text"
             onClick={() => setQuick(true)}
           >
             <Plus className="h-3.5 w-3.5" /> Добавить

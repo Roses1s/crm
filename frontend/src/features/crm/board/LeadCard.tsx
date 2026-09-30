@@ -21,13 +21,13 @@ export function LeadCardBody({
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className={menuSpace ? "pr-7" : ""}>
         <h3
-          className="line-clamp-3 text-[15px] font-medium leading-5 text-odoo-text"
+          className="line-clamp-2 text-[13px] font-medium leading-[17px] text-odoo-text"
           title={title}
         >
           {title}
         </h3>
         <p
-          className="mt-0.5 truncate text-[13px] leading-[18px] text-odoo-text-muted"
+          className="mt-px truncate text-[12px] leading-4 text-odoo-text-muted"
           title={lead.logist_contact || lead.name}
         >
           {lead.logist_contact || lead.name}
@@ -35,12 +35,12 @@ export function LeadCardBody({
       </div>
 
       {lead.tags?.length > 0 && (
-        <div className="mt-1 flex flex-wrap gap-1 overflow-hidden">
+        <div className="mt-0.5 flex flex-wrap gap-1 overflow-hidden">
           {lead.tags.map((tag) => (
             <span
               key={tag.id}
               title={tag.name}
-              className="inline-flex max-w-full items-center rounded-full bg-odoo-chip px-2 py-0.5 text-[11px] font-normal leading-[14px] text-odoo-chip-text"
+              className="inline-flex max-w-full items-center rounded-full bg-odoo-chip px-1.5 py-px text-[10px] font-normal leading-[13px] text-odoo-chip-text"
             >
               <span className="max-w-[150px] truncate">{tag.name}</span>
             </span>
@@ -48,7 +48,7 @@ export function LeadCardBody({
         </div>
       )}
 
-      <div className="mt-1 flex shrink-0 items-end justify-between gap-2">
+      <div className="mt-0.5 flex shrink-0 items-end justify-between gap-2">
         <div className="flex items-center gap-1.5">
           <StarRating value={lead.priority} />
         </div>
@@ -104,9 +104,9 @@ export function LeadCard({
 
   const inner = (
     <div
-      className={`overflow-hidden border-b border-odoo-border-light bg-odoo-board-card px-2.5 py-2 ${
+      className={`overflow-hidden rounded-[2px] border border-odoo-border-light bg-odoo-board-card px-2.5 py-1.5 ${
         isOverlay
-          ? "w-[325px] rotate-2 scale-[1.02] cursor-grabbing rounded-[4px] border border-odoo-primary shadow-2xl transition-transform"
+          ? "w-[340px] rotate-2 scale-[1.02] cursor-grabbing border-odoo-primary shadow-2xl transition-transform"
           : isDragging
             ? "cursor-grabbing opacity-40 transition-opacity duration-150"
             : "cursor-grab transition-colors duration-150 hover:bg-odoo-board-card-hover"
@@ -124,7 +124,7 @@ export function LeadCard({
       style={style}
       {...attributes}
       {...listeners}
-      className="group relative touch-none"
+      className="group relative mx-2 mb-1 touch-none"
       aria-label={`Переместить ${lead.name}`}
     >
       {!isDragging && (
