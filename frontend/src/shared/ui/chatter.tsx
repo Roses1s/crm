@@ -17,8 +17,8 @@ const MODES: { id: string; label: string; placeholder: string; action: string }[
   {
     id: "note",
     label: "Лог примечания",
-    placeholder: "Записать внутреннее примечание…",
-    action: "Записать",
+    placeholder: "Запишите внутреннюю запись…",
+    action: "Лог",
   },
 ];
 
@@ -75,6 +75,8 @@ function AttachmentThumb({ file, onOpen }: { file: Attachment; onOpen: () => voi
 
 interface ChatterProps {
   timeline: TimelineEntry[];
+  /** Инициалы текущего сотрудника для редактора новой записи. */
+  authorInitials?: string;
   attachments?: Attachment[];
   /** Отправка примечания вместе с выбранными файлами. */
   onSubmit?: (body: string, files: File[]) => void;
@@ -87,6 +89,7 @@ interface ChatterProps {
 
 export function Chatter({
   timeline,
+  authorInitials = "Я",
   attachments,
   onSubmit,
   posting = false,
@@ -133,7 +136,7 @@ export function Chatter({
 
   return (
     <div className="flex h-full min-h-[420px] flex-col border-l border-odoo-border bg-odoo-surface">
-      <div className="flex flex-wrap items-center gap-1 px-3 py-2">
+      <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-odoo-border-light px-3 py-2">
         {MODES.map((m) => (
           <button
             key={m.id}
@@ -275,7 +278,7 @@ export function Chatter({
       )}
 
       <form
-        className="border-b border-odoo-border-light px-3 pb-2"
+        className="shrink-0 border-b border-odoo-border-light px-3 py-3"
         onSubmit={(event) => {
           event.preventDefault();
           if (!onSubmit) return;
@@ -285,72 +288,87 @@ export function Chatter({
           setPending([]);
         }}
       >
-        <textarea
-          rows={2}
-          value={text}
-          onChange={(e) => setText(e.target.value)}
-          placeholder={current.placeholder}
-          className="w-full resize-y rounded-[4px] border border-odoo-border px-2 py-1.5 text-[13px] text-odoo-text outline-none placeholder:text-odoo-text-light focus:border-odoo-primary"
-        />
-
-        {pending.length > 0 && (
-          <ul className="mt-1 flex flex-wrap gap-1">
-            {pending.map((file, i) => (
-              <li
-                key={`${file.name}-${i}`}
-                className="inline-flex items-center gap-1 rounded-[4px] border border-odoo-border bg-odoo-bg px-1.5 py-0.5 text-[11px]"
-              >
-                <Paperclip className="h-3 w-3 shrink-0 text-odoo-text-light" />
-                <span className="max-w-[150px] truncate" title={file.name}>
-                  {file.name}
-                </span>
-                <span className="text-odoo-text-muted">{formatSize(file.size)}</span>
-                <button
-                  type="button"
-                  aria-label={`Убрать ${file.name}`}
-                  onClick={() => setPending((list) => list.filter((_, index) => index !== i))}
-                  className="text-odoo-text-muted hover:text-odoo-danger"
-                >
-                  <X className="h-3 w-3" />
-                </button>
-              </li>
-            ))}
-          </ul>
-        )}
-
-        <div className="mt-1 flex items-center justify-end gap-1">
-          <input
-            ref={composerInput}
-            type="file"
-            multiple
-            className="hidden"
-            aria-label="Файлы записи"
-            onChange={(e) => {
-              const chosen = Array.from(e.target.files ?? []);
-              if (chosen.length) setPending((list) => [...list, ...chosen]);
-              e.target.value = "";
-            }}
-          />
-          <button
-            type="button"
-            aria-label="Прикрепить файл к записи"
-            title="Прикрепить файл к записи"
-            onClick={() => composerInput.current?.click()}
-            className="inline-flex h-7 w-7 items-center justify-center rounded-sm text-odoo-text-muted transition-colors hover:bg-odoo-bg hover:text-odoo-text"
+        <div className="flex items-start gap-2">
+          <span
+            title="Вы"
+            className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[4px] bg-odoo-primary text-[13px] font-semibold text-white"
           >
-            <Paperclip className="h-4 w-4" />
-          </button>
+            {authorInitials}
+          </span>
+          <div className="min-w-0 flex-1 overflow-hidden rounded-[4px] border border-odoo-border bg-odoo-surface focus-within:border-odoo-primary">
+            <textarea
+              rows={2}
+              aria-label="Текст внутреннего примечания"
+              value={text}
+              onChange={(e) => setText(e.target.value)}
+              placeholder={current.placeholder}
+              className="min-h-[58px] w-full resize-y border-0 bg-transparent px-2 py-2 text-[13px] leading-[19px] text-odoo-text outline-none placeholder:text-odoo-text-light"
+            />
+
+            {pending.length > 0 && (
+              <ul className="flex flex-wrap gap-1 border-t border-odoo-border-light px-2 py-1">
+                {pending.map((file, i) => (
+                  <li
+                    key={`${file.name}-${i}`}
+                    className="inline-flex items-center gap-1 rounded-[4px] border border-odoo-border bg-odoo-bg px-1.5 py-0.5 text-[11px]"
+                  >
+                    <Paperclip className="h-3 w-3 shrink-0 text-odoo-text-light" />
+                    <span className="max-w-[150px] truncate" title={file.name}>
+                      {file.name}
+                    </span>
+                    <span className="text-odoo-text-muted">{formatSize(file.size)}</span>
+                    <button
+                      type="button"
+                      aria-label={`Убрать ${file.name}`}
+                      onClick={() =>
+                        setPending((list) => list.filter((_, index) => index !== i))
+                      }
+                      className="text-odoo-text-muted hover:text-odoo-danger"
+                    >
+                      <X className="h-3 w-3" />
+                    </button>
+                  </li>
+                ))}
+              </ul>
+            )}
+
+            <div className="flex h-8 items-center border-t border-odoo-border-light px-1">
+              <input
+                ref={composerInput}
+                type="file"
+                multiple
+                className="hidden"
+                aria-label="Файлы записи"
+                onChange={(e) => {
+                  const chosen = Array.from(e.target.files ?? []);
+                  if (chosen.length) setPending((list) => [...list, ...chosen]);
+                  e.target.value = "";
+                }}
+              />
+              <button
+                type="button"
+                aria-label="Прикрепить файл к записи"
+                title="Прикрепить файл к записи"
+                onClick={() => composerInput.current?.click()}
+                className="inline-flex h-7 w-7 items-center justify-center rounded-sm text-odoo-text-muted transition-colors hover:bg-odoo-bg hover:text-odoo-text"
+              >
+                <Paperclip className="h-4 w-4" />
+              </button>
+            </div>
+          </div>
+        </div>
+        <div className="ml-10 mt-2 flex items-center">
           <button
             type="submit"
             disabled={posting || !onSubmit || (!text.trim() && pending.length === 0)}
             className="h-7 rounded-[4px] bg-odoo-primary px-3 text-[13px] font-medium text-white transition-colors hover:bg-odoo-primary-hover disabled:opacity-50"
           >
-            {posting ? "Отправка…" : current.action}
+            {posting ? "Сохранение…" : current.action}
           </button>
         </div>
       </form>
 
-      <div className="flex-1 overflow-y-auto px-3 pb-3">
+      <div className="flex-1 overflow-y-auto px-3 pb-4">
         {groups.length === 0 && (
           <p className="py-6 text-center text-[12px] text-odoo-text-light">
             {query ? "Ничего не найдено" : "Пока нет записей"}
@@ -358,14 +376,17 @@ export function Chatter({
         )}
         {groups.map(([day, entries]) => (
           <div key={day}>
-            <div className="my-2 flex items-center gap-2">
+            <div className="my-5 flex items-center gap-2 first:mt-4">
               <span className="h-px flex-1 bg-odoo-border-light" />
-              <span className="text-[11px] text-odoo-text-muted">{day}</span>
+              <span className="shrink-0 text-[11px] font-semibold text-odoo-text-muted">{day}</span>
               <span className="h-px flex-1 bg-odoo-border-light" />
             </div>
             {entries.map((entry) => (
-              <div key={entry.id} className="flex items-start gap-2 py-1.5">
-                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-sm bg-odoo-avatar text-[11px] font-semibold text-white">
+              <div
+                key={entry.id}
+                className={`flex items-start gap-2 ${entry.type === "note" ? "py-2.5" : "py-2"}`}
+              >
+                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[4px] bg-odoo-avatar text-[11px] font-semibold text-white">
                   {entry.author_initials ?? "—"}
                 </span>
                 <div className="min-w-0 flex-1">
@@ -377,7 +398,7 @@ export function Chatter({
                       className="text-[12px] text-odoo-text-muted"
                       title={absoluteTime(entry.created_at)}
                     >
-                      - {relativeTime(entry.created_at)}
+                      · {relativeTime(entry.created_at)}
                     </span>
                   </div>
 
@@ -392,7 +413,7 @@ export function Chatter({
                   ) : (
                     entry.body && (
                       <p
-                        className={`text-[13px] leading-[19px] ${
+                        className={`whitespace-pre-wrap text-[13px] leading-[19px] ${
                           entry.type === "history" ? "text-odoo-text-muted" : "text-odoo-text"
                         }`}
                       >

@@ -22,6 +22,7 @@ import {
   useLeadPager,
   useLeadShipments,
   useLeadTimeline,
+  useMe,
   useStages,
   useTags,
   useUpdateLead,
@@ -58,6 +59,7 @@ function LeadForm({ id }: { id?: string }) {
   const isNew = id === "new" || !id;
   const navigate = useNavigate();
 
+  const { data: currentUser } = useMe();
   const { data: lead, isLoading } = useLead(id);
   const { data: stages = [] } = useStages();
   const { data: allTags = [] } = useTags();
@@ -199,6 +201,9 @@ function LeadForm({ id }: { id?: string }) {
 
   const owner = lead ? ownerLabel(lead) : "";
   const ownerAvatar = lead ? ownerInitials(lead) : "—";
+  const composerInitial = (currentUser?.first_name || currentUser?.email || "Я")
+    .slice(0, 1)
+    .toUpperCase();
 
   const notebookTabs = [
     {
@@ -566,6 +571,7 @@ function LeadForm({ id }: { id?: string }) {
           >
             <Chatter
               timeline={timeline}
+              authorInitials={composerInitial}
               attachments={attachments}
               posting={addNote.isPending || uploadAttachment.isPending}
               uploading={uploadAttachment.isPending}
