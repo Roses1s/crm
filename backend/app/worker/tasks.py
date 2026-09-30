@@ -6,6 +6,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import subprocess
 import tarfile
@@ -15,6 +16,7 @@ from typing import Any
 
 from celery import shared_task
 from sqlalchemy import Engine, create_engine, select
+from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
@@ -38,6 +40,29 @@ def _session() -> Session:
     return Session(_sync_engine, expire_on_commit=False)
 
 
+def _pg_dump_command(target: Path) -> tuple[list[str], dict[str, str]]:
+    """Команда pg_dump и окружение так, чтобы пароль НЕ попал в аргументы.
+
+    Пароль в аргументах командной строки виден в списке процессов (`ps aux`) и
+    может утечь в логи. Поэтому параметры подключения передаём отдельными флагами,
+    а пароль — только через переменную окружения PGPASSWORD, которую понимает libpq.
+    """
+    url = make_url(settings.plain_dsn)
+    cmd = ["pg_dump", "--format=custom", "--no-owner"]
+    if url.host:
+        cmd += ["--host", url.host]
+    if url.port:
+        cmd += ["--port", str(url.port)]
+    if url.username:
+        cmd += ["--username", url.username]
+    cmd += ["--file", str(target), "--dbname", url.database or ""]
+
+    env = dict(os.environ)
+    if url.password:
+        env["PGPASSWORD"] = url.password
+    return cmd, env
+
+
 @shared_task(name="app.worker.tasks.backup_database")
 def backup_database() -> dict[str, Any]:
     """Ночной дамп базы через pg_dump. Хранит копии 14 дней."""
@@ -49,8 +74,10 @@ def backup_database() -> dict[str, Any]:
         log.error("backup.no_pg_dump")
         return {"ok": False, "error": "pg_dump не установлен в образе"}
 
+    cmd, env = _pg_dump_command(target)
     result = subprocess.run(
-        ["pg_dump", "--format=custom", "--no-owner", "--file", str(target), settings.plain_dsn],
+        cmd,
+        env=env,
         capture_output=True,
         text=True,
         check=False,

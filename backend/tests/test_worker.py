@@ -8,9 +8,13 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
 from sqlalchemy import create_engine
 
 from app.core.config import settings
+from app.worker.tasks import _pg_dump_command
 
 
 def test_celery_imports_task_modules() -> None:
@@ -46,3 +50,24 @@ def test_sync_postgres_driver_is_installed() -> None:
 def test_dsn_variants_do_not_leak_drivers() -> None:
     """pg_dump понимает только чистый URL, без +asyncpg и +psycopg."""
     assert "+" not in settings.plain_dsn.split("://", 1)[0]
+
+
+def test_pg_dump_command_keeps_password_out_of_argv(monkeypatch: pytest.MonkeyPatch) -> None:
+    """Пароль не должен попадать в аргументы pg_dump — только в PGPASSWORD.
+
+    Иначе он виден в списке процессов (`ps aux`) любому на сервере.
+    """
+    monkeypatch.setattr(
+        settings, "database_url", "postgresql+psycopg://crm:s3cr3t-pass@dbhost:5433/crmdb"
+    )
+    cmd, env = _pg_dump_command(Path("/tmp/crm.dump"))
+
+    # Пароля нет ни в одном аргументе командной строки.
+    assert all("s3cr3t-pass" not in arg for arg in cmd)
+    # Пароль передаётся исключительно через окружение.
+    assert env["PGPASSWORD"] == "s3cr3t-pass"
+    # Параметры подключения переданы флагами.
+    assert "--host" in cmd and "dbhost" in cmd
+    assert "--port" in cmd and "5433" in cmd
+    assert "--username" in cmd and "crm" in cmd
+    assert "--dbname" in cmd and "crmdb" in cmd
