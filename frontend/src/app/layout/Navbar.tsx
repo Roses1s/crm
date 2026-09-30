@@ -79,7 +79,6 @@ export function Navbar() {
       >
         CRM
       </Link>
-      <div className="ml-2 hidden h-10 items-center md:flex">{links}</div>
       <div className="ml-auto flex h-10 items-center gap-2">
         <span
           className="max-w-36 truncate text-[13px] font-medium text-odoo-text sm:max-w-52"

@@ -422,7 +422,7 @@ export function Chatter({
                   {entry.field_label ? (
                     <div className="flex flex-wrap items-baseline gap-1 text-[13px]">
                       <span className="text-odoo-text-light">•</span>
-                      <span className="text-odoo-text">{entry.old_value || "—"}</span>
+                      <span className="text-odoo-text-muted">{entry.old_value || "—"}</span>
                       <span className="text-odoo-text-light">→</span>
                       <span className="font-medium text-odoo-link">{entry.new_value || "—"}</span>
                       <span className="italic text-odoo-text-muted">({entry.field_label})</span>

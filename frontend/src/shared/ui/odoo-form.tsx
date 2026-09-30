@@ -254,7 +254,7 @@ export function FormGroup({ children }: { children: ReactNode }) {
 /** Плашка заголовка записи во всю ширину листа. */
 export function FormTitle({ children }: { children: ReactNode }) {
   return (
-    <div className="mb-4 rounded-[3px] bg-odoo-primary/12 px-0 py-1">
+    <div className="-mt-2 mb-4 rounded-[3px] bg-odoo-primary/12 px-0 py-1">
       <h1 className="text-[24px] font-normal leading-[34px] text-odoo-text">{children}</h1>
     </div>
   );
@@ -322,7 +322,7 @@ export function OdooInput({ className = "", ...props }: InputHTMLAttributes<HTML
   return (
     <input
       {...props}
-      className={`w-full rounded-[3px] border border-transparent bg-transparent px-1 py-[2px] text-[13px] leading-[19px] text-odoo-text outline-none transition-colors placeholder:text-odoo-text-light hover:border-odoo-border focus:border-odoo-focus ${className}`}
+      className={`w-full rounded-[3px] border border-transparent bg-transparent px-1 py-[2px] text-[13px] leading-[19px] text-odoo-text outline-none transition-colors placeholder:text-odoo-text-light hover:border-odoo-border focus:border-odoo-focus/40 ${className}`}
     />
   );
 }
