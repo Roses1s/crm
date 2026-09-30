@@ -112,6 +112,12 @@ jobs:
       - name: Установка зависимостей
         run: npm ci
 
+      - name: Линтер
+        run: npm run lint
+
+      - name: Формат
+        run: npm run format:check
+
       - name: Типы
         run: npx tsc -b
 
