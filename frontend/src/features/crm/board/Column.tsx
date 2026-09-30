@@ -3,13 +3,12 @@ import {
   SortableContext,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
-import { MoreHorizontal, Plus } from "lucide-react";
+import { MoreHorizontal } from "lucide-react";
 import { useState } from "react";
 
 import { useDeleteStage, useUpdateStage } from "@/shared/api/hooks";
 import type { Lead, Stage } from "@/shared/types";
 import { LeadCard } from "./LeadCard";
-import { QuickCreate } from "./QuickCreate";
 import { STAGE_COLORS, stageColor } from "./stage-colors";
 
 // Колонка рисует страницу карточек, остальное — по кнопке, как в канбане Odoo.
@@ -39,7 +38,6 @@ export function Column({
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(stage.name);
   const [menu, setMenu] = useState(false);
-  const [quick, setQuick] = useState(false);
   // Диалог удаления: у непустого этапа спрашиваем, куда переложить карточки.
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [moveTo, setMoveTo] = useState<number | null>(null);
@@ -106,15 +104,6 @@ export function Column({
           <div className="relative flex items-center gap-px">
             <button
               type="button"
-              className="inline-flex h-6 w-6 items-center justify-center rounded-sm text-odoo-text-muted hover:bg-odoo-surface-sunken hover:text-odoo-text"
-              onClick={() => setQuick(true)}
-              title="Добавить лид"
-              aria-label="Добавить лид"
-            >
-              <Plus className="h-3.5 w-3.5" />
-            </button>
-            <button
-              type="button"
               className="crm-kanban-stage-secondary-action inline-flex h-6 w-5 items-center justify-center rounded-sm text-[17px] leading-none text-odoo-text-muted hover:bg-odoo-surface-sunken hover:text-odoo-text"
               onClick={onFold}
               title="Свернуть"
@@ -144,21 +133,6 @@ export function Column({
                       }}
                     >
                       Переименовать
-                    </button>
-                    <button
-                      type="button"
-                      className="block w-full px-3 py-1.5 text-left text-sm hover:bg-odoo-bg"
-                      onClick={() => {
-                        setMenu(false);
-                        patch.mutate({
-                          id: stage.id,
-                          is_closed: !stage.is_closed,
-                        });
-                      }}
-                    >
-                      {stage.is_closed
-                        ? "Открывающий этап"
-                        : "Закрывающий этап"}
                     </button>
                     <div className="flex flex-wrap gap-1 px-3 py-1.5">
                       {Object.keys(STAGE_COLORS).map((c) => (
@@ -289,17 +263,6 @@ export function Column({
             className="mx-2.5 mb-2 rounded-[3px] border border-dashed border-odoo-border px-2 py-1.5 text-[13px] text-odoo-text-muted transition-colors hover:bg-odoo-surface-hover hover:text-odoo-text"
           >
             Показать ещё {Math.min(CARDS_PER_COLUMN, hidden)} из {leads.length}
-          </button>
-        )}
-        {quick ? (
-          <QuickCreate stageId={stage.id} onDone={() => setQuick(false)} />
-        ) : (
-          <button
-            type="button"
-            className="flex w-full items-center gap-1 px-3 py-1.5 text-left text-[12px] text-odoo-text-muted hover:bg-odoo-surface-hover hover:text-odoo-text"
-            onClick={() => setQuick(true)}
-          >
-            <Plus className="h-3.5 w-3.5" /> Добавить
           </button>
         )}
       </div>
