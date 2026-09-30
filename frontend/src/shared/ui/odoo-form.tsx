@@ -21,8 +21,9 @@ const STATUSBAR_HEIGHT = 33; // $o-statusbar-height
 const ARROW_WIDTH = 11; // $o-statusbar-arrow-width
 
 export function FormSheetBg({ children }: { children: ReactNode }) {
-  // .o_form_sheet_bg: padding-top 8px, padding-x 16px, max-width 1534px, выравнивание по левому краю
-  return <div className="w-full max-w-[1534px] px-4 pb-4 pt-2">{children}</div>;
+  // Фон тянется вместе с рабочей областью: предел в пикселях оставлял пустые поля
+  // на широком экране, когда масштаб браузера был меньше 100%.
+  return <div className="w-full px-4 pb-4 pt-2">{children}</div>;
 }
 
 export function FormSheet({ children }: { children: ReactNode }) {
