@@ -6,7 +6,10 @@ import { useShipments } from "@/shared/api/hooks";
 
 const STATUS: Record<string, { label: string; cls: string }> = {
   new: { label: "Новая", cls: "bg-odoo-tag-yellow-bg text-odoo-tag-yellow-text" },
-  checked: { label: "Проверена и подписана заявка", cls: "bg-odoo-tag-blue-bg text-odoo-tag-blue-text" },
+  checked: {
+    label: "Проверена и подписана заявка",
+    cls: "bg-odoo-tag-blue-bg text-odoo-tag-blue-text",
+  },
   loaded: { label: "Машина загрузилась", cls: "bg-odoo-tag-green-bg text-odoo-tag-green-text" },
   unloaded: { label: "Машина выгрузилась", cls: "bg-odoo-tag-green-bg text-odoo-tag-green-text" },
 };
@@ -54,18 +57,16 @@ export function ShipmentsPage() {
 
   return (
     <AppShell>
-      <ControlPanel
-        title="Заявки"
-        status={statusFilter}
-        count={shipments.length}
-      />
+      <ControlPanel title="Заявки" status={statusFilter} count={shipments.length} />
 
       <div className="flex-1 overflow-auto">
         <table className="w-full border-collapse text-[13px]">
           <thead className="sticky top-0 z-10 bg-odoo-surface-sunken text-odoo-text-muted">
             <tr className="border-b border-odoo-border">
               <th className="whitespace-nowrap px-3 py-2.5 text-left font-semibold">Номер</th>
-              <th className="whitespace-nowrap px-3 py-2.5 text-left font-semibold">Дата создания</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-left font-semibold">
+                Дата создания
+              </th>
               <th className="whitespace-nowrap px-3 py-2.5 text-left font-semibold">Продавец</th>
               <th className="whitespace-nowrap px-3 py-2.5 text-left font-semibold">Клиент</th>
               <th className="whitespace-nowrap px-3 py-2.5 text-left font-semibold">Маршрут</th>
@@ -113,7 +114,9 @@ export function ShipmentsPage() {
                     {s.carrier_name || "—"}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2">
-                    <span className={`inline-flex rounded-[10px] px-2 py-0.5 text-[11px] font-medium ${st.cls}`}>
+                    <span
+                      className={`inline-flex rounded-[10px] px-2 py-0.5 text-[11px] font-medium ${st.cls}`}
+                    >
                       {st.label}
                     </span>
                   </td>

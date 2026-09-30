@@ -31,7 +31,8 @@ function fullName(user: { first_name?: string; last_name?: string }): string {
   return `${user.first_name ?? ""} ${user.last_name ?? ""}`.trim();
 }
 
-const inputCls = "rounded-[4px] border border-odoo-border bg-odoo-surface px-2 py-1.5 text-sm text-odoo-text placeholder:text-odoo-text-light transition-colors hover:border-odoo-border focus:border-odoo-focus focus:outline-none";
+const inputCls =
+  "rounded-[4px] border border-odoo-border bg-odoo-surface px-2 py-1.5 text-sm text-odoo-text placeholder:text-odoo-text-light transition-colors hover:border-odoo-border focus:border-odoo-focus focus:outline-none";
 const capCls = "mb-1 block text-[11px] uppercase text-odoo-text-muted";
 
 export function UsersPage() {
@@ -142,9 +143,7 @@ export function UsersPage() {
           />
         </label>
         <label>
-          <span className={capCls}>
-            {editing ? "Новый пароль (пусто = не менять)" : "Пароль"}
-          </span>
+          <span className={capCls}>{editing ? "Новый пароль (пусто = не менять)" : "Пароль"}</span>
           <input
             className={inputCls}
             placeholder="минимум 8 символов"
@@ -236,7 +235,8 @@ export function UsersPage() {
                   onClick={() => {
                     if (!window.confirm(`Удалить ${user.email}?`)) return;
                     remove.mutate(user.id, {
-                      onError: (err) => setError(describe(err, "Нельзя удалить этого пользователя")),
+                      onError: (err) =>
+                        setError(describe(err, "Нельзя удалить этого пользователя")),
                     });
                   }}
                 >

@@ -168,8 +168,7 @@ function ShipmentForm({ id }: { id?: string }) {
   // Заявка из карточки лида приходит со ссылкой /shipments/new?lead=42.
   useEffect(() => {
     const leadParam = searchParams.get("lead");
-    if (isNew && leadParam)
-      setForm((f) => ({ ...f, lead_id: Number(leadParam) }));
+    if (isNew && leadParam) setForm((f) => ({ ...f, lead_id: Number(leadParam) }));
   }, [isNew, searchParams]);
 
   // Загруженную карточку кладём в форму один раз, чтобы фоновое обновление
@@ -224,9 +223,7 @@ function ShipmentForm({ id }: { id?: string }) {
     }
   }, [shipment]);
 
-  const dirty = isNew
-    ? form.lead_id !== 0
-    : JSON.stringify(form) !== JSON.stringify(pristine);
+  const dirty = isNew ? form.lead_id !== 0 : JSON.stringify(form) !== JSON.stringify(pristine);
   const saving = save.isPending;
 
   useEffect(() => {
@@ -292,8 +289,7 @@ function ShipmentForm({ id }: { id?: string }) {
     });
   }
 
-  const currentStageId =
-    STAGES.find((s) => s.value === shipment?.status)?.id ?? 0;
+  const currentStageId = STAGES.find((s) => s.value === shipment?.status)?.id ?? 0;
 
   const selectedLead = leads.find((l) => l.id === form.lead_id);
   const title = shipment?.lead_name || selectedLead?.name || "Новая заявка";
@@ -330,17 +326,9 @@ function ShipmentForm({ id }: { id?: string }) {
   return (
     <AppShell>
       <ControlPanel
-        crumbs={[
-          { label: "Заявки", to: "/shipments" },
-          { label: isNew ? "Новая заявка" : title },
-        ]}
+        crumbs={[{ label: "Заявки", to: "/shipments" }, { label: isNew ? "Новая заявка" : title }]}
         status={
-          <FormStatusIndicator
-            dirty={dirty}
-            saving={saving}
-            onSave={submit}
-            onDiscard={discard}
-          />
+          <FormStatusIndicator dirty={dirty} saving={saving} onSave={submit} onDiscard={discard} />
         }
         stats={
           !isNew && selectedLead ? (
@@ -357,414 +345,371 @@ function ShipmentForm({ id }: { id?: string }) {
 
       <FormWorkspace aside={chatter}>
         <main className="min-w-0 flex-1 lg:overflow-y-auto">
-        <FormStatusbar
-          items={STAGES.map((s) => ({ id: s.id, name: s.name }))}
-          current={currentStageId}
-          disabled={setStatus.isPending || isNew}
-          onSelect={selectStage}
-        />
+          <FormStatusbar
+            items={STAGES.map((s) => ({ id: s.id, name: s.name }))}
+            current={currentStageId}
+            disabled={setStatus.isPending || isNew}
+            onSelect={selectStage}
+          />
 
-        <FormSheetBg>
-          {error && <FormAlert>{error}</FormAlert>}
+          <FormSheetBg>
+            {error && <FormAlert>{error}</FormAlert>}
 
-          <FormSheet>
-            {isLoading && !isNew ? (
-              <FormSkeleton />
-            ) : (
-              <>
-                <FormTitle>
-                  <span className="block px-0 text-[24px] font-normal leading-[34px] text-odoo-text">
-                    {title}
-                  </span>
-                </FormTitle>
+            <FormSheet>
+              {isLoading && !isNew ? (
+                <FormSkeleton />
+              ) : (
+                <>
+                  <FormTitle>
+                    <span className="block px-0 text-[24px] font-normal leading-[34px] text-odoo-text">
+                      {title}
+                    </span>
+                  </FormTitle>
 
-                {/* --- Шапка: своя компания и заказчик (заказчик привязан к лиду) --- */}
-                <FormGroup>
-                  <div>
-                    <InnerGroup title="Заявка">
-                      <Field label="Компания">
-                        <span className="px-1.5 py-[3px] text-odoo-text">
-                          {OWN_COMPANY}
-                        </span>
-                      </Field>
-                      <Field label="Заказчик">
-                        <span className="px-1.5 py-[3px] text-odoo-text">
-                          {selectedLead?.name || title}
-                        </span>
-                      </Field>
-                      <Field label="ИНН заказчика">
-                        <span className="px-1.5 py-[3px] text-odoo-text-muted">
-                          {selectedLead?.inn || "—"}
-                        </span>
-                      </Field>
-                      <Field label="Контакт заказчика" htmlFor="ship-cust-contact">
-                        <SInput
-                          id="ship-cust-contact"
-                          value={form.customer_contact}
-                          onChange={(e) =>
-                            set("customer_contact", e.target.value)
-                          }
-                        />
-                      </Field>
-                    </InnerGroup>
-                  </div>
-                  <div />
-                </FormGroup>
-
-                {/* --- Погрузка / Выгрузка --- */}
-                <FormGroup>
-                  <div>
-                    <InnerGroup title="Информация о погрузке">
-                      <Field label="Города погрузки" htmlFor="ship-load-cities">
-                        <TokenField
-                          id="ship-load-cities"
-                          placeholder="Город + Enter"
-                          value={form.loading_cities}
-                          onChange={(v) => set("loading_cities", v)}
-                        />
-                      </Field>
-                      <Field label="Адрес погрузки" htmlFor="ship-addr-load">
-                        <SInput
-                          id="ship-addr-load"
-                          value={form.address_loading}
-                          onChange={(e) => set("address_loading", e.target.value)}
-                        />
-                      </Field>
-                      <Field
-                        label="Контактное лицо на погрузке и телефон"
-                        htmlFor="ship-load-name"
-                      >
-                        <SInput
-                          id="ship-load-name"
-                          placeholder="Иванов Иван, +7 900 000-00-00"
-                          value={form.contact_loading_name}
-                          onChange={(e) =>
-                            set("contact_loading_name", e.target.value)
-                          }
-                        />
-                      </Field>
-                      <Field label="Дата погрузки с" htmlFor="ship-load-date-from">
-                        <SInput
-                          id="ship-load-date-from"
-                          type="date"
-                          value={form.loading_date_from}
-                          onChange={(e) =>
-                            set("loading_date_from", e.target.value)
-                          }
-                        />
-                      </Field>
-                      <Field label="Дата погрузки по" htmlFor="ship-load-date-to">
-                        <SInput
-                          id="ship-load-date-to"
-                          type="date"
-                          value={form.loading_date_to}
-                          onChange={(e) =>
-                            set("loading_date_to", e.target.value)
-                          }
-                        />
-                      </Field>
-                      <Field label="Время" htmlFor="ship-load-time-from">
-                        <SInput
-                          id="ship-load-time-from"
-                          placeholder="09:00"
-                          value={form.loading_time_from}
-                          onChange={(e) =>
-                            set("loading_time_from", e.target.value)
-                          }
-                        />
-                      </Field>
-                    </InnerGroup>
-                  </div>
-
-                  <div>
-                    <InnerGroup title="Информация о выгрузке">
-                      <Field label="Города выгрузки" htmlFor="ship-unload-cities">
-                        <TokenField
-                          id="ship-unload-cities"
-                          placeholder="Город + Enter"
-                          value={form.unloading_cities}
-                          onChange={(v) => set("unloading_cities", v)}
-                        />
-                      </Field>
-                      <Field label="Адрес выгрузки" htmlFor="ship-addr-unload">
-                        <SInput
-                          id="ship-addr-unload"
-                          value={form.address_unloading}
-                          onChange={(e) =>
-                            set("address_unloading", e.target.value)
-                          }
-                        />
-                      </Field>
-                      <Field
-                        label="Контактное лицо на выгрузке и телефон"
-                        htmlFor="ship-unload-name"
-                      >
-                        <SInput
-                          id="ship-unload-name"
-                          placeholder="Иванов Иван, +7 900 000-00-00"
-                          value={form.contact_unloading_name}
-                          onChange={(e) =>
-                            set("contact_unloading_name", e.target.value)
-                          }
-                        />
-                      </Field>
-                      <Field
-                        label="Дата выгрузки с"
-                        htmlFor="ship-unload-date-from"
-                      >
-                        <SInput
-                          id="ship-unload-date-from"
-                          type="date"
-                          value={form.unloading_date_from}
-                          onChange={(e) =>
-                            set("unloading_date_from", e.target.value)
-                          }
-                        />
-                      </Field>
-                      <Field
-                        label="Дата выгрузки по"
-                        htmlFor="ship-unload-date-to"
-                      >
-                        <SInput
-                          id="ship-unload-date-to"
-                          type="date"
-                          value={form.unloading_date_to}
-                          onChange={(e) =>
-                            set("unloading_date_to", e.target.value)
-                          }
-                        />
-                      </Field>
-                      <Field label="Время" htmlFor="ship-unload-time-from">
-                        <SInput
-                          id="ship-unload-time-from"
-                          placeholder="09:00"
-                          value={form.unloading_time_from}
-                          onChange={(e) =>
-                            set("unloading_time_from", e.target.value)
-                          }
-                        />
-                      </Field>
-                    </InnerGroup>
-                  </div>
-                </FormGroup>
-
-                {/* --- Перевозчик / Груз --- */}
-                <FormGroup>
-                  <div>
-                    <InnerGroup title="Сведения о перевозчике">
-                      <Field label="Перевозчик" htmlFor="ship-carrier">
-                        <select
-                          id="ship-carrier"
-                          className={selectCls}
-                          value={form.carrier_id ?? ""}
-                          onChange={(e) =>
-                            set(
-                              "carrier_id",
-                              e.target.value ? Number(e.target.value) : null,
-                            )
-                          }
-                        >
-                          <option value="">—</option>
-                          {carriers.map((c) => (
-                            <option key={c.id} value={c.id}>
-                              {c.name}
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
-                      <Field label="Контакт перевозчика" htmlFor="ship-carr-contact">
-                        <SInput
-                          id="ship-carr-contact"
-                          value={form.carrier_contact}
-                          onChange={(e) =>
-                            set("carrier_contact", e.target.value)
-                          }
-                        />
-                      </Field>
-                      <Field label="ТС (марка)" htmlFor="ship-vehicle">
-                        <SInput
-                          id="ship-vehicle"
-                          value={form.vehicle}
-                          onChange={(e) => set("vehicle", e.target.value)}
-                        />
-                      </Field>
-                      <Field label="Номер ТС" htmlFor="ship-vehicle-num">
-                        <SInput
-                          id="ship-vehicle-num"
-                          value={form.vehicle_number}
-                          onChange={(e) => set("vehicle_number", e.target.value)}
-                        />
-                      </Field>
-                      <Field label="Прицеп" htmlFor="ship-has-trailer">
-                        <OdooCheckbox
-                          id="ship-has-trailer"
-                          label="Есть прицеп"
-                          checked={form.has_trailer}
-                          onChange={(v) => set("has_trailer", v)}
-                        />
-                      </Field>
-                      {form.has_trailer && (
-                        <Field label="Номер прицепа" htmlFor="ship-trailer-num">
+                  {/* --- Шапка: своя компания и заказчик (заказчик привязан к лиду) --- */}
+                  <FormGroup>
+                    <div>
+                      <InnerGroup title="Заявка">
+                        <Field label="Компания">
+                          <span className="px-1.5 py-[3px] text-odoo-text">{OWN_COMPANY}</span>
+                        </Field>
+                        <Field label="Заказчик">
+                          <span className="px-1.5 py-[3px] text-odoo-text">
+                            {selectedLead?.name || title}
+                          </span>
+                        </Field>
+                        <Field label="ИНН заказчика">
+                          <span className="px-1.5 py-[3px] text-odoo-text-muted">
+                            {selectedLead?.inn || "—"}
+                          </span>
+                        </Field>
+                        <Field label="Контакт заказчика" htmlFor="ship-cust-contact">
                           <SInput
-                            id="ship-trailer-num"
-                            value={form.trailer_number}
-                            onChange={(e) =>
-                              set("trailer_number", e.target.value)
-                            }
+                            id="ship-cust-contact"
+                            value={form.customer_contact}
+                            onChange={(e) => set("customer_contact", e.target.value)}
                           />
                         </Field>
-                      )}
-                      <Field label="ФИО водителя" htmlFor="ship-driver-name">
-                        <SInput
-                          id="ship-driver-name"
-                          value={form.driver_name}
-                          onChange={(e) => set("driver_name", e.target.value)}
-                        />
-                      </Field>
-                      <Field label="Телефон водителя" htmlFor="ship-driver-phone">
-                        <SInput
-                          id="ship-driver-phone"
-                          placeholder="+7 900 000-00-00"
-                          value={form.driver_phone}
-                          onChange={(e) => set("driver_phone", e.target.value)}
-                        />
-                      </Field>
-                      <Field label="Паспорт водителя" htmlFor="ship-driver-pass">
-                        <SInput
-                          id="ship-driver-pass"
-                          value={form.driver_passport}
-                          onChange={(e) =>
-                            set("driver_passport", e.target.value)
-                          }
-                        />
-                      </Field>
-                      <Field label="Кто подписывает" htmlFor="ship-carr-signer">
-                        <SInput
-                          id="ship-carr-signer"
-                          value={form.carrier_signer}
-                          onChange={(e) =>
-                            set("carrier_signer", e.target.value)
-                          }
-                        />
-                      </Field>
-                    </InnerGroup>
-                  </div>
+                      </InnerGroup>
+                    </div>
+                    <div />
+                  </FormGroup>
 
-                  <div>
-                    <InnerGroup title="Информация о грузе">
-                      <Field label="Тип груза" htmlFor="ship-cargo-type">
-                        <SInput
-                          id="ship-cargo-type"
-                          value={form.cargo_type}
-                          onChange={(e) => set("cargo_type", e.target.value)}
-                        />
-                      </Field>
-                      <Field label="Упаковка" htmlFor="ship-cargo-pack">
-                        <SInput
-                          id="ship-cargo-pack"
-                          value={form.cargo_packaging}
-                          onChange={(e) =>
-                            set("cargo_packaging", e.target.value)
-                          }
-                        />
-                      </Field>
-                      <Field label="Объём кузова, м³" htmlFor="ship-volume">
-                        <SInput
-                          id="ship-volume"
-                          inputMode="decimal"
-                          value={form.cargo_volume}
-                          onChange={(e) => set("cargo_volume", e.target.value)}
-                        />
-                      </Field>
-                      <Field label="Вес груза, т" htmlFor="ship-weight">
-                        <SInput
-                          id="ship-weight"
-                          inputMode="decimal"
-                          value={form.cargo_weight}
-                          onChange={(e) => set("cargo_weight", e.target.value)}
-                        />
-                      </Field>
-                      <Field label="Грузоподъёмность, т" htmlFor="ship-capacity">
-                        <SInput
-                          id="ship-capacity"
-                          inputMode="decimal"
-                          value={form.capacity}
-                          onChange={(e) => set("capacity", e.target.value)}
-                        />
-                      </Field>
-                      <Field label="Тип кузова" htmlFor="ship-body-type">
-                        <TokenField
-                          id="ship-body-type"
-                          placeholder="Например: изотерм + Enter"
-                          value={form.body_type}
-                          onChange={(v) => set("body_type", v)}
-                        />
-                      </Field>
-                      <Field label="Способ погрузки" htmlFor="ship-load-method">
-                        <TokenField
-                          id="ship-load-method"
-                          placeholder="Например: задняя + Enter"
-                          value={form.loading_method}
-                          onChange={(v) => set("loading_method", v)}
-                        />
-                      </Field>
-                      <Field label="Тип транспорта" htmlFor="ship-transport">
-                        <select
-                          id="ship-transport"
-                          className={selectCls}
-                          value={form.transport_type}
-                          onChange={(e) => set("transport_type", e.target.value)}
+                  {/* --- Погрузка / Выгрузка --- */}
+                  <FormGroup>
+                    <div>
+                      <InnerGroup title="Информация о погрузке">
+                        <Field label="Города погрузки" htmlFor="ship-load-cities">
+                          <TokenField
+                            id="ship-load-cities"
+                            placeholder="Город + Enter"
+                            value={form.loading_cities}
+                            onChange={(v) => set("loading_cities", v)}
+                          />
+                        </Field>
+                        <Field label="Адрес погрузки" htmlFor="ship-addr-load">
+                          <SInput
+                            id="ship-addr-load"
+                            value={form.address_loading}
+                            onChange={(e) => set("address_loading", e.target.value)}
+                          />
+                        </Field>
+                        <Field
+                          label="Контактное лицо на погрузке и телефон"
+                          htmlFor="ship-load-name"
                         >
-                          {TRANSPORT_OPTIONS.map((t) => (
-                            <option key={t.value} value={t.value}>
-                              {t.label}
-                            </option>
-                          ))}
-                        </select>
-                      </Field>
-                    </InnerGroup>
-                  </div>
-                </FormGroup>
+                          <SInput
+                            id="ship-load-name"
+                            placeholder="Иванов Иван, +7 900 000-00-00"
+                            value={form.contact_loading_name}
+                            onChange={(e) => set("contact_loading_name", e.target.value)}
+                          />
+                        </Field>
+                        <Field label="Дата погрузки с" htmlFor="ship-load-date-from">
+                          <SInput
+                            id="ship-load-date-from"
+                            type="date"
+                            value={form.loading_date_from}
+                            onChange={(e) => set("loading_date_from", e.target.value)}
+                          />
+                        </Field>
+                        <Field label="Дата погрузки по" htmlFor="ship-load-date-to">
+                          <SInput
+                            id="ship-load-date-to"
+                            type="date"
+                            value={form.loading_date_to}
+                            onChange={(e) => set("loading_date_to", e.target.value)}
+                          />
+                        </Field>
+                        <Field label="Время" htmlFor="ship-load-time-from">
+                          <SInput
+                            id="ship-load-time-from"
+                            placeholder="09:00"
+                            value={form.loading_time_from}
+                            onChange={(e) => set("loading_time_from", e.target.value)}
+                          />
+                        </Field>
+                      </InnerGroup>
+                    </div>
 
-                {/* --- Вкладки: позиции заказа / прочая информация --- */}
-                <Notebook
-                  active={tab}
-                  onSelect={setTab}
-                  tabs={[
-                    {
-                      id: "info",
-                      label: "Прочая информация",
-                      content: (
-                        <STextarea
-                          id="ship-comment"
-                          rows={4}
-                          placeholder="Дополнительные условия, комментарии…"
-                          value={form.comment}
-                          onChange={(e) => set("comment", e.target.value)}
-                        />
-                      ),
-                    },
-                    {
-                      id: "lines",
-                      label: "Позиции заказа",
-                      content: (
-                        <p className="text-[13px] text-odoo-text-light">
-                          Таблица позиций заказа с суммами и НДС появится позже.
-                        </p>
-                      ),
-                    },
-                  ]}
-                />
-              </>
-            )}
-          </FormSheet>
-        </FormSheetBg>
+                    <div>
+                      <InnerGroup title="Информация о выгрузке">
+                        <Field label="Города выгрузки" htmlFor="ship-unload-cities">
+                          <TokenField
+                            id="ship-unload-cities"
+                            placeholder="Город + Enter"
+                            value={form.unloading_cities}
+                            onChange={(v) => set("unloading_cities", v)}
+                          />
+                        </Field>
+                        <Field label="Адрес выгрузки" htmlFor="ship-addr-unload">
+                          <SInput
+                            id="ship-addr-unload"
+                            value={form.address_unloading}
+                            onChange={(e) => set("address_unloading", e.target.value)}
+                          />
+                        </Field>
+                        <Field
+                          label="Контактное лицо на выгрузке и телефон"
+                          htmlFor="ship-unload-name"
+                        >
+                          <SInput
+                            id="ship-unload-name"
+                            placeholder="Иванов Иван, +7 900 000-00-00"
+                            value={form.contact_unloading_name}
+                            onChange={(e) => set("contact_unloading_name", e.target.value)}
+                          />
+                        </Field>
+                        <Field label="Дата выгрузки с" htmlFor="ship-unload-date-from">
+                          <SInput
+                            id="ship-unload-date-from"
+                            type="date"
+                            value={form.unloading_date_from}
+                            onChange={(e) => set("unloading_date_from", e.target.value)}
+                          />
+                        </Field>
+                        <Field label="Дата выгрузки по" htmlFor="ship-unload-date-to">
+                          <SInput
+                            id="ship-unload-date-to"
+                            type="date"
+                            value={form.unloading_date_to}
+                            onChange={(e) => set("unloading_date_to", e.target.value)}
+                          />
+                        </Field>
+                        <Field label="Время" htmlFor="ship-unload-time-from">
+                          <SInput
+                            id="ship-unload-time-from"
+                            placeholder="09:00"
+                            value={form.unloading_time_from}
+                            onChange={(e) => set("unloading_time_from", e.target.value)}
+                          />
+                        </Field>
+                      </InnerGroup>
+                    </div>
+                  </FormGroup>
+
+                  {/* --- Перевозчик / Груз --- */}
+                  <FormGroup>
+                    <div>
+                      <InnerGroup title="Сведения о перевозчике">
+                        <Field label="Перевозчик" htmlFor="ship-carrier">
+                          <select
+                            id="ship-carrier"
+                            className={selectCls}
+                            value={form.carrier_id ?? ""}
+                            onChange={(e) =>
+                              set("carrier_id", e.target.value ? Number(e.target.value) : null)
+                            }
+                          >
+                            <option value="">—</option>
+                            {carriers.map((c) => (
+                              <option key={c.id} value={c.id}>
+                                {c.name}
+                              </option>
+                            ))}
+                          </select>
+                        </Field>
+                        <Field label="Контакт перевозчика" htmlFor="ship-carr-contact">
+                          <SInput
+                            id="ship-carr-contact"
+                            value={form.carrier_contact}
+                            onChange={(e) => set("carrier_contact", e.target.value)}
+                          />
+                        </Field>
+                        <Field label="ТС (марка)" htmlFor="ship-vehicle">
+                          <SInput
+                            id="ship-vehicle"
+                            value={form.vehicle}
+                            onChange={(e) => set("vehicle", e.target.value)}
+                          />
+                        </Field>
+                        <Field label="Номер ТС" htmlFor="ship-vehicle-num">
+                          <SInput
+                            id="ship-vehicle-num"
+                            value={form.vehicle_number}
+                            onChange={(e) => set("vehicle_number", e.target.value)}
+                          />
+                        </Field>
+                        <Field label="Прицеп" htmlFor="ship-has-trailer">
+                          <OdooCheckbox
+                            id="ship-has-trailer"
+                            label="Есть прицеп"
+                            checked={form.has_trailer}
+                            onChange={(v) => set("has_trailer", v)}
+                          />
+                        </Field>
+                        {form.has_trailer && (
+                          <Field label="Номер прицепа" htmlFor="ship-trailer-num">
+                            <SInput
+                              id="ship-trailer-num"
+                              value={form.trailer_number}
+                              onChange={(e) => set("trailer_number", e.target.value)}
+                            />
+                          </Field>
+                        )}
+                        <Field label="ФИО водителя" htmlFor="ship-driver-name">
+                          <SInput
+                            id="ship-driver-name"
+                            value={form.driver_name}
+                            onChange={(e) => set("driver_name", e.target.value)}
+                          />
+                        </Field>
+                        <Field label="Телефон водителя" htmlFor="ship-driver-phone">
+                          <SInput
+                            id="ship-driver-phone"
+                            placeholder="+7 900 000-00-00"
+                            value={form.driver_phone}
+                            onChange={(e) => set("driver_phone", e.target.value)}
+                          />
+                        </Field>
+                        <Field label="Паспорт водителя" htmlFor="ship-driver-pass">
+                          <SInput
+                            id="ship-driver-pass"
+                            value={form.driver_passport}
+                            onChange={(e) => set("driver_passport", e.target.value)}
+                          />
+                        </Field>
+                        <Field label="Кто подписывает" htmlFor="ship-carr-signer">
+                          <SInput
+                            id="ship-carr-signer"
+                            value={form.carrier_signer}
+                            onChange={(e) => set("carrier_signer", e.target.value)}
+                          />
+                        </Field>
+                      </InnerGroup>
+                    </div>
+
+                    <div>
+                      <InnerGroup title="Информация о грузе">
+                        <Field label="Тип груза" htmlFor="ship-cargo-type">
+                          <SInput
+                            id="ship-cargo-type"
+                            value={form.cargo_type}
+                            onChange={(e) => set("cargo_type", e.target.value)}
+                          />
+                        </Field>
+                        <Field label="Упаковка" htmlFor="ship-cargo-pack">
+                          <SInput
+                            id="ship-cargo-pack"
+                            value={form.cargo_packaging}
+                            onChange={(e) => set("cargo_packaging", e.target.value)}
+                          />
+                        </Field>
+                        <Field label="Объём кузова, м³" htmlFor="ship-volume">
+                          <SInput
+                            id="ship-volume"
+                            inputMode="decimal"
+                            value={form.cargo_volume}
+                            onChange={(e) => set("cargo_volume", e.target.value)}
+                          />
+                        </Field>
+                        <Field label="Вес груза, т" htmlFor="ship-weight">
+                          <SInput
+                            id="ship-weight"
+                            inputMode="decimal"
+                            value={form.cargo_weight}
+                            onChange={(e) => set("cargo_weight", e.target.value)}
+                          />
+                        </Field>
+                        <Field label="Грузоподъёмность, т" htmlFor="ship-capacity">
+                          <SInput
+                            id="ship-capacity"
+                            inputMode="decimal"
+                            value={form.capacity}
+                            onChange={(e) => set("capacity", e.target.value)}
+                          />
+                        </Field>
+                        <Field label="Тип кузова" htmlFor="ship-body-type">
+                          <TokenField
+                            id="ship-body-type"
+                            placeholder="Например: изотерм + Enter"
+                            value={form.body_type}
+                            onChange={(v) => set("body_type", v)}
+                          />
+                        </Field>
+                        <Field label="Способ погрузки" htmlFor="ship-load-method">
+                          <TokenField
+                            id="ship-load-method"
+                            placeholder="Например: задняя + Enter"
+                            value={form.loading_method}
+                            onChange={(v) => set("loading_method", v)}
+                          />
+                        </Field>
+                        <Field label="Тип транспорта" htmlFor="ship-transport">
+                          <select
+                            id="ship-transport"
+                            className={selectCls}
+                            value={form.transport_type}
+                            onChange={(e) => set("transport_type", e.target.value)}
+                          >
+                            {TRANSPORT_OPTIONS.map((t) => (
+                              <option key={t.value} value={t.value}>
+                                {t.label}
+                              </option>
+                            ))}
+                          </select>
+                        </Field>
+                      </InnerGroup>
+                    </div>
+                  </FormGroup>
+
+                  {/* --- Вкладки: позиции заказа / прочая информация --- */}
+                  <Notebook
+                    active={tab}
+                    onSelect={setTab}
+                    tabs={[
+                      {
+                        id: "info",
+                        label: "Прочая информация",
+                        content: (
+                          <STextarea
+                            id="ship-comment"
+                            rows={4}
+                            placeholder="Дополнительные условия, комментарии…"
+                            value={form.comment}
+                            onChange={(e) => set("comment", e.target.value)}
+                          />
+                        ),
+                      },
+                      {
+                        id: "lines",
+                        label: "Позиции заказа",
+                        content: (
+                          <p className="text-[13px] text-odoo-text-light">
+                            Таблица позиций заказа с суммами и НДС появится позже.
+                          </p>
+                        ),
+                      },
+                    ]}
+                  />
+                </>
+              )}
+            </FormSheet>
+          </FormSheetBg>
         </main>
       </FormWorkspace>
 
-      {preview && (
-        <FilePreview file={preview} onClose={() => setPreview(null)} />
-      )}
+      {preview && <FilePreview file={preview} onClose={() => setPreview(null)} />}
     </AppShell>
   );
 }

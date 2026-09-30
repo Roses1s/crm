@@ -17,13 +17,7 @@ export function Breadcrumb({ items }: { items: string[] }) {
       {items.map((item, i) => (
         <span key={`${item}-${i}`}>
           {i > 0 && <span className="mx-1.5 text-odoo-text-light">/</span>}
-          <span
-            className={
-              i === items.length - 1 ? "font-medium text-odoo-text" : ""
-            }
-          >
-            {item}
-          </span>
+          <span className={i === items.length - 1 ? "font-medium text-odoo-text" : ""}>{item}</span>
         </span>
       ))}
     </div>
@@ -96,17 +90,11 @@ export function ControlPanel({
           </button>
         )}
         {crumbs && crumbs.length > 0 ? (
-          <nav
-            aria-label="Хлебные крошки"
-            className="flex min-w-0 flex-col justify-center"
-          >
+          <nav aria-label="Хлебные крошки" className="flex min-w-0 flex-col justify-center">
             {crumbs.length > 1 && (
               <span className="flex items-center gap-1 text-[12px] leading-[15px]">
                 {crumbs.slice(0, -1).map((crumb, i) => (
-                  <span
-                    key={`${crumb.label}-${i}`}
-                    className="flex items-center gap-1"
-                  >
+                  <span key={`${crumb.label}-${i}`} className="flex items-center gap-1">
                     {i > 0 && <span className="text-odoo-text-light">/</span>}
                     {crumb.to ? (
                       <Link
@@ -116,9 +104,7 @@ export function ControlPanel({
                         {crumb.label}
                       </Link>
                     ) : (
-                      <span className="text-odoo-text-muted">
-                        {crumb.label}
-                      </span>
+                      <span className="text-odoo-text-muted">{crumb.label}</span>
                     )}
                   </span>
                 ))}
@@ -132,16 +118,12 @@ export function ControlPanel({
             </span>
           </nav>
         ) : (
-          <span className="text-[14px] font-medium leading-none text-odoo-text">
-            {title}
-          </span>
+          <span className="text-[14px] font-medium leading-none text-odoo-text">{title}</span>
         )}
         {status}
         {stats && (
           <div className="pointer-events-none absolute inset-x-0 hidden justify-center lg:flex">
-            <div className="pointer-events-auto flex items-center gap-2">
-              {stats}
-            </div>
+            <div className="pointer-events-auto flex items-center gap-2">{stats}</div>
           </div>
         )}
         {onSettings && (

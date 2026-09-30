@@ -25,9 +25,7 @@ export function BoardSuggestions({
     if (q.length < 2) return [];
     return users
       .filter((u) => u.is_active && u.id !== boardUserId)
-      .filter((u) =>
-        `${u.last_name} ${u.first_name} ${u.email}`.toLowerCase().includes(q),
-      )
+      .filter((u) => `${u.last_name} ${u.first_name} ${u.email}`.toLowerCase().includes(q))
       .slice(0, 5);
   }, [users, query, boardUserId]);
 
@@ -36,9 +34,7 @@ export function BoardSuggestions({
   return (
     <div className="absolute inset-x-0 top-full z-50 mt-1 overflow-hidden rounded-[3px] border border-odoo-border bg-odoo-surface shadow-lg">
       <div className="flex items-center justify-between border-b border-odoo-border-light px-3 py-1">
-        <span className="text-[11px] uppercase tracking-wide text-odoo-text-muted">
-          Сотрудники
-        </span>
+        <span className="text-[11px] uppercase tracking-wide text-odoo-text-muted">Сотрудники</span>
         <button
           type="button"
           aria-label="Скрыть подсказку"
@@ -59,9 +55,7 @@ export function BoardSuggestions({
           <span className="min-w-0 flex-1 truncate">
             {`${u.last_name} ${u.first_name}`.trim() || u.email}
           </span>
-          <span className="shrink-0 text-[11px] text-odoo-text-muted">
-            открыть доску
-          </span>
+          <span className="shrink-0 text-[11px] text-odoo-text-muted">открыть доску</span>
         </button>
       ))}
     </div>

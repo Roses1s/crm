@@ -23,11 +23,7 @@ export class ApiError extends Error {
 
 type Options = Omit<RequestInit, "body"> & { body?: unknown; auth?: boolean };
 
-export async function api<T>(
-  path: string,
-  options: Options = {},
-  retry = true,
-): Promise<T> {
+export async function api<T>(path: string, options: Options = {}, retry = true): Promise<T> {
   const { body, auth = true, headers, ...rest } = options;
   const token = auth ? getAccessToken() : null;
 
@@ -109,7 +105,6 @@ export async function apiBlob(path: string): Promise<Blob> {
   const response = await fetch(`${BASE}${path}`, {
     headers: token ? { Authorization: `Bearer ${token}` } : {},
   });
-  if (!response.ok)
-    throw new ApiError(response.status, "Не удалось получить файл");
+  if (!response.ok) throw new ApiError(response.status, "Не удалось получить файл");
   return response.blob();
 }

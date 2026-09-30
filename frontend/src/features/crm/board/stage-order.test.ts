@@ -11,9 +11,7 @@ const STAGES = [
 
 describe("порядок этапов канбана", () => {
   it("перемещает этап на позицию этапа под курсором", () => {
-    expect(reorderedStageIds(STAGES, stageDragId(1), stageDragId(3))).toEqual([
-      2, 3, 1,
-    ]);
+    expect(reorderedStageIds(STAGES, stageDragId(1), stageDragId(3))).toEqual([2, 3, 1]);
   });
 
   it("не создаёт запрос, если этап остался на своей позиции", () => {

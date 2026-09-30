@@ -1,13 +1,7 @@
 import { useState } from "react";
 
 /** Приоритет лида звёздами. В макете звёзды некликабельны по умолчанию. */
-export function StarRating({
-  value,
-  onChange,
-}: {
-  value: number;
-  onChange?: (n: number) => void;
-}) {
+export function StarRating({ value, onChange }: { value: number; onChange?: (n: number) => void }) {
   const [preview, setPreview] = useState<number | null>(null);
   const displayedValue = preview ?? value;
 

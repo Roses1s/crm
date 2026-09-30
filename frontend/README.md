@@ -20,19 +20,19 @@ npm run preview  # предпросмотр собранной версии
 
 ## Страницы и маршруты
 
-| Маршрут | Экран |
-|---|---|
-| `/login` | Вход (форма, кнопка просто ведёт на `/`) |
-| `/` | Лаунчер приложений |
-| `/crm` | Канбан лидов + переключение в список |
-| `/crm/leads/:id` | Карточка лида: статусбар этапов, форма, вкладка «Заявки», чаттер |
-| `/shipments` | Список заявок |
-| `/shipments/:id` | Карточка заявки |
-| `/admin` | Дашборд с графиком воронки |
-| `/admin/users` | Пользователи |
-| `/admin/carriers` | Перевозчики |
-| `/admin/security` | Бэкапы и попытки входа |
-| `*` | Редирект на `/` |
+| Маршрут           | Экран                                                            |
+| ----------------- | ---------------------------------------------------------------- |
+| `/login`          | Вход (форма, кнопка просто ведёт на `/`)                         |
+| `/`               | Лаунчер приложений                                               |
+| `/crm`            | Канбан лидов + переключение в список                             |
+| `/crm/leads/:id`  | Карточка лида: статусбар этапов, форма, вкладка «Заявки», чаттер |
+| `/shipments`      | Список заявок                                                    |
+| `/shipments/:id`  | Карточка заявки                                                  |
+| `/admin`          | Дашборд с графиком воронки                                       |
+| `/admin/users`    | Пользователи                                                     |
+| `/admin/carriers` | Перевозчики                                                      |
+| `/admin/security` | Бэкапы и попытки входа                                           |
+| `*`               | Редирект на `/`                                                  |
 
 Набор маршрутов совпадает с исходным `router.tsx` один в один —
 ничего не добавлено и не убрано.
@@ -52,12 +52,12 @@ npm run preview  # предпросмотр собранной версии
 
 Отличия синтаксиса от исходника (Tailwind v3 → v4):
 
-| v3 | v4 |
-|---|---|
-| `tailwind.config.ts` + `postcss.config.js` | `@theme` в CSS + плагин `@tailwindcss/vite` |
+| v3                                              | v4                                                |
+| ----------------------------------------------- | ------------------------------------------------- |
+| `tailwind.config.ts` + `postcss.config.js`      | `@theme` в CSS + плагин `@tailwindcss/vite`       |
 | `colors.odoo.* = rgb(var(--x) / <alpha-value>)` | `--color-odoo-*: rgb(var(--x))` в `@theme inline` |
-| `darkMode: ["class"]` | `@custom-variant dark (&:where(.dark, .dark *))` |
-| `shadow-sm`, `rounded` | `shadow-xs`, `rounded-[4px]` (переименования v4) |
+| `darkMode: ["class"]`                           | `@custom-variant dark (&:where(.dark, .dark *))`  |
+| `shadow-sm`, `rounded`                          | `shadow-xs`, `rounded-[4px]` (переименования v4)  |
 
 ## Структура
 
@@ -84,8 +84,8 @@ test/                     окружение Vitest (setup, renderWithProviders)
 
 ```tsx
 const { data: leads = [] } = useLeads({ search, stage, archived });
-const moveLead = useMoveLead();          // перетаскивание карточки
-const save = useUpdateLead(id);          // сохранение карточки
+const moveLead = useMoveLead(); // перетаскивание карточки
+const save = useUpdateLead(id); // сохранение карточки
 ```
 
 - `client.ts` — обёртка над fetch: подставляет токен, разбирает единый формат

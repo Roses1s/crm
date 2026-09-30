@@ -58,9 +58,7 @@ export function LeadCardBody({
         </div>
         <span
           title={
-            [ownerLabel(lead), lead.assigned_to_email]
-              .filter(Boolean)
-              .join(" · ") || "Не назначен"
+            [ownerLabel(lead), lead.assigned_to_email].filter(Boolean).join(" · ") || "Не назначен"
           }
           className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-odoo-primary text-[9px] font-semibold text-white"
         >
@@ -75,23 +73,10 @@ export function LeadCardBody({
  * Карточка на доске. Перетаскивание включено через dnd-kit: карточку можно
  * тянуть в другую колонку, этап сохраняется на сервере (см. KanbanPage).
  */
-export function LeadCard({
-  lead,
-  isOverlay,
-}: {
-  lead: Lead;
-  isOverlay?: boolean;
-}) {
+export function LeadCard({ lead, isOverlay }: { lead: Lead; isOverlay?: boolean }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const updatePriority = useUpdateLeadPriority();
-  const {
-    attributes,
-    listeners,
-    setNodeRef,
-    transform,
-    transition,
-    isDragging,
-  } = useSortable({
+  const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `lead-${lead.id}`,
     disabled: isOverlay,
     // Плавное расступание соседей: без своей длительности dnd-kit иногда

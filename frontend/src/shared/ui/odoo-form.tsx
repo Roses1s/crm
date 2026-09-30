@@ -20,13 +20,7 @@ import {
 const STATUSBAR_HEIGHT = 33; // $o-statusbar-height
 const ARROW_WIDTH = 11; // $o-statusbar-arrow-width
 
-export function FormWorkspace({
-  children,
-  aside,
-}: {
-  children: ReactNode;
-  aside?: ReactNode;
-}) {
+export function FormWorkspace({ children, aside }: { children: ReactNode; aside?: ReactNode }) {
   /*
    * Рабочая область карточки: форма и боковая лента имеют собственную
    * прокрутку. На узком экране лента переходит под форму с верхним разделителем.
@@ -138,9 +132,7 @@ export function FormStatusbar({
   const moreItems = moreOpen === "before" ? before : after;
 
   const segments: StatusbarSegment[] = [
-    ...(before.length > 0
-      ? [{ key: "before", overflow: "before" as const }]
-      : []),
+    ...(before.length > 0 ? [{ key: "before", overflow: "before" as const }] : []),
     ...visible.map((item) => ({ key: `stage-${item.id}`, item })),
     ...(after.length > 0 ? [{ key: "after", overflow: "after" as const }] : []),
   ];
@@ -157,8 +149,7 @@ export function FormStatusbar({
           const active = segment.item?.id === current;
           const label = segment.item?.name ?? "…";
           const overflowSide = segment.overflow;
-          const overflowLabel =
-            overflowSide === "before" ? "Предыдущие этапы" : "Следующие этапы";
+          const overflowLabel = overflowSide === "before" ? "Предыдущие этапы" : "Следующие этапы";
 
           return (
             <span

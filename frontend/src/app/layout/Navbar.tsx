@@ -18,9 +18,7 @@ export function Navbar() {
   const profileRef = useRef<HTMLDivElement>(null);
   const letter = (user?.first_name || user?.email || "U").slice(0, 1).toUpperCase();
   const fullName =
-    [user?.last_name, user?.first_name].filter(Boolean).join(" ") ||
-    user?.email ||
-    "Сотрудник";
+    [user?.last_name, user?.first_name].filter(Boolean).join(" ") || user?.email || "Сотрудник";
 
   useEffect(() => {
     if (!menu) return;
@@ -152,7 +150,10 @@ export function Navbar() {
       </div>
 
       {sheet && (
-        <div className="fixed inset-0 z-[60] bg-odoo-overlay/20 md:hidden" onClick={() => setSheet(false)}>
+        <div
+          className="fixed inset-0 z-[60] bg-odoo-overlay/20 md:hidden"
+          onClick={() => setSheet(false)}
+        >
           <div
             className="h-full w-64 bg-odoo-surface p-4 shadow-lg"
             onClick={(e) => e.stopPropagation()}

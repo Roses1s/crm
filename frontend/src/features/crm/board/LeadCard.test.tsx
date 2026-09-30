@@ -22,9 +22,7 @@ describe("Карточка лида на канбане", () => {
   it("показывает название, ИНН, контакт и тег", () => {
     renderWithProviders(<LeadCardBody lead={LEAD} />);
 
-    expect(
-      screen.getByRole("heading", { name: /Уралпромснаб/ }),
-    ).toBeInTheDocument();
+    expect(screen.getByRole("heading", { name: /Уралпромснаб/ })).toBeInTheDocument();
     expect(screen.getByText(/7451234565/)).toBeInTheDocument();
     expect(screen.getByText("Громов Сергей")).toBeInTheDocument();
     const tag = screen.getByText("Крупный клиент");
@@ -35,9 +33,7 @@ describe("Карточка лида на канбане", () => {
   it("меняет приоритет по звезде без открытия карточки", async () => {
     const user = userEvent.setup();
     const onPriorityChange = vi.fn();
-    renderWithProviders(
-      <LeadCardBody lead={LEAD} onPriorityChange={onPriorityChange} />,
-    );
+    renderWithProviders(<LeadCardBody lead={LEAD} onPriorityChange={onPriorityChange} />);
 
     await user.click(screen.getByRole("button", { name: "Приоритет 3" }));
 

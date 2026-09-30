@@ -23,11 +23,7 @@ import { BoardBanner } from "@/features/crm/board/BoardBanner";
 import { BoardSuggestions } from "@/features/crm/board/BoardSuggestions";
 import { Column } from "@/features/crm/board/Column";
 import { LeadCard } from "@/features/crm/board/LeadCard";
-import {
-  isStageDragId,
-  reorderedStageIds,
-  stageDragId,
-} from "@/features/crm/board/stage-order";
+import { isStageDragId, reorderedStageIds, stageDragId } from "@/features/crm/board/stage-order";
 import { LeadListView } from "@/features/crm/list/LeadListView";
 import {
   useCreateStage,
@@ -69,9 +65,7 @@ export function KanbanPage() {
   const [searchInput, setSearchInput] = useState(search);
   const [folded, setFolded] = useState<number[]>(() => {
     try {
-      return JSON.parse(
-        localStorage.getItem("crm-folded-stages") ?? "[]",
-      ) as number[];
+      return JSON.parse(localStorage.getItem("crm-folded-stages") ?? "[]") as number[];
     } catch {
       return [];
     }
@@ -127,9 +121,7 @@ export function KanbanPage() {
     const stageIsDragged = isStageDragId(args.active.id);
     const relevant = (collisions: ReturnType<typeof pointerWithin>) =>
       collisions.filter((collision) =>
-        stageIsDragged
-          ? isStageDragId(collision.id)
-          : !isStageDragId(collision.id),
+        stageIsDragged ? isStageDragId(collision.id) : !isStageDragId(collision.id),
       );
     const pointer = relevant(pointerWithin(args));
     return pointer.length > 0 ? pointer : relevant(closestCorners(args));
@@ -143,9 +135,7 @@ export function KanbanPage() {
    * стабильный порядок по номеру: он не меняется от правок.
    */
   function columnLeads(stageId: number) {
-    return leads
-      .filter((l) => l.stage_id === stageId)
-      .sort((a, b) => a.id - b.id);
+    return leads.filter((l) => l.stage_id === stageId).sort((a, b) => a.id - b.id);
   }
 
   const sensors = useSensors(
@@ -179,9 +169,7 @@ export function KanbanPage() {
     if (String(over.id).startsWith("stage-")) {
       stageId = Number(String(over.id).replace("stage-", ""));
     } else if (String(over.id).startsWith("lead-")) {
-      const target = leads.find(
-        (l) => l.id === Number(String(over.id).replace("lead-", "")),
-      );
+      const target = leads.find((l) => l.id === Number(String(over.id).replace("lead-", "")));
       stageId = target?.stage_id ?? null;
     }
 
@@ -218,10 +206,7 @@ export function KanbanPage() {
       ></ControlPanel>
 
       {boardUserId !== null && (
-        <BoardBanner
-          boardUserId={boardUserId}
-          onLeave={() => setFilter("board", "")}
-        />
+        <BoardBanner boardUserId={boardUserId} onLeave={() => setFilter("board", "")} />
       )}
 
       {(moveLead.isError || reorderStages.isError) && (
@@ -261,9 +246,7 @@ export function KanbanPage() {
                   folded={folded.includes(stage.id)}
                   onFold={() =>
                     setFolded((f) =>
-                      f.includes(stage.id)
-                        ? f.filter((x) => x !== stage.id)
-                        : [...f, stage.id],
+                      f.includes(stage.id) ? f.filter((x) => x !== stage.id) : [...f, stage.id],
                     )
                   }
                   allStages={stages}
@@ -294,8 +277,7 @@ export function KanbanPage() {
                     setStageName("");
                   }}
                   onKeyDown={(e) => {
-                    if (e.key === "Enter")
-                      (e.target as HTMLInputElement).blur();
+                    if (e.key === "Enter") (e.target as HTMLInputElement).blur();
                     if (e.key === "Escape") {
                       setStageName("");
                       setNewStage(false);

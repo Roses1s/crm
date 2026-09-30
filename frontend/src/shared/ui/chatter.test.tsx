@@ -66,9 +66,9 @@ describe("Лента примечаний", () => {
     expect(logButton.parentElement).toHaveStyle(
       "margin-inline-start: var(--odoo-chatter-composer-indent)",
     );
-    expect(screen.getByRole("textbox", { name: "Текст внутреннего примечания" }).closest("form")).toHaveStyle(
-      "padding-inline: var(--odoo-chatter-panel-padding)",
-    );
+    expect(
+      screen.getByRole("textbox", { name: "Текст внутреннего примечания" }).closest("form"),
+    ).toHaveStyle("padding-inline: var(--odoo-chatter-panel-padding)");
 
     const date = screen.getByText("30 сентября 2026 г.");
     expect(date.previousElementSibling).toHaveClass("bg-odoo-chatter-divider");

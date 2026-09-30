@@ -75,9 +75,7 @@ export function FilePreview({ file, onClose }: { file: Attachment; onClose: () =
           <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-odoo-text">
             {file.name}
           </span>
-          <span className="shrink-0 text-[12px] text-odoo-text-muted">
-            {formatSize(file.size)}
-          </span>
+          <span className="shrink-0 text-[12px] text-odoo-text-muted">{formatSize(file.size)}</span>
           <button
             type="button"
             aria-label="Скачать"

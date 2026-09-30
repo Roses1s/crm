@@ -30,9 +30,7 @@ export function TransferDialog({
   const found = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return colleagues.slice(0, 8);
-    return colleagues
-      .filter((c) => c.full_name.toLowerCase().includes(q))
-      .slice(0, 8);
+    return colleagues.filter((c) => c.full_name.toLowerCase().includes(q)).slice(0, 8);
   }, [colleagues, query]);
 
   return (
@@ -40,20 +38,13 @@ export function TransferDialog({
       <div className="w-full max-w-md rounded-lg bg-odoo-surface p-4 shadow-lg">
         {chosen ? (
           <>
-            <h3 className="text-[15px] font-semibold text-odoo-text">
-              Передать лид?
-            </h3>
+            <h3 className="text-[15px] font-semibold text-odoo-text">Передать лид?</h3>
             <p className="mt-2 text-[13px] leading-relaxed text-odoo-text-muted">
               Карточка «{leadName}» перейдёт к сотруднику{" "}
-              <span className="font-medium text-odoo-text">
-                {chosen.full_name}
-              </span>{" "}
-              вместе с заявками, документами и перепиской. С вашей доски она
-              исчезнет.
+              <span className="font-medium text-odoo-text">{chosen.full_name}</span> вместе с
+              заявками, документами и перепиской. С вашей доски она исчезнет.
             </p>
-            {error && (
-              <p className="mt-3 text-[13px] text-odoo-danger">{error}</p>
-            )}
+            {error && <p className="mt-3 text-[13px] text-odoo-danger">{error}</p>}
             <div className="mt-4 flex justify-end gap-2">
               <button
                 type="button"
@@ -74,9 +65,7 @@ export function TransferDialog({
           </>
         ) : (
           <>
-            <h3 className="text-[15px] font-semibold text-odoo-text">
-              Кому передать лид
-            </h3>
+            <h3 className="text-[15px] font-semibold text-odoo-text">Кому передать лид</h3>
             <p className="mt-1 text-[13px] text-odoo-text-muted">
               Начните вводить фамилию коллеги.
             </p>
@@ -93,9 +82,7 @@ export function TransferDialog({
 
             <div className="mt-2 max-h-64 overflow-y-auto">
               {isLoading ? (
-                <p className="px-1 py-2 text-[13px] text-odoo-text-light">
-                  Загрузка…
-                </p>
+                <p className="px-1 py-2 text-[13px] text-odoo-text-light">Загрузка…</p>
               ) : found.length === 0 ? (
                 <p className="px-1 py-2 text-[13px] text-odoo-text-light">
                   Никого не нашли. Сотрудников заводит администратор.

@@ -11,13 +11,7 @@ const LIST_COLUMNS = 8; // чекбокс + 7 колонок данных
 const ROWS_PER_PAGE = 80;
 
 type SortKey =
-  | "name"
-  | "inn"
-  | "logist_contact"
-  | "tags"
-  | "assigned_to_email"
-  | "stage_name"
-  | "priority";
+  "name" | "inn" | "logist_contact" | "tags" | "assigned_to_email" | "stage_name" | "priority";
 
 interface SortState {
   key: SortKey;
@@ -75,9 +69,7 @@ function ListTh({
         <span
           aria-hidden="true"
           className={`shrink-0 text-[9px] leading-none ${
-            active
-              ? "text-odoo-action"
-              : "text-odoo-text-light opacity-0 group-hover:opacity-100"
+            active ? "text-odoo-action" : "text-odoo-text-light opacity-0 group-hover:opacity-100"
           }`}
         >
           {active ? (sort!.dir === "asc" ? "▲" : "▼") : "▲"}
@@ -88,9 +80,7 @@ function ListTh({
   return (
     <th
       scope="col"
-      aria-sort={
-        active ? (sort!.dir === "asc" ? "ascending" : "descending") : undefined
-      }
+      aria-sort={active ? (sort!.dir === "asc" ? "ascending" : "descending") : undefined}
       className={`group sticky top-0 z-10 bg-odoo-bg px-2 py-1.5 align-middle text-[13px] font-medium text-odoo-text shadow-[inset_0_-1px_0_rgb(var(--odoo-border))] ${
         numeric ? "text-right" : "text-left"
       } ${className}`}
@@ -136,9 +126,7 @@ export function LeadListView({
     const map = new Map<string, Lead[]>();
     for (const l of sorted) {
       const key =
-        groupBy === "assigned"
-          ? l.assigned_to_email || "Не назначен"
-          : l.stage_name || "Без этапа";
+        groupBy === "assigned" ? l.assigned_to_email || "Не назначен" : l.stage_name || "Без этапа";
       const list = map.get(key);
       if (list) list.push(l);
       else map.set(key, [l]);
@@ -156,8 +144,7 @@ export function LeadListView({
     return ids;
   }, [groups, visible]);
 
-  const allShownSelected =
-    shownIds.length > 0 && shownIds.every((id) => selected.has(id));
+  const allShownSelected = shownIds.length > 0 && shownIds.every((id) => selected.has(id));
 
   function toggleSort(key: SortKey) {
     setSort((prev) => {
@@ -219,13 +206,7 @@ export function LeadListView({
       <ListTh sortKey="stage_name" sort={sort} onSort={toggleSort}>
         Этап
       </ListTh>
-      <ListTh
-        sortKey="priority"
-        sort={sort}
-        onSort={toggleSort}
-        className="pr-4"
-        numeric
-      >
+      <ListTh sortKey="priority" sort={sort} onSort={toggleSort} className="pr-4" numeric>
         Приоритет
       </ListTh>
     </tr>
@@ -288,10 +269,7 @@ export function LeadListView({
             <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-odoo-primary text-[9px] font-semibold text-white">
               {ownerInitials(lead)}
             </span>
-            <span
-              className="truncate"
-              title={lead.assigned_to_email || "Не назначен"}
-            >
+            <span className="truncate" title={lead.assigned_to_email || "Не назначен"}>
               {ownerLabel(lead) || "Не назначен"}
             </span>
           </span>
@@ -320,9 +298,7 @@ export function LeadListView({
     <div className="h-[calc(100dvh-var(--odoo-record-control-panel-height))] min-h-0 overflow-auto overscroll-contain border-t border-odoo-border-light bg-odoo-bg [scrollbar-gutter:stable]">
       {selectedCount > 0 && (
         <div className="sticky top-0 z-20 flex min-h-[38px] items-center gap-3 border-b border-odoo-border-light bg-odoo-surface px-4 py-1.5 text-[13px] shadow-xs">
-          <span className="font-medium text-odoo-text">
-            Выбрано записей: {selectedCount}
-          </span>
+          <span className="font-medium text-odoo-text">Выбрано записей: {selectedCount}</span>
           <button
             type="button"
             className="rounded-[3px] border border-odoo-border bg-odoo-surface px-2.5 py-1 text-[13px] text-odoo-text transition-colors hover:bg-odoo-bg"
@@ -352,8 +328,7 @@ export function LeadListView({
                 colSpan={LIST_COLUMNS}
                 className="bg-odoo-surface px-4 py-12 text-center text-[13px] text-odoo-text-muted"
               >
-                Нет лидов. Нажмите{" "}
-                <span className="font-medium text-odoo-text">Новый</span>, чтобы
+                Нет лидов. Нажмите <span className="font-medium text-odoo-text">Новый</span>, чтобы
                 создать первый.
               </td>
             </tr>
@@ -365,12 +340,8 @@ export function LeadListView({
             {g.title && (
               <tr className="border-b border-odoo-border-light bg-odoo-bg">
                 <td colSpan={LIST_COLUMNS} className="px-4 py-1.5">
-                  <span className="text-[13px] font-semibold text-odoo-text">
-                    {g.title}
-                  </span>
-                  <span className="ml-2 text-[12px] text-odoo-text-muted">
-                    ({g.items.length})
-                  </span>
+                  <span className="text-[13px] font-semibold text-odoo-text">{g.title}</span>
+                  <span className="ml-2 text-[12px] text-odoo-text-muted">({g.items.length})</span>
                 </td>
               </tr>
             )}
@@ -387,8 +358,7 @@ export function LeadListView({
                   onClick={() => setVisible((n) => n + ROWS_PER_PAGE)}
                   className="text-[13px] text-odoo-action hover:underline"
                 >
-                  Показать ещё {Math.min(ROWS_PER_PAGE, hidden)} из{" "}
-                  {leads.length}
+                  Показать ещё {Math.min(ROWS_PER_PAGE, hidden)} из {leads.length}
                 </button>
               </td>
             </tr>

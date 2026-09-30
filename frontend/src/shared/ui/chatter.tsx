@@ -355,9 +355,7 @@ export function Chatter({
                     <button
                       type="button"
                       aria-label={`Убрать ${file.name}`}
-                      onClick={() =>
-                        setPending((list) => list.filter((_, index) => index !== i))
-                      }
+                      onClick={() => setPending((list) => list.filter((_, index) => index !== i))}
                       className="text-odoo-text-muted hover:text-odoo-danger"
                     >
                       <X className="h-3 w-3" />
@@ -392,7 +390,10 @@ export function Chatter({
             </div>
           </div>
         </div>
-        <div style={{ marginInlineStart: "var(--odoo-chatter-composer-indent)" }} className="mt-2 flex items-center">
+        <div
+          style={{ marginInlineStart: "var(--odoo-chatter-composer-indent)" }}
+          className="mt-2 flex items-center"
+        >
           <button
             type="submit"
             disabled={posting || !onSubmit || (!text.trim() && pending.length === 0)}

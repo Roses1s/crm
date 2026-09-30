@@ -1,9 +1,5 @@
 import { useDroppable } from "@dnd-kit/core";
-import {
-  SortableContext,
-  useSortable,
-  verticalListSortingStrategy,
-} from "@dnd-kit/sortable";
+import { SortableContext, useSortable, verticalListSortingStrategy } from "@dnd-kit/sortable";
 import { CSS } from "@dnd-kit/utilities";
 import { MoreHorizontal } from "lucide-react";
 import { useCallback, useState } from "react";
@@ -188,9 +184,7 @@ export function Column({
                       className="block w-full px-3 py-1.5 text-left text-sm text-odoo-danger hover:bg-odoo-bg"
                       onClick={() => {
                         setMenu(false);
-                        setMoveTo(
-                          allStages.find((s) => s.id !== stage.id)?.id ?? null,
-                        );
+                        setMoveTo(allStages.find((s) => s.id !== stage.id)?.id ?? null);
                         setConfirmDelete(true);
                       }}
                     >
@@ -229,8 +223,8 @@ export function Column({
             {leads.length > 0 ? (
               <>
                 <p className="mt-2 text-[13px] text-odoo-text-muted">
-                  В этапе {leads.length} лид(ов). Выберите, куда их перенести —
-                  без этого удалить нельзя.
+                  В этапе {leads.length} лид(ов). Выберите, куда их перенести — без этого удалить
+                  нельзя.
                 </p>
                 <select
                   className="mt-3 w-full rounded-[4px] border border-odoo-border px-2.5 py-1.5 text-sm"
@@ -261,17 +255,13 @@ export function Column({
               </button>
               <button
                 type="button"
-                disabled={
-                  remove.isPending || (leads.length > 0 && moveTo === null)
-                }
+                disabled={remove.isPending || (leads.length > 0 && moveTo === null)}
                 className="h-8 rounded-[4px] bg-odoo-danger px-3 text-sm font-medium text-white disabled:opacity-60"
                 onClick={() => {
                   remove.mutate(
                     {
                       id: stage.id,
-                      fallbackId: leads.length
-                        ? (moveTo ?? undefined)
-                        : undefined,
+                      fallbackId: leads.length ? (moveTo ?? undefined) : undefined,
                     },
                     { onSuccess: () => setConfirmDelete(false) },
                   );

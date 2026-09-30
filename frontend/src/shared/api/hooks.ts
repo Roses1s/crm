@@ -53,13 +53,10 @@ export const keys = {
   pager: (id: string | number) => ["pager", String(id)] as const,
   shipments: (status: string) => ["shipments", status] as const,
   shipment: (id: string | number) => ["shipment", String(id)] as const,
-  leadShipments: (id: string | number) =>
-    ["lead-shipments", String(id)] as const,
+  leadShipments: (id: string | number) => ["lead-shipments", String(id)] as const,
   attachments: (id: string | number) => ["attachments", String(id)] as const,
-  shipmentAttachments: (id: string | number) =>
-    ["shipment-attachments", String(id)] as const,
-  shipmentTimeline: (id: string | number) =>
-    ["shipment-timeline", String(id)] as const,
+  shipmentAttachments: (id: string | number) => ["shipment-attachments", String(id)] as const,
+  shipmentTimeline: (id: string | number) => ["shipment-timeline", String(id)] as const,
   carriers: ["carriers"] as const,
   users: ["users"] as const,
   backups: ["backups"] as const,
@@ -87,9 +84,7 @@ export function useLogin() {
 
 export function logout(): void {
   // Куку может стереть только сервер — она недоступна скриптам.
-  void fetch("/api/v1/auth/logout", { method: "POST" }).finally(() =>
-    clearTokens(),
-  );
+  void fetch("/api/v1/auth/logout", { method: "POST" }).finally(() => clearTokens());
 }
 
 export function useMe() {
@@ -109,8 +104,7 @@ export function useMe() {
 export function useStages(ownerId?: number | null) {
   return useQuery({
     queryKey: [...keys.stages, ownerId ?? "me"],
-    queryFn: () =>
-      api<Stage[]>(`/crm/stages${ownerId ? `?owner_id=${ownerId}` : ""}`),
+    queryFn: () => api<Stage[]>(`/crm/stages${ownerId ? `?owner_id=${ownerId}` : ""}`),
   });
 }
 
@@ -138,13 +132,7 @@ export function useLauncherApps() {
 export function useCreateStage() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({
-      name,
-      ownerId,
-    }: {
-      name: string;
-      ownerId?: number | null;
-    }) =>
+    mutationFn: ({ name, ownerId }: { name: string; ownerId?: number | null }) =>
       api<Stage>(`/crm/stages${ownerId ? `?owner_id=${ownerId}` : ""}`, {
         method: "POST",
         body: { name },
@@ -200,10 +188,9 @@ export function useDeleteStage() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, fallbackId }: { id: number; fallbackId?: number }) =>
-      api<void>(
-        `/crm/stages/${id}${fallbackId ? `?fallback_stage_id=${fallbackId}` : ""}`,
-        { method: "DELETE" },
-      ),
+      api<void>(`/crm/stages/${id}${fallbackId ? `?fallback_stage_id=${fallbackId}` : ""}`, {
+        method: "DELETE",
+      }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.stages });
       void qc.invalidateQueries({ queryKey: ["leads"] });
@@ -268,8 +255,7 @@ export interface LeadPayload {
 export function useCreateLead() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: LeadPayload) =>
-      api<Lead>("/crm/leads", { method: "POST", body }),
+    mutationFn: (body: LeadPayload) => api<Lead>("/crm/leads", { method: "POST", body }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["leads"] }),
   });
 }
@@ -301,9 +287,7 @@ export function useMoveLead() {
         old
           ? {
               ...old,
-              results: old.results.map((lead) =>
-                lead.id === id ? { ...lead, stage_id } : lead,
-              ),
+              results: old.results.map((lead) => (lead.id === id ? { ...lead, stage_id } : lead)),
             }
           : old,
       );
@@ -337,15 +321,11 @@ export function useUpdateLeadPriority() {
         old
           ? {
               ...old,
-              results: old.results.map((lead) =>
-                lead.id === id ? { ...lead, priority } : lead,
-              ),
+              results: old.results.map((lead) => (lead.id === id ? { ...lead, priority } : lead)),
             }
           : old,
       );
-      qc.setQueryData<Lead>(keys.lead(id), (old) =>
-        old ? { ...old, priority } : old,
-      );
+      qc.setQueryData<Lead>(keys.lead(id), (old) => (old ? { ...old, priority } : old));
       return { leadsSnapshot, leadSnapshot, id };
     },
     onError: (_error, _variables, context) => {
@@ -365,8 +345,7 @@ export function useUpdateLeadPriority() {
 export function useArchiveLead() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number | string) =>
-      api<void>(`/crm/leads/${id}`, { method: "DELETE" }),
+    mutationFn: (id: number | string) => api<void>(`/crm/leads/${id}`, { method: "DELETE" }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: ["leads"] }),
   });
 }
@@ -379,8 +358,7 @@ export function useAddNote(id: string | undefined) {
         method: "POST",
         body: { body },
       }),
-    onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: keys.timeline(id ?? "") }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.timeline(id ?? "") }),
   });
 }
 
@@ -392,8 +370,7 @@ export function useEditNote(id: string | undefined) {
         method: "PATCH",
         body: { body },
       }),
-    onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: keys.timeline(id ?? "") }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.timeline(id ?? "") }),
   });
 }
 
@@ -402,8 +379,7 @@ export function useDeleteTimelineEntry(id: string | undefined) {
   return useMutation({
     mutationFn: (entryId: number) =>
       api<void>(`/crm/leads/${id}/timeline/${entryId}`, { method: "DELETE" }),
-    onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: keys.timeline(id ?? "") }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.timeline(id ?? "") }),
   });
 }
 
@@ -485,9 +461,7 @@ export function useShipmentAttachments(id: string | number | undefined) {
   });
 }
 
-export function useUploadShipmentAttachment(
-  shipmentId: string | number | undefined,
-) {
+export function useUploadShipmentAttachment(shipmentId: string | number | undefined) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ file, entryId }: { file: File; entryId?: number }) =>
@@ -506,9 +480,7 @@ export function useUploadShipmentAttachment(
   });
 }
 
-export function useDeleteShipmentAttachment(
-  shipmentId: string | number | undefined,
-) {
+export function useDeleteShipmentAttachment(shipmentId: string | number | undefined) {
   const qc = useQueryClient();
   return useMutation({
     // Удаление общее для всех вложений — ручка различает их по номеру файла.
@@ -542,8 +514,7 @@ export function useAddShipmentNote(id: string | undefined) {
         method: "POST",
         body: { body },
       }),
-    onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: keys.shipmentTimeline(id ?? "") }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.shipmentTimeline(id ?? "") }),
   });
 }
 
@@ -555,8 +526,7 @@ export function useEditShipmentNote(id: string | undefined) {
         method: "PATCH",
         body: { body },
       }),
-    onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: keys.shipmentTimeline(id ?? "") }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.shipmentTimeline(id ?? "") }),
   });
 }
 
@@ -565,8 +535,7 @@ export function useDeleteShipmentTimelineEntry(id: string | undefined) {
   return useMutation({
     mutationFn: (entryId: number) =>
       api<void>(`/shipments/${id}/timeline/${entryId}`, { method: "DELETE" }),
-    onSuccess: () =>
-      void qc.invalidateQueries({ queryKey: keys.shipmentTimeline(id ?? "") }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.shipmentTimeline(id ?? "") }),
   });
 }
 
@@ -576,9 +545,7 @@ export function attachmentBlob(attachmentId: number): Promise<Blob> {
 }
 
 /** Скачивание: получаем файл с токеном и отдаём браузеру. */
-export async function downloadAttachment(
-  attachment: Attachment,
-): Promise<void> {
+export async function downloadAttachment(attachment: Attachment): Promise<void> {
   const blob = await attachmentBlob(attachment.id);
   const url = URL.createObjectURL(blob);
   const link = document.createElement("a");
@@ -593,9 +560,7 @@ export function useShipments(status = "") {
   return useQuery({
     queryKey: keys.shipments(status),
     queryFn: () =>
-      api<Page<Shipment>>(
-        `/shipments?page_size=200${status ? `&status=${status}` : ""}`,
-      ),
+      api<Page<Shipment>>(`/shipments?page_size=200${status ? `&status=${status}` : ""}`),
     select: (page) => page.results,
   });
 }
@@ -721,8 +686,7 @@ export interface UserPayload {
 export function useCreateUser() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: UserPayload) =>
-      api<User>("/admin/users", { method: "POST", body }),
+    mutationFn: (body: UserPayload) => api<User>("/admin/users", { method: "POST", body }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: keys.users }),
   });
 }
@@ -739,8 +703,7 @@ export function useUpdateUser() {
 export function useDeleteUser() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) =>
-      api<void>(`/admin/users/${id}`, { method: "DELETE" }),
+    mutationFn: (id: number) => api<void>(`/admin/users/${id}`, { method: "DELETE" }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: keys.users }),
   });
 }
@@ -763,14 +726,10 @@ export function useBackups() {
 export function useRunBackup() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () =>
-      api<{ task_id: string }>("/admin/backup", { method: "POST" }),
+    mutationFn: () => api<{ task_id: string }>("/admin/backup", { method: "POST" }),
     onSuccess: () => {
       // Файл появится через несколько секунд — обновим список с задержкой.
-      setTimeout(
-        () => void qc.invalidateQueries({ queryKey: keys.backups }),
-        4000,
-      );
+      setTimeout(() => void qc.invalidateQueries({ queryKey: keys.backups }), 4000);
     },
   });
 }

@@ -279,17 +279,14 @@
   --odoo-kanban-record-width: 300px;
   --odoo-kanban-record-small-width: 240px;
   --odoo-kanban-group-width: 90vw;
-  --odoo-kanban-record-current-width: calc(
-    90vw - (var(--odoo-kanban-group-padding-x) * 2)
-  );
+  --odoo-kanban-record-current-width: calc(90vw - (var(--odoo-kanban-group-padding-x) * 2));
 }
 
 @media (min-width: 768px) {
   .crm-kanban-renderer {
     --odoo-kanban-record-current-width: var(--odoo-kanban-record-small-width);
     --odoo-kanban-group-width: calc(
-      var(--odoo-kanban-record-current-width) +
-        (var(--odoo-kanban-group-padding-x) * 2)
+      var(--odoo-kanban-record-current-width) + (var(--odoo-kanban-group-padding-x) * 2)
     );
   }
 }
@@ -311,7 +308,9 @@
     overflow: hidden;
     opacity: 0;
     pointer-events: none;
-    transition: width 120ms ease, opacity 120ms ease;
+    transition:
+      width 120ms ease,
+      opacity 120ms ease;
   }
 
   .crm-kanban-stage-header:hover .crm-kanban-stage-secondary-action,
@@ -346,18 +345,8 @@
      * достигается совпадение шрифта с образцом без подгрузки Google Fonts.
      */
     font-family:
-      -apple-system,
-      BlinkMacSystemFont,
-      "Segoe UI",
-      Roboto,
-      "Helvetica Neue",
-      Arial,
-      "Noto Sans",
-      "Liberation Sans",
-      sans-serif,
-      "Apple Color Emoji",
-      "Segoe UI Emoji",
-      "Segoe UI Symbol",
+      -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans",
+      "Liberation Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
       "Noto Color Emoji";
     font-size: 13px;
     line-height: 1.5;

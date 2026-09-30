@@ -30,8 +30,7 @@ export function LoginPage() {
     login.mutate(
       { email, password },
       {
-        onSuccess: () =>
-          navigate(location.state?.from ?? "/", { replace: true }),
+        onSuccess: () => navigate(location.state?.from ?? "/", { replace: true }),
         onError: (err) => {
           if (err instanceof ApiError && err.status === 429) {
             setError("Слишком много попыток входа. Подождите минуту.");
@@ -96,16 +95,10 @@ export function LoginPage() {
                 <button
                   type="button"
                   onClick={() => setShowPassword((v) => !v)}
-                  aria-label={
-                    showPassword ? "Скрыть пароль" : "Показать пароль"
-                  }
+                  aria-label={showPassword ? "Скрыть пароль" : "Показать пароль"}
                   className="absolute right-0.5 top-0.5 inline-flex h-9 w-9 items-center justify-center rounded-md text-odoo-text-light transition-colors hover:bg-odoo-surface-sunken hover:text-odoo-text"
                 >
-                  {showPassword ? (
-                    <EyeOff className="h-4 w-4" />
-                  ) : (
-                    <Eye className="h-4 w-4" />
-                  )}
+                  {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
                 </button>
               </div>
             </label>

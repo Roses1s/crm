@@ -17,8 +17,7 @@ export function BoardBanner({
   return (
     <div className="flex items-center gap-2 border-b border-odoo-border-light bg-odoo-surface px-3 py-1.5">
       <span className="rounded-[3px] bg-odoo-accent-soft px-2 py-0.5 text-[12px] font-medium text-odoo-action">
-        Доска сотрудника:{" "}
-        {`${current.last_name} ${current.first_name}`.trim() || current.email}
+        Доска сотрудника: {`${current.last_name} ${current.first_name}`.trim() || current.email}
       </span>
       <button
         type="button"

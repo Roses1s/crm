@@ -67,10 +67,7 @@ describe("Статусбар карточки", () => {
       <FormStatusbar current={4} items={items} onSelect={onSelect} visibleCount={3} />,
     );
 
-    expect(screen.getByRole("button", { name: "Этап 4" })).toHaveAttribute(
-      "aria-current",
-      "step",
-    );
+    expect(screen.getByRole("button", { name: "Этап 4" })).toHaveAttribute("aria-current", "step");
     fireEvent.click(screen.getByRole("button", { name: "Предыдущие этапы" }));
     fireEvent.click(screen.getByRole("button", { name: "Этап 1" }));
     expect(onSelect).toHaveBeenCalledWith(1);
