@@ -1,123 +1,25 @@
-"""Вложения лидов и заявок на перевозку.
+"""HTTP-слой вложений лидов и заявок.
 
-Файлы лежат на диске в томе (`ATTACHMENTS_DIR`), а метаданные — в базе.
-На диск попадает обезличенное имя `<uuid>.<расширение>`: так исключены
-совпадения имён и подстановка пути вроде `../../etc/passwd`.
+Бизнес-логика (запись на диск, белый список типов, права) — в
+`app.services.attachments`.
 """
 
 from __future__ import annotations
 
-import shutil
-import uuid
-from pathlib import Path
 from typing import Annotated
 
 from fastapi import APIRouter, File, Query, UploadFile, status
 from fastapi.responses import FileResponse
-from sqlalchemy import select
-from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import CurrentUser, SessionDep
-from app.api.v1.leads import get_lead_or_404
-from app.core.config import settings
-from app.core.errors import AppError, NotFoundError, PermissionDeniedError
-from app.core.logging import get_logger
-from app.models.shipment import Shipment
-from app.models.timeline import Attachment, TimelineEntry
-from app.models.user import Role
+from app.models.timeline import Attachment
 from app.schemas.crm import AttachmentRead
+from app.services import attachments as service
+from app.services.attachments import ALLOWED_EXTENSIONS, INLINE_TYPES, disk_usage
 
 router = APIRouter(prefix="/crm", tags=["crm: вложения"])
 # Заявки живут вне префикса /crm, поэтому их вложениям нужен отдельный роутер.
 shipment_router = APIRouter(tags=["заявки: вложения"])
-log = get_logger(__name__)
-
-CHUNK = 1024 * 1024  # читаем файл мегабайтными кусками, не целиком в память
-
-# Белый список расширений. Сознательно без .svg и .htm(l): такие файлы браузер
-# разбирает как разметку, и открытие вложения могло бы стать XSS на домене.
-# Заодно отсекаются .exe и прочее, чего в CRM делать нечего.
-ALLOWED_EXTENSIONS: dict[str, str] = {
-    ".pdf": "application/pdf",
-    ".png": "image/png",
-    ".jpg": "image/jpeg",
-    ".jpeg": "image/jpeg",
-    ".gif": "image/gif",
-    ".webp": "image/webp",
-    ".txt": "text/plain",
-    ".csv": "text/csv",
-    ".doc": "application/msword",
-    ".docx": "application/vnd.openxmlformats-officedocument.wordprocessingml.document",
-    ".xls": "application/vnd.ms-excel",
-    ".xlsx": "application/vnd.openxmlformats-officedocument.spreadsheetml.sheet",
-    ".zip": "application/zip",
-    ".rar": "application/vnd.rar",
-    ".7z": "application/x-7z-compressed",
-}
-
-# Эти типы браузер может открыть прямо в окне — остальные всегда скачиваются.
-INLINE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp", "application/pdf"}
-
-
-def _storage_root() -> Path:
-    return Path(settings.attachments_dir)
-
-
-async def _save_upload(upload: UploadFile, target: Path) -> int:
-    """Пишет файл на диск в отдельном потоке, следя за лимитом. Возвращает размер.
-
-    Запись на диск — блокирующая операция. Выносим её в пул потоков через
-    ``run_in_threadpool``, чтобы загрузка большого файла не «замораживала» весь
-    асинхронный воркер: пока один пользователь заливает документ, остальные
-    продолжают получать ответы.
-    """
-    limit = settings.max_upload_mb * 1024 * 1024
-    written = 0
-    await run_in_threadpool(target.parent.mkdir, parents=True, exist_ok=True)
-    out = await run_in_threadpool(target.open, "wb")
-    try:
-        while chunk := await upload.read(CHUNK):
-            written += len(chunk)
-            if written > limit:
-                raise AppError(
-                    f"Файл больше {settings.max_upload_mb} МБ",
-                    code="file_too_large",
-                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
-                )
-            await run_in_threadpool(out.write, chunk)
-    except BaseException:
-        # Любой сбой (превышен лимит, обрыв соединения) — недописанный файл
-        # не должен остаться на диске.
-        await run_in_threadpool(out.close)
-        await run_in_threadpool(target.unlink, missing_ok=True)
-        raise
-    await run_in_threadpool(out.close)
-    return written
-
-
-async def _store_upload(file: UploadFile, relative_dir: Path) -> tuple[str, str, int, Path]:
-    """Проверяет тип, сохраняет файл и возвращает имя, тип, размер и путь.
-
-    Общая часть загрузки для лидов и заявок: различается только папка,
-    остальное — белый список расширений, лимит размера и обезличенное имя.
-    """
-    original = Path(file.filename or "file").name  # отбрасываем путь целиком
-    suffix = _checked_suffix(original)
-    target = _storage_root() / relative_dir / f"{uuid.uuid4().hex}{suffix}"
-    size = await _save_upload(file, target)
-    return original[:255], ALLOWED_EXTENSIONS[suffix], size, target
-
-
-def _checked_suffix(original: str) -> str:
-    """Проверяет расширение по белому списку и возвращает его в нижнем регистре."""
-    suffix = Path(original).suffix.lower()
-    if suffix not in ALLOWED_EXTENSIONS:
-        raise AppError(
-            f"Тип файла «{suffix or 'без расширения'}» не поддерживается. "
-            f"Разрешены: {', '.join(sorted(ALLOWED_EXTENSIONS))}",
-            code="unsupported_file_type",
-        )
-    return suffix
 
 
 @router.get(
@@ -128,14 +30,7 @@ def _checked_suffix(original: str) -> str:
 async def list_attachments(
     lead_id: int, session: SessionDep, user: CurrentUser
 ) -> list[Attachment]:
-    await get_lead_or_404(session, lead_id, user)
-    stmt = (
-        select(Attachment)
-        # Файлы заявок показываются только на самой заявке — решение владельца.
-        .where(Attachment.lead_id == lead_id, Attachment.shipment_id.is_(None))
-        .order_by(Attachment.created_at.desc())
-    )
-    return list((await session.execute(stmt)).unique().scalars().all())
+    return await service.list_lead_attachments(session, user, lead_id)
 
 
 @router.post(
@@ -151,30 +46,7 @@ async def upload_attachment(
     file: Annotated[UploadFile, File(description="Файл до 25 МБ")],
     entry_id: Annotated[int | None, Query(description="Привязать к записи ленты")] = None,
 ) -> Attachment:
-    await get_lead_or_404(session, lead_id, user)
-    if entry_id is not None:
-        entry = await session.get(TimelineEntry, entry_id)
-        if entry is None or entry.lead_id != lead_id:
-            raise NotFoundError(f"Запись ленты {entry_id} не найдена")
-
-    # Тип берём из расширения, а не из заголовка клиента: заголовку верить нельзя.
-    name, content_type, size, target = await _store_upload(file, Path(str(lead_id)))
-
-    attachment = Attachment(
-        lead_id=lead_id,
-        entry_id=entry_id,
-        uploaded_by_id=user.id,
-        name=name,
-        size=size,
-        content_type=content_type,
-        storage_path=str(target),
-    )
-    session.add(attachment)
-    await session.commit()
-    await session.refresh(attachment)
-
-    log.info("attachment.uploaded", lead_id=lead_id, size=size, by=user.id)
-    return attachment
+    return await service.upload_lead_attachment(session, user, lead_id, file, entry_id)
 
 
 @shipment_router.get(
@@ -185,16 +57,7 @@ async def upload_attachment(
 async def list_shipment_attachments(
     shipment_id: int, session: SessionDep, user: CurrentUser
 ) -> list[Attachment]:
-    shipment = await session.get(Shipment, shipment_id)
-    if shipment is None:
-        raise NotFoundError(f"Заявка {shipment_id} не найдена")
-    await get_lead_or_404(session, shipment.lead_id, user)
-    stmt = (
-        select(Attachment)
-        .where(Attachment.shipment_id == shipment_id)
-        .order_by(Attachment.created_at.desc())
-    )
-    return list((await session.execute(stmt)).unique().scalars().all())
+    return await service.list_shipment_attachments(session, user, shipment_id)
 
 
 @shipment_router.post(
@@ -210,58 +73,14 @@ async def upload_shipment_attachment(
     file: Annotated[UploadFile, File(description="Файл до 25 МБ")],
     entry_id: Annotated[int | None, Query(description="Привязать файл к записи ленты")] = None,
 ) -> Attachment:
-    shipment = await session.get(Shipment, shipment_id)
-    if shipment is None:
-        raise NotFoundError(f"Заявка {shipment_id} не найдена")
-    # Документы заявки доступны тому же кругу, что и сама заявка.
-    await get_lead_or_404(session, shipment.lead_id, user)
-
-    if entry_id is not None:
-        entry = await session.get(TimelineEntry, entry_id)
-        if entry is None or entry.shipment_id != shipment_id:
-            raise NotFoundError(f"Запись {entry_id} не найдена")
-
-    # Файлы заявки лежат в отдельной папке, чтобы не смешиваться с файлами лида.
-    name, content_type, size, target = await _store_upload(
-        file, Path("shipments") / str(shipment_id)
-    )
-
-    attachment = Attachment(
-        # lead_id заполняем от заявки: так файл не потеряется при подсчёте
-        # объёма по лиду и удалится вместе с ним.
-        lead_id=shipment.lead_id,
-        shipment_id=shipment_id,
-        entry_id=entry_id,
-        uploaded_by_id=user.id,
-        name=name,
-        size=size,
-        content_type=content_type,
-        storage_path=str(target),
-    )
-    session.add(attachment)
-    await session.commit()
-    await session.refresh(attachment)
-
-    log.info("attachment.uploaded", shipment_id=shipment_id, size=size, by=user.id)
-    return attachment
+    return await service.upload_shipment_attachment(session, user, shipment_id, file, entry_id)
 
 
 @router.get("/attachments/{attachment_id}", summary="Скачать файл")
 async def download_attachment(
     attachment_id: int, session: SessionDep, user: CurrentUser
 ) -> FileResponse:
-    attachment = await session.get(Attachment, attachment_id)
-    if attachment is None:
-        raise NotFoundError(f"Вложение {attachment_id} не найдено")
-    await get_lead_or_404(session, attachment.lead_id, user)
-
-    path = Path(attachment.storage_path)
-    if not path.is_file():
-        raise NotFoundError("Файл не найден на диске — возможно, он был удалён")
-
-    # Картинки и PDF можно показать в окне, остальное — только скачать:
-    # так исполняемый или html-файл не выполнится в браузере.
-    disposition = "inline" if attachment.content_type in INLINE_TYPES else "attachment"
+    attachment, path, disposition = await service.get_for_download(session, user, attachment_id)
     return FileResponse(
         path,
         media_type=attachment.content_type or "application/octet-stream",
@@ -277,38 +96,8 @@ async def download_attachment(
     summary="Удалить файл",
 )
 async def delete_attachment(attachment_id: int, session: SessionDep, user: CurrentUser) -> None:
-    attachment = await session.get(Attachment, attachment_id)
-    if attachment is None:
-        raise NotFoundError(f"Вложение {attachment_id} не найдено")
-    await get_lead_or_404(session, attachment.lead_id, user)
-
-    # Свой файл удаляет автор, чужой — только администратор.
-    if attachment.uploaded_by_id != user.id and user.role != Role.admin:
-        raise PermissionDeniedError("Удалить чужое вложение может только администратор")
-
-    Path(attachment.storage_path).unlink(missing_ok=True)
-    await session.delete(attachment)
-    await session.commit()
-    log.info("attachment.deleted", attachment_id=attachment_id, by=user.id)
+    await service.delete_attachment(session, user, attachment_id)
 
 
-def _scan_disk_usage() -> dict[str, int]:
-    """Синхронный обход каталога вложений — вызывается в пуле потоков."""
-    root = _storage_root()
-    if not root.exists():
-        return {"files": 0, "bytes": 0, "free_bytes": 0}
-    files = [p for p in root.rglob("*") if p.is_file()]
-    return {
-        "files": len(files),
-        "bytes": sum(p.stat().st_size for p in files),
-        "free_bytes": shutil.disk_usage(root).free,
-    }
-
-
-async def disk_usage() -> dict[str, int]:
-    """Сколько места занимают вложения — показывается в разделе «Безопасность».
-
-    Обход всех файлов на диске блокирующий, поэтому выполняется в пуле потоков,
-    чтобы не задерживать остальные запросы.
-    """
-    return await run_in_threadpool(_scan_disk_usage)
+# disk_usage переэкспортируем: им пользуется раздел «Безопасность» в админке.
+__all__ = ["ALLOWED_EXTENSIONS", "INLINE_TYPES", "disk_usage", "router", "shipment_router"]
