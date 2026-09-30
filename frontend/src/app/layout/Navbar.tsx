@@ -1,5 +1,5 @@
 import { LayoutGrid, Menu, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useRef, useState } from "react";
 import { Link, NavLink, useNavigate } from "react-router-dom";
 import { logout, useMe } from "@/shared/api/hooks";
 import { toggleTheme, useTheme } from "@/shared/lib/theme";
@@ -15,7 +15,31 @@ export function Navbar() {
   const navigate = useNavigate();
   const theme = useTheme();
   const { data: user } = useMe();
+  const profileRef = useRef<HTMLDivElement>(null);
   const letter = (user?.first_name || user?.email || "U").slice(0, 1).toUpperCase();
+  const fullName =
+    [user?.last_name, user?.first_name].filter(Boolean).join(" ") ||
+    user?.email ||
+    "Сотрудник";
+
+  useEffect(() => {
+    if (!menu) return;
+
+    function closeOnOutsidePointer(event: PointerEvent) {
+      if (!profileRef.current?.contains(event.target as Node)) setMenu(false);
+    }
+
+    function closeOnEscape(event: KeyboardEvent) {
+      if (event.key === "Escape") setMenu(false);
+    }
+
+    document.addEventListener("pointerdown", closeOnOutsidePointer);
+    document.addEventListener("keydown", closeOnEscape);
+    return () => {
+      document.removeEventListener("pointerdown", closeOnOutsidePointer);
+      document.removeEventListener("keydown", closeOnEscape);
+    };
+  }, [menu]);
 
   const links = (
     <NavLink
@@ -56,18 +80,30 @@ export function Navbar() {
         CRM
       </Link>
       <div className="ml-2 hidden h-10 items-center md:flex">{links}</div>
-      <div className="ml-auto flex h-10 items-center">
-        <div className="relative">
+      <div className="ml-auto flex h-10 items-center gap-2">
+        <span
+          className="max-w-36 truncate text-[13px] font-medium text-odoo-text sm:max-w-52"
+          title={fullName}
+        >
+          {fullName}
+        </span>
+        <div ref={profileRef} className="relative">
           <button
             type="button"
             onClick={() => setMenu((v) => !v)}
             className="flex h-7 w-7 items-center justify-center rounded-sm bg-odoo-secondary text-[12px] font-semibold text-white hover:brightness-95"
             title={user?.email}
+            aria-label="Меню профиля"
+            aria-expanded={menu}
+            aria-haspopup="menu"
           >
             {letter}
           </button>
           {menu && (
-            <div className="absolute right-0 mt-2 min-w-[200px] rounded-md border border-odoo-border bg-odoo-surface py-1 text-odoo-text shadow-lg">
+            <div
+              role="menu"
+              className="absolute right-0 mt-2 min-w-[200px] rounded-md border border-odoo-border bg-odoo-surface py-1 text-odoo-text shadow-lg"
+            >
               <div className="px-3 py-1.5 text-xs text-odoo-text-muted">{user?.email}</div>
               <button
                 type="button"
