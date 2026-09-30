@@ -81,7 +81,7 @@ export function ControlPanel({
         {createTo && (
           <Link
             to={createTo}
-            className="inline-flex h-8 items-center rounded-[3px] bg-odoo-primary-soft px-3 text-[13px] font-medium text-odoo-primary-soft-text transition-colors hover:opacity-90"
+            className="inline-flex h-8 items-center rounded-[3px] bg-odoo-primary px-3 text-[13px] font-medium text-white transition-colors hover:bg-odoo-primary-hover"
           >
             Новый
           </Link>
@@ -90,7 +90,7 @@ export function ControlPanel({
           <button
             type="button"
             onClick={onNew}
-            className="inline-flex h-8 shrink-0 items-center rounded-[3px] bg-odoo-primary-soft px-3 text-[13px] font-medium text-odoo-primary-soft-text transition-colors hover:opacity-90"
+            className="inline-flex h-8 shrink-0 items-center rounded-[3px] bg-odoo-primary px-3 text-[13px] font-medium text-white transition-colors hover:bg-odoo-primary-hover"
           >
             Новый
           </button>
@@ -101,7 +101,7 @@ export function ControlPanel({
             className="flex min-w-0 flex-col justify-center"
           >
             {crumbs.length > 1 && (
-              <span className="flex items-center gap-1 text-[11px] leading-[14px]">
+              <span className="flex items-center gap-1 text-[12px] leading-[15px]">
                 {crumbs.slice(0, -1).map((crumb, i) => (
                   <span
                     key={`${crumb.label}-${i}`}
@@ -111,7 +111,7 @@ export function ControlPanel({
                     {crumb.to ? (
                       <Link
                         to={crumb.to}
-                        className="text-odoo-action hover:underline"
+                        className="font-semibold text-odoo-action hover:underline"
                       >
                         {crumb.label}
                       </Link>

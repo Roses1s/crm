@@ -47,7 +47,7 @@ export function FormSheetBg({ children }: { children: ReactNode }) {
   // Фон тянется вместе с рабочей областью: предел в пикселях оставлял пустые поля
   // на широком экране, когда масштаб браузера был меньше 100%.
   return (
-    <div className="w-full px-[var(--odoo-form-workspace-padding)] pb-[var(--odoo-form-workspace-padding)] pt-1">
+    <div className="w-full px-[var(--odoo-form-workspace-padding)] pb-[var(--odoo-form-workspace-padding)] pt-0">
       {children}
     </div>
   );
@@ -196,7 +196,7 @@ export function FormStatusbar({
                     ? "rgb(var(--odoo-statusbar-current-text))"
                     : "rgb(var(--odoo-statusbar-text))",
                 }}
-                className={`max-w-[200px] truncate pr-4 text-[13px] transition-opacity hover:opacity-90 disabled:cursor-wait disabled:hover:opacity-100 ${
+                className={`max-w-[200px] truncate pr-4 text-[13px] transition-opacity hover:opacity-90 disabled:hover:opacity-100 ${
                   isFirst ? "pl-4" : "pl-5"
                 } ${active ? "font-semibold" : "font-medium"}`}
               >
@@ -254,7 +254,7 @@ export function FormGroup({ children }: { children: ReactNode }) {
 /** Плашка заголовка записи во всю ширину листа. */
 export function FormTitle({ children }: { children: ReactNode }) {
   return (
-    <div className="mb-4 rounded-[2px] bg-odoo-title-band px-3 py-1.5">
+    <div className="mb-4 rounded-[3px] bg-odoo-primary/12 px-0 py-1">
       <h1 className="text-[24px] font-normal leading-[34px] text-odoo-text">{children}</h1>
     </div>
   );

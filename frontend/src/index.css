@@ -172,7 +172,7 @@
 
   /* Чаттер: единая геометрия автора, отступов и мягких разделителей ленты. */
   --odoo-chatter-avatar-size: 36px;
-  --odoo-chatter-panel-padding: 12px;
+  --odoo-chatter-panel-padding: 16px;
   --odoo-chatter-composer-indent: 44px;
   --odoo-chatter-composer-min-height: 36px;
   --odoo-chatter-log-button-width: 42px;

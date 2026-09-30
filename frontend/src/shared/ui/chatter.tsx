@@ -159,7 +159,7 @@ export function Chatter({
             onClick={() => setMode(m.id)}
             className={`h-7 rounded-[4px] px-3 text-[13px] transition-colors ${
               mode === m.id
-                ? "bg-odoo-primary-soft font-medium text-odoo-primary-soft-text"
+                ? "bg-odoo-primary font-medium text-white"
                 : "border border-odoo-border bg-odoo-surface text-odoo-text hover:bg-odoo-surface-hover"
             }`}
           >

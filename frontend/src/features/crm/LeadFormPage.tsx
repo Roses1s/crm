@@ -371,7 +371,7 @@ function LeadForm({ id }: { id?: string }) {
         }
         pager={
           !isNew && pager ? (
-            <span className="mr-1 flex items-center gap-1">
+            <span className="flex items-center gap-1">
               <span className="whitespace-nowrap text-[13px] text-odoo-text-muted [font-variant-numeric:tabular-nums]">
                 {pager.position} / {pager.total}
               </span>
@@ -456,7 +456,7 @@ function LeadForm({ id }: { id?: string }) {
                     <OdooInput
                       aria-label="Название лида"
                       placeholder="например, ООО «Ромашка»"
-                      className="!px-1 !text-[24px] !leading-[34px]"
+                      className="!px-0 !text-[24px] !leading-[34px]"
                       value={form.name}
                       onChange={(e) => set("name", e.target.value)}
                     />
