@@ -28,7 +28,8 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          python-version: "3.11"
+          # Версия как в проде (backend/Dockerfile: python:3.13-slim).
+          python-version: "3.13"
           cache: pip
 
       - name: Установка зависимостей
@@ -49,6 +50,11 @@ jobs:
         env:
           DATABASE_URL: sqlite+aiosqlite:////tmp/checks.db
         run: alembic upgrade head
+
+      - name: Аудит зависимостей на уязвимости
+        run: |
+          pip install pip-audit
+          pip-audit
 
   backend-postgres:
     name: Бэкенд на PostgreSQL — миграции и тесты
