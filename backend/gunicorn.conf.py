@@ -14,8 +14,10 @@ bind = os.getenv("GUNICORN_BIND", "0.0.0.0:8000")
 # uvicorn внутри каждого обрабатывает асинхронные запросы.
 worker_class = "uvicorn.workers.UvicornWorker"
 
-# На VPS с 2 ГБ памяти держим 2 воркера: формула 2*CPU+1 съест всю память.
-workers = int(os.getenv("GUNICORN_WORKERS", min(multiprocessing.cpu_count(), 2)))
+# Число воркеров задаётся через GUNICORN_WORKERS (в docker-compose: 3 на 4 ГБ).
+# Запасное значение, если переменная не задана: не больше числа ядер и не
+# больше 3 — формула 2*CPU+1 съела бы всю память на маленьком VPS.
+workers = int(os.getenv("GUNICORN_WORKERS", min(multiprocessing.cpu_count(), 3)))
 
 timeout = int(os.getenv("GUNICORN_TIMEOUT", 60))
 graceful_timeout = 30

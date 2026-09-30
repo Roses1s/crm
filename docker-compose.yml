@@ -29,12 +29,28 @@ services:
     restart: unless-stopped
     logging: *default-logging
     # Предел памяти: контейнер перезапустится сам, а не утянет сервер.
-    mem_limit: 512m
+    # Сервер на 4 ГБ — базе выделяем 1 ГБ.
+    mem_limit: 1024m
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-crm}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?задайте POSTGRES_PASSWORD в .env}
       POSTGRES_DB: ${POSTGRES_DB:-crm}
       POSTGRES_INITDB_ARGS: "--data-checksums"
+    # Тюнинг под 1 ГБ памяти контейнера. Значения по умолчанию у Postgres
+    # рассчитаны на крошечную машину (shared_buffers всего 128 МБ) и не
+    # используют доступную память. Флаги ниже ускоряют запросы, не рискуя ООM.
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=256MB"
+      - "-c"
+      - "effective_cache_size=768MB"
+      - "-c"
+      - "work_mem=16MB"
+      - "-c"
+      - "maintenance_work_mem=128MB"
+      - "-c"
+      - "max_connections=120"
     volumes:
       # ВАЖНО: в Postgres 18 данные лежат в /var/lib/postgresql/18/docker,
       # а том монтируется на уровень выше — в /var/lib/postgresql.
@@ -57,7 +73,7 @@ services:
     restart: unless-stopped
     logging: *default-logging
     # Предел памяти: контейнер перезапустится сам, а не утянет сервер.
-    mem_limit: 160m
+    mem_limit: 256m
     command: ["valkey-server", "--appendonly", "yes", "--save", "60", "1"]
     volumes:
       - valkeydata:/data
@@ -77,12 +93,13 @@ services:
     restart: unless-stopped
     logging: *default-logging
     # Предел памяти: контейнер перезапустится сам, а не утянет сервер.
-    mem_limit: 448m
+    # Сервер на 4 ГБ — API даём ~0,9 ГБ на 3 воркера.
+    mem_limit: 896m
     env_file: [.env]
     environment:
       POSTGRES_HOST: postgres
       VALKEY_URL: redis://valkey:6379/0
-      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-2}
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
     # Миграции накатываются один раз при старте API — до приёма трафика.
     command: >
       sh -c "alembic upgrade head &&
@@ -107,7 +124,7 @@ services:
     restart: unless-stopped
     logging: *default-logging
     # Предел памяти: контейнер перезапустится сам, а не утянет сервер.
-    mem_limit: 320m
+    mem_limit: 448m
     env_file: [.env]
     environment:
       POSTGRES_HOST: postgres
@@ -168,7 +185,7 @@ services:
     restart: unless-stopped
     logging: *default-logging
     # Предел памяти: контейнер перезапустится сам, а не утянет сервер.
-    mem_limit: 96m
+    mem_limit: 128m
     networks: [edge]
 
   # --- публичный вход -------------------------------------------------------
@@ -178,7 +195,7 @@ services:
     restart: unless-stopped
     logging: *default-logging
     # Предел памяти: контейнер перезапустится сам, а не утянет сервер.
-    mem_limit: 96m
+    mem_limit: 128m
     ports:
       - "80:80"
       - "443:443"
