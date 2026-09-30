@@ -41,7 +41,7 @@ export function ShipmentAttachments({ shipmentId }: { shipmentId: number }) {
   }
 
   return (
-    <div className="flex h-full min-h-[420px] flex-col border-l border-odoo-border bg-odoo-surface">
+    <div className="flex h-full min-h-[420px] flex-col border-t border-odoo-border bg-odoo-surface lg:border-l lg:border-t-0">
       <div className="flex items-center gap-2 px-3 py-2">
         <Paperclip className="h-4 w-4 text-odoo-text-muted" />
         <span className="text-sm font-medium text-odoo-text">

@@ -37,7 +37,7 @@ const STATUS_LABEL: Record<string, string> = {
 };
 
 const inputCls =
-  "w-full rounded-[4px] border border-odoo-border px-2.5 py-1.5 text-sm";
+  "w-full rounded-[4px] border border-odoo-border bg-odoo-surface px-2.5 py-1.5 text-sm text-odoo-text placeholder:text-odoo-text-light transition-colors hover:border-odoo-border focus:border-odoo-focus focus:outline-none";
 const labelCls =
   "mb-1 block text-xs font-medium uppercase text-odoo-text-muted";
 
@@ -159,7 +159,7 @@ function ShipmentForm({ id }: { id?: string }) {
       </Toolbar>
 
       {/* Та же защита от разъезжающихся колонок, что и в карточке лида. */}
-      <div className="mx-auto flex min-h-[calc(100vh-140px)] w-full max-w-[1900px] flex-col lg:flex-row">
+      <div className="mx-auto flex min-h-[calc(100dvh-var(--odoo-record-control-panel-height))] w-full max-w-[1900px] flex-col lg:flex-row">
         <div className="flex-1 p-4">
           {!isNew && (
             <div className="mb-4 flex flex-wrap gap-1">
@@ -363,7 +363,7 @@ function ShipmentForm({ id }: { id?: string }) {
         </div>
 
         {!isNew && shipment && (
-          <div className="w-full shrink-0 lg:w-[420px]">
+          <div className="w-full shrink-0 lg:w-[var(--odoo-record-aside-width)]">
             {/* Ленты изменений у заявки нет, поэтому правая колонка — документы. */}
             <ShipmentAttachments shipmentId={shipment.id} />
           </div>

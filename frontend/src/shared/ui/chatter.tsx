@@ -277,7 +277,7 @@ export function Chatter({
             value={query}
             onChange={(e) => setQuery(e.target.value)}
             placeholder="Искать в ленте…"
-            className="h-7 w-full rounded-[4px] border border-odoo-border px-2 text-[13px] text-odoo-text outline-none placeholder:text-odoo-text-light focus:border-odoo-primary"
+            className="h-7 w-full rounded-[4px] border border-odoo-border px-2 text-[13px] text-odoo-text outline-none placeholder:text-odoo-text-light focus:border-odoo-focus"
           />
           {query && (
             <button
@@ -311,7 +311,7 @@ export function Chatter({
           >
             {authorInitials}
           </span>
-          <div className="min-w-0 flex-1 overflow-hidden rounded-[4px] border border-odoo-border bg-odoo-surface focus-within:border-odoo-primary">
+          <div className="min-w-0 flex-1 overflow-hidden rounded-[4px] border border-odoo-border bg-odoo-surface focus-within:border-odoo-focus">
             <textarea
               ref={composerText}
               rows={1}

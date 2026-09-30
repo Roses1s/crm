@@ -32,7 +32,7 @@ export function Breadcrumb({ items }: { items: string[] }) {
 
 export function Toolbar({ children }: { children: ReactNode }) {
   return (
-    <div className="flex min-h-12 flex-wrap items-center gap-2 border-b border-odoo-border-light bg-odoo-surface px-3 py-1.5">
+    <div className="flex min-h-11 flex-wrap items-center gap-2 border-b border-odoo-border-light bg-odoo-surface px-3 py-1">
       {children}
     </div>
   );
