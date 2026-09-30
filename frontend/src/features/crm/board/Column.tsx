@@ -73,7 +73,7 @@ export function Column({
         isOver ? "bg-odoo-drop" : "bg-odoo-board-canvas"
       }`}
     >
-      <div className="shrink-0 bg-odoo-board-canvas px-3 pb-2 pt-2">
+      <div className="shrink-0 bg-odoo-board-canvas px-[var(--odoo-kanban-group-padding-x)] py-2">
         <div className="flex items-start justify-between gap-1">
           <div className="min-w-0">
             {editing ? (
@@ -100,9 +100,6 @@ export function Column({
                 title="Двойной клик — переименовать"
               >
                 {stage.name}
-                <span className="ml-1 font-normal text-odoo-text-muted">
-                  {leads.length}
-                </span>
               </button>
             )}
           </div>
@@ -197,8 +194,8 @@ export function Column({
             }
           </div>
         </div>
-        <div className="mt-1 flex items-center gap-2">
-          <div className="h-2.5 w-[150px] overflow-hidden bg-odoo-track">
+        <div className="mt-1 flex items-center justify-between gap-2">
+          <div className="h-2.5 w-1/2 overflow-hidden bg-odoo-track">
             <div
               className="h-full min-w-1"
               style={{
@@ -207,6 +204,9 @@ export function Column({
               }}
             />
           </div>
+          <span className="shrink-0 text-[13px] font-semibold leading-4 text-odoo-text [font-variant-numeric:tabular-nums]">
+            {leads.length}
+          </span>
         </div>
       </div>
       {confirmDelete && (
