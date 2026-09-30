@@ -142,7 +142,7 @@ export function FormStatusbar({
                 clipPath: single ? undefined : arrowClip(shape),
                 marginLeft: isFirst ? 0 : -(ARROW_WIDTH - 2),
                 backgroundColor: active
-                  ? "rgb(var(--odoo-secondary))"
+                  ? "rgb(var(--odoo-statusbar-current))"
                   : "rgb(var(--odoo-statusbar))",
               }}
               className="relative inline-flex"
@@ -158,7 +158,7 @@ export function FormStatusbar({
                   isFirst ? "pl-4" : "pl-5"
                 } pr-4 ${
                   active
-                    ? "font-semibold text-odoo-text"
+                    ? "bg-odoo-statusbar-current font-semibold text-white"
                     : "font-medium text-odoo-statusbar-text hover:bg-odoo-bg"
                 }`}
               >
@@ -227,7 +227,11 @@ export function FormStatusbar({
 
 /** .o_group — две внутренние группы рядом. */
 export function FormGroup({ children }: { children: ReactNode }) {
-  return <div className="grid grid-cols-1 gap-x-8 md:grid-cols-2">{children}</div>;
+  return (
+    <div className="grid grid-cols-1 gap-x-[var(--odoo-form-group-gap)] md:grid-cols-2">
+      {children}
+    </div>
+  );
 }
 
 /** Плашка заголовка записи во всю ширину листа. */
@@ -242,14 +246,14 @@ export function FormTitle({ children }: { children: ReactNode }) {
 /** .o_inner_group — фиксированная колонка подписей, значения выровнены. */
 export function InnerGroup({ title, children }: { title?: string; children: ReactNode }) {
   return (
-    <div className="mb-7">
+    <div className="mb-[var(--odoo-form-section-gap)]">
       {title && (
         <h3 className="mb-3 text-[12px] font-bold uppercase leading-[16px] tracking-[0.02em] text-odoo-text">
           {title}
         </h3>
       )}
       <div
-        className="grid items-start gap-x-3 gap-y-[10px]"
+        className="grid items-start gap-x-3 gap-y-[var(--odoo-form-field-gap)]"
         style={{ gridTemplateColumns: "140px minmax(0, 1fr)" }}
       >
         {children}
@@ -276,7 +280,7 @@ export function Field({
     <>
       <label
         htmlFor={htmlFor}
-        className={`pr-2 pt-[3px] text-[13px] font-normal leading-[19px] text-odoo-text ${
+        className={`pr-2 pt-[3px] text-[13px] font-medium leading-[19px] text-odoo-text ${
           muted ? "opacity-[0.66]" : ""
         }`}
       >

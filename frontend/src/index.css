@@ -48,6 +48,7 @@
   --color-odoo-title-band: rgb(var(--odoo-title-band));
   --color-odoo-statusbar: rgb(var(--odoo-statusbar));
   --color-odoo-statusbar-text: rgb(var(--odoo-statusbar-text));
+  --color-odoo-statusbar-current: rgb(var(--odoo-statusbar-current));
   --color-odoo-drop: rgb(var(--odoo-drop));
   --color-odoo-accent-soft: rgb(var(--odoo-accent-soft));
   --color-odoo-accent-line: rgb(var(--odoo-accent-line));
@@ -121,6 +122,7 @@
   --odoo-title-band: 253 239 241; /* #fdeff1 */
   --odoo-statusbar: 222 226 230; /* #DEE2E6 */
   --odoo-statusbar-text: 73 80 87; /* #495057 */
+  --odoo-statusbar-current: 0 119 117; /* Контрастный бирюзовый. */
   --odoo-drop: 244 247 251; /* #f4f7fb */
   --odoo-accent-soft: 233 242 242; /* #e9f2f2 */
   --odoo-accent-line: 143 185 184; /* #8FB9B8 */
@@ -142,6 +144,9 @@
   --odoo-form-sheet-padding: 16px;
   --odoo-form-sheet-padding-wide: 24px;
   --odoo-form-sheet-radius: 4px;
+  --odoo-form-group-gap: 24px;
+  --odoo-form-section-gap: 20px;
+  --odoo-form-field-gap: 8px;
 
   --border: 210 14% 89%;
   --radius: 0.375rem;
@@ -179,6 +184,8 @@
   --odoo-title-band: 61 47 58;
   --odoo-statusbar: 53 54 59;
   --odoo-statusbar-text: 200 200 204;
+  /* Тёмный фон текущего этапа повторяет спокойный акцент образца. */
+  --odoo-statusbar-current: 23 55 59;
   --odoo-drop: 38 49 61;
   --odoo-accent-soft: 34 52 54;
   --odoo-accent-line: 61 110 109;
