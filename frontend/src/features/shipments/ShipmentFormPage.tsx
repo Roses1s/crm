@@ -430,23 +430,16 @@ function ShipmentForm({ id }: { id?: string }) {
                           onChange={(e) => set("address_loading", e.target.value)}
                         />
                       </Field>
-                      <Field label="Контакт" htmlFor="ship-load-name">
+                      <Field
+                        label="Контактное лицо на погрузке и телефон"
+                        htmlFor="ship-load-name"
+                      >
                         <SInput
                           id="ship-load-name"
-                          placeholder="Фамилия Имя"
+                          placeholder="Иванов Иван, +7 900 000-00-00"
                           value={form.contact_loading_name}
                           onChange={(e) =>
                             set("contact_loading_name", e.target.value)
-                          }
-                        />
-                      </Field>
-                      <Field label="Телефон" htmlFor="ship-load-phone">
-                        <SInput
-                          id="ship-load-phone"
-                          placeholder="+7 900 000-00-00"
-                          value={form.contact_loading_phone}
-                          onChange={(e) =>
-                            set("contact_loading_phone", e.target.value)
                           }
                         />
                       </Field>
@@ -502,23 +495,16 @@ function ShipmentForm({ id }: { id?: string }) {
                           }
                         />
                       </Field>
-                      <Field label="Контакт" htmlFor="ship-unload-name">
+                      <Field
+                        label="Контактное лицо на выгрузке и телефон"
+                        htmlFor="ship-unload-name"
+                      >
                         <SInput
                           id="ship-unload-name"
-                          placeholder="Фамилия Имя"
+                          placeholder="Иванов Иван, +7 900 000-00-00"
                           value={form.contact_unloading_name}
                           onChange={(e) =>
                             set("contact_unloading_name", e.target.value)
-                          }
-                        />
-                      </Field>
-                      <Field label="Телефон" htmlFor="ship-unload-phone">
-                        <SInput
-                          id="ship-unload-phone"
-                          placeholder="+7 900 000-00-00"
-                          value={form.contact_unloading_phone}
-                          onChange={(e) =>
-                            set("contact_unloading_phone", e.target.value)
                           }
                         />
                       </Field>
