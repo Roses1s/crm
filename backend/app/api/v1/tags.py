@@ -3,17 +3,24 @@
 from __future__ import annotations
 
 from fastapi import APIRouter, status
+from fastapi_cache.decorator import cache
 from sqlalchemy import select
 
 from app.api.deps import AdminUser, CurrentUser, SessionDep
+from app.core.cache import invalidate, public_key_builder
+from app.core.config import settings
 from app.core.errors import NotFoundError
 from app.models.crm import Tag
 from app.schemas.crm import TagCreate, TagRead
 
 router = APIRouter(prefix="/crm/tags", tags=["crm: теги"])
 
+# Список тегов одинаков для всех и меняется редко — кешируем его целиком.
+CACHE_NS = "tags"
+
 
 @router.get("", response_model=list[TagRead], summary="Все теги")
+@cache(expire=settings.cache_ttl_seconds, namespace=CACHE_NS, key_builder=public_key_builder)
 async def list_tags(session: SessionDep, _: CurrentUser) -> list[Tag]:
     return list((await session.execute(select(Tag).order_by(Tag.name))).scalars().all())
 
@@ -24,6 +31,7 @@ async def create_tag(payload: TagCreate, session: SessionDep, _: AdminUser) -> T
     session.add(tag)
     await session.commit()
     await session.refresh(tag)
+    await invalidate(CACHE_NS)  # список тегов изменился — сбрасываем кеш
     return tag
 
 
@@ -34,3 +42,4 @@ async def delete_tag(tag_id: int, session: SessionDep, _: AdminUser) -> None:
         raise NotFoundError(f"Тег {tag_id} не найден")
     await session.delete(tag)
     await session.commit()
+    await invalidate(CACHE_NS)  # список тегов изменился — сбрасываем кеш
