@@ -145,7 +145,7 @@ export function Chatter({
   }
 
   return (
-    <div className="flex h-full min-h-[420px] flex-col border-l border-odoo-border bg-odoo-surface">
+    <div className="flex h-full min-h-[420px] flex-col bg-odoo-surface">
       <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-odoo-border-light px-3 py-2">
         {MODES.map((m) => (
           <button

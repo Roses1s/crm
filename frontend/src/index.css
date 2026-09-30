@@ -135,6 +135,14 @@
   --odoo-link: 0 160 157; /* #00A09D */
   --odoo-action: 113 75 103; /* #714B67 — интерактивный текст; в тёмной теме синий */
 
+  /* Геометрия карточки: отдельные имена не дают расползаться числам по JSX. */
+  --odoo-record-control-panel-height: 90px;
+  --odoo-record-aside-width: 34.3%;
+  --odoo-form-workspace-padding: 16px;
+  --odoo-form-sheet-padding: 16px;
+  --odoo-form-sheet-padding-wide: 24px;
+  --odoo-form-sheet-radius: 4px;
+
   --border: 210 14% 89%;
   --radius: 0.375rem;
 }

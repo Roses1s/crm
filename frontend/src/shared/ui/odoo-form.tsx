@@ -20,16 +20,43 @@ import {
 const STATUSBAR_HEIGHT = 33; // $o-statusbar-height
 const ARROW_WIDTH = 11; // $o-statusbar-arrow-width
 
+export function FormWorkspace({
+  children,
+  aside,
+}: {
+  children: ReactNode;
+  aside?: ReactNode;
+}) {
+  /*
+   * Рабочая область карточки: форма и боковая лента имеют собственную
+   * прокрутку. На узком экране лента переходит под форму с верхним разделителем.
+   */
+  return (
+    <div className="flex min-h-0 w-full flex-col lg:h-[calc(100dvh-var(--odoo-record-control-panel-height))] lg:flex-row">
+      {children}
+      {aside && (
+        <aside className="w-full shrink-0 border-t border-odoo-border bg-odoo-surface lg:w-[var(--odoo-record-aside-width)] lg:overflow-y-auto lg:border-l lg:border-t-0">
+          {aside}
+        </aside>
+      )}
+    </div>
+  );
+}
+
 export function FormSheetBg({ children }: { children: ReactNode }) {
   // Фон тянется вместе с рабочей областью: предел в пикселях оставлял пустые поля
   // на широком экране, когда масштаб браузера был меньше 100%.
-  return <div className="w-full px-4 pb-4 pt-2">{children}</div>;
+  return (
+    <div className="w-full px-[var(--odoo-form-workspace-padding)] pb-[var(--odoo-form-workspace-padding)] pt-2">
+      {children}
+    </div>
+  );
 }
 
 export function FormSheet({ children }: { children: ReactNode }) {
-  // .o_form_sheet: белый лист, рамка 1px, радиус 4px, отступ 16px (24px на lg)
+  // .o_form_sheet: белый лист, рамка 1px и компактные тематические отступы.
   return (
-    <div className="rounded-[4px] border border-odoo-border bg-odoo-surface p-4 lg:p-6">
+    <div className="rounded-[var(--odoo-form-sheet-radius)] border border-odoo-border bg-odoo-surface p-[var(--odoo-form-sheet-padding)] lg:p-[var(--odoo-form-sheet-padding-wide)]">
       {children}
     </div>
   );

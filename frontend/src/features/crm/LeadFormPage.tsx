@@ -39,6 +39,7 @@ import {
   FormAlert,
   FormGroup,
   FormSheet,
+  FormWorkspace,
   FormSheetBg,
   FormStatusIndicator,
   FormStatusbar,
@@ -272,6 +273,34 @@ function LeadForm({ id }: { id?: string }) {
     },
   ];
 
+  const chatter = !isNew ? (
+    <Chatter
+      timeline={timeline}
+      authorInitials={composerInitial}
+      attachments={attachments}
+      posting={addNote.isPending || uploadAttachment.isPending}
+      uploading={uploadAttachment.isPending}
+      onSubmit={(body, files) => {
+        // Сначала создаём запись, затем цепляем к ней файлы —
+        // так вложения попадают именно в эту строку ленты.
+        if (!body && files.length === 0) return;
+        addNote.mutate(body || "Вложение", {
+          onSuccess: (entry) => {
+            for (const file of files) {
+              uploadAttachment.mutate({
+                file,
+                entryId: Number(entry.id),
+              });
+            }
+          },
+        });
+      }}
+      onUpload={(file) => uploadAttachment.mutate({ file })}
+      onDelete={(file) => deleteAttachment.mutate(file.id)}
+      onPreview={(file) => setPreview(file)}
+    />
+  ) : undefined;
+
   return (
     <AppShell>
       <ControlPanel
@@ -377,10 +406,11 @@ function LeadForm({ id }: { id?: string }) {
       {/*
         Пара «форма + лента» занимает всю доступную ширину. Предел в пикселях
         давал заметные поля по бокам при масштабе браузера меньше 100%.
-        У ленты остаётся постоянная ширина, поэтому она не отдаляется от формы.
+        Долевая ширина ленты живёт в FormWorkspace, чтобы не расходиться между
+        карточками и не превращаться в фиксированные пиксели.
       */}
-      <div className="flex min-h-0 w-full flex-col lg:h-[calc(100dvh-90px)] lg:flex-row">
-        <div className="min-w-0 flex-1 lg:overflow-y-auto">
+      <FormWorkspace aside={chatter}>
+        <main className="min-w-0 flex-1 lg:overflow-y-auto">
           <FormSheetBg>
             {error && <FormAlert>{error}</FormAlert>}
 
@@ -561,43 +591,8 @@ function LeadForm({ id }: { id?: string }) {
               )}
             </FormSheet>
           </FormSheetBg>
-        </div>
-
-        {!isNew && (
-          <div
-            // Соотношение как в Odoo CRM 17 на широком экране: чаттер занимает
-            // около трети рабочей области, а не становится визуально уже при
-            // росте разрешения или уменьшении масштаба браузера.
-            className="w-full shrink-0 bg-odoo-surface lg:w-[34.3%] lg:overflow-y-auto"
-          >
-            <Chatter
-              timeline={timeline}
-              authorInitials={composerInitial}
-              attachments={attachments}
-              posting={addNote.isPending || uploadAttachment.isPending}
-              uploading={uploadAttachment.isPending}
-              onSubmit={(body, files) => {
-                // Сначала создаём запись, затем цепляем к ней файлы —
-                // так вложения попадают именно в эту строку ленты.
-                if (!body && files.length === 0) return;
-                addNote.mutate(body || "Вложение", {
-                  onSuccess: (entry) => {
-                    for (const file of files) {
-                      uploadAttachment.mutate({
-                        file,
-                        entryId: Number(entry.id),
-                      });
-                    }
-                  },
-                });
-              }}
-              onUpload={(file) => uploadAttachment.mutate({ file })}
-              onDelete={(file) => deleteAttachment.mutate(file.id)}
-              onPreview={(file) => setPreview(file)}
-            />
-          </div>
-        )}
-      </div>
+        </main>
+      </FormWorkspace>
 
       {transferOpen && lead && (
         <TransferDialog
