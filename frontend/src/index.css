@@ -143,6 +143,8 @@
   --odoo-chatter-avatar-size: 36px;
   --odoo-chatter-panel-padding: 12px;
   --odoo-chatter-composer-indent: 44px;
+  --odoo-chatter-log-button-width: 42px;
+  --odoo-chatter-log-button-height: 30px;
   --odoo-chatter-divider: 233 236 239; /* #E9ECEF */
 
   /* Геометрия карточки: отдельные имена не дают расползаться числам по JSX. */

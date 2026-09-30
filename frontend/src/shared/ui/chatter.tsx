@@ -378,7 +378,7 @@ export function Chatter({
           <button
             type="submit"
             disabled={posting || !onSubmit || (!text.trim() && pending.length === 0)}
-            className="h-7 rounded-[4px] bg-odoo-primary px-3 text-[13px] font-medium text-white transition-colors hover:bg-odoo-primary-hover disabled:opacity-50"
+            className="h-[var(--odoo-chatter-log-button-height)] w-[var(--odoo-chatter-log-button-width)] rounded-[4px] bg-odoo-primary px-2 text-[13px] font-medium text-white transition-colors hover:bg-odoo-primary-hover disabled:opacity-50"
           >
             {posting ? "Сохранение…" : current.action}
           </button>

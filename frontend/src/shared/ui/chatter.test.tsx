@@ -58,8 +58,12 @@ describe("Лента примечаний", () => {
       );
     }
 
-    const submitRow = screen.getByRole("button", { name: "Лог" }).parentElement;
-    expect(submitRow).toHaveStyle(
+    const logButton = screen.getByRole("button", { name: "Лог" });
+    expect(logButton).toHaveClass(
+      "h-[var(--odoo-chatter-log-button-height)]",
+      "w-[var(--odoo-chatter-log-button-width)]",
+    );
+    expect(logButton.parentElement).toHaveStyle(
       "margin-inline-start: var(--odoo-chatter-composer-indent)",
     );
     expect(screen.getByRole("textbox", { name: "Текст внутреннего примечания" }).closest("form")).toHaveStyle(
