@@ -231,9 +231,7 @@ async def add_note(
     return entry
 
 
-async def _get_entry_or_404(
-    session: AsyncSession, lead_id: int, entry_id: int
-) -> TimelineEntry:
+async def _get_entry_or_404(session: AsyncSession, lead_id: int, entry_id: int) -> TimelineEntry:
     entry = await session.get(TimelineEntry, entry_id)
     if entry is None or entry.lead_id != lead_id:
         raise NotFoundError(f"Запись {entry_id} не найдена")

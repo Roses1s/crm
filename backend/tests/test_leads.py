@@ -109,9 +109,7 @@ async def test_timeline_entry_can_be_deleted(auth_client: AsyncClient, seeded: d
     assert len(entries) == 2
 
     for entry in entries:
-        deleted = await auth_client.delete(
-            f"/api/v1/crm/leads/{lead_id}/timeline/{entry['id']}"
-        )
+        deleted = await auth_client.delete(f"/api/v1/crm/leads/{lead_id}/timeline/{entry['id']}")
         assert deleted.status_code == 204
 
     after = await auth_client.get(f"/api/v1/crm/leads/{lead_id}/timeline")
