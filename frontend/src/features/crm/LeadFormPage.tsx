@@ -464,7 +464,20 @@ function LeadForm({ id }: { id?: string }) {
 
                   <FormGroup>
                     <div>
-                      <InnerGroup title="Реквизиты">
+                      <InnerGroup title="Информация о компании">
+                        <Field label="Компания" htmlFor="lead-company">
+                          {/*
+                            «Компания» показывает и редактирует то же название,
+                            что и крупный заголовок сверху (одно поле form.name),
+                            без отдельного поля в базе.
+                          */}
+                          <OdooInput
+                            id="lead-company"
+                            placeholder="например, ООО «Ромашка»"
+                            value={form.name}
+                            onChange={(e) => set("name", e.target.value)}
+                          />
+                        </Field>
                         <Field
                           label="ИНН"
                           htmlFor="lead-inn"
@@ -509,9 +522,7 @@ function LeadForm({ id }: { id?: string }) {
                           </button>
                         </Field>
                       </InnerGroup>
-                    </div>
 
-                    <div>
                       <InnerGroup>
                         <Field label="Приоритет">
                           {/*
@@ -537,7 +548,9 @@ function LeadForm({ id }: { id?: string }) {
                           />
                         </Field>
                       </InnerGroup>
+                    </div>
 
+                    <div>
                       <InnerGroup title="Информация о клиенте">
                         <Field
                           label="Контакт логиста/ЛПР"

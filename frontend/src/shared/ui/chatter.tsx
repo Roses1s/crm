@@ -311,7 +311,7 @@ export function Chatter({
           >
             {authorInitials}
           </span>
-          <div className="min-w-0 flex-1 overflow-hidden rounded-[4px] border border-odoo-border bg-odoo-surface focus-within:border-odoo-focus">
+          <div className="min-w-0 flex-1 overflow-hidden rounded-[4px] border border-odoo-border bg-odoo-surface focus-within:border-odoo-focus/40">
             <textarea
               ref={composerText}
               rows={1}
