@@ -81,8 +81,7 @@ export function ControlPanel({
         {createTo && (
           <Link
             to={createTo}
-            className="inline-flex h-8 items-center rounded-[3px] px-3 text-[13px] font-medium text-white hover:opacity-90"
-            style={{ backgroundColor: "rgb(var(--odoo-primary))" }}
+            className="inline-flex h-8 items-center rounded-[3px] bg-odoo-primary-soft px-3 text-[13px] font-medium text-odoo-primary-soft-text transition-colors hover:opacity-90"
           >
             Новый
           </Link>

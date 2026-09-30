@@ -35,7 +35,7 @@ export function FormWorkspace({
     <div className="flex min-h-0 w-full flex-col lg:h-[calc(100dvh-var(--odoo-record-control-panel-height))] lg:flex-row">
       {children}
       {aside && (
-        <aside className="w-full shrink-0 border-t border-odoo-border bg-odoo-surface lg:w-[var(--odoo-record-aside-width)] lg:overflow-y-auto lg:border-l lg:border-t-0">
+        <aside className="w-full shrink-0 border-t border-odoo-border bg-odoo-bg lg:w-[var(--odoo-record-aside-width)] lg:overflow-y-auto lg:border-l lg:border-t-0">
           {aside}
         </aside>
       )}
@@ -146,7 +146,7 @@ export function FormStatusbar({
   ];
 
   return (
-    <div className="sticky top-0 z-20 flex min-h-[46px] flex-wrap items-center justify-between gap-2 border-b border-odoo-border bg-odoo-surface px-4 py-1.5 lg:px-6">
+    <div className="sticky top-0 z-20 flex min-h-[46px] flex-wrap items-center justify-between gap-2 bg-odoo-bg px-4 py-2 lg:px-6">
       <div className="flex flex-wrap items-center gap-1">{left}</div>
       <div className="relative flex min-w-0 flex-nowrap items-stretch justify-end overflow-x-auto py-px">
         {segments.map((segment, index) => {
@@ -254,7 +254,7 @@ export function FormGroup({ children }: { children: ReactNode }) {
 /** Плашка заголовка записи во всю ширину листа. */
 export function FormTitle({ children }: { children: ReactNode }) {
   return (
-    <div className="mb-4 rounded-[2px] bg-odoo-title-band px-3 py-1.5">
+    <div className="mb-4 rounded-[3px] border border-odoo-border-light bg-odoo-title-band px-3 py-1.5">
       <h1 className="text-[24px] font-normal leading-[34px] text-odoo-text">{children}</h1>
     </div>
   );

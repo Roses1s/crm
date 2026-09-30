@@ -147,7 +147,7 @@ export function Chatter({
   }
 
   return (
-    <div className="flex h-full min-h-[420px] flex-col bg-odoo-surface">
+    <div className="flex h-full min-h-[420px] flex-col bg-odoo-bg">
       <div
         style={CHATTER_INSET_STYLE}
         className="flex shrink-0 flex-wrap items-center gap-1 border-b border-odoo-chatter-divider py-2"
@@ -159,8 +159,8 @@ export function Chatter({
             onClick={() => setMode(m.id)}
             className={`h-7 rounded-[4px] px-3 text-[13px] transition-colors ${
               mode === m.id
-                ? "bg-odoo-primary font-medium text-white"
-                : "border border-odoo-border bg-odoo-surface text-odoo-text hover:bg-odoo-bg"
+                ? "bg-odoo-primary-soft font-medium text-odoo-primary-soft-text"
+                : "border border-odoo-border bg-odoo-surface text-odoo-text hover:bg-odoo-surface-hover"
             }`}
           >
             {m.label}

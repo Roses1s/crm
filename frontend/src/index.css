@@ -18,6 +18,8 @@
 @theme inline {
   --color-odoo-primary: rgb(var(--odoo-primary));
   --color-odoo-primary-hover: rgb(var(--odoo-primary-hover));
+  --color-odoo-primary-soft: rgb(var(--odoo-primary-soft));
+  --color-odoo-primary-soft-text: rgb(var(--odoo-primary-soft-text));
   --color-odoo-secondary: rgb(var(--odoo-secondary));
 
   /* Фиксированные цвета фирменного тёмного фона (экран логина). */
@@ -102,6 +104,8 @@
   /* Базовые роли всей CRM: спокойная светлая тема с тем же фиолетово-бирюзовым ритмом. */
   --odoo-primary: 113 75 103; /* #714B67 — фирменный фиолетовый Odoo (manifest) */
   --odoo-primary-hover: 94 62 85; /* #5E3E55 — темнее для наведения на светлой теме */
+  --odoo-primary-soft: 234 221 231; /* #EADDE7 — светло-сиреневая «таблетка» */
+  --odoo-primary-soft-text: 113 75 103; /* #714B67 — фиолетовый текст на «таблетке» */
   --odoo-secondary: 0 143 132; /* #008F84 */
 
   --odoo-bg: 247 246 248; /* #F7F6F8 */
@@ -133,7 +137,7 @@
   --odoo-nav: 255 255 255;
   --odoo-focus: 107 62 102;
   --odoo-overlay: 42 32 42;
-  --odoo-title-band: 249 241 247;
+  --odoo-title-band: 241 241 243; /* #F1F1F3 — нейтральный бокс заголовка (не фиолетовый) */
   --odoo-statusbar: 221 217 223;
   --odoo-statusbar-segment: 247 246 248;
   --odoo-statusbar-text: 98 91 99;
@@ -193,25 +197,27 @@
 .dark {
   color-scheme: dark;
 
-  /* Три уровня slate-поверхностей отделяют приложение, панели и hover без чёрных провалов. */
+  /* Нейтральные графитовые поверхности на почти-чёрном фоне — как тёмная тема Odoo 17. */
   --odoo-primary: 113 75 103; /* #714B67 — фирменный фиолетовый Odoo (manifest) */
   --odoo-primary-hover: 138 95 126; /* #8A5F7E — светлее для наведения на тёмной теме */
+  --odoo-primary-soft: 58 43 55; /* #3A2B37 — приглушённая мовная «таблетка» */
+  --odoo-primary-soft-text: 214 166 198; /* #D6A6C6 — светло-фиолетовый текст на «таблетке» */
   --odoo-secondary: 31 166 160; /* #1FA6A0 — приглушённый бирюзовый под образец Odoo */
 
-  --odoo-bg: 27 29 38; /* #1B1D26 */
-  --odoo-surface: 38 42 54; /* #262A36 */
-  --odoo-surface-hover: 48 52 66; /* #303442 */
-  --odoo-surface-sunken: 32 35 44; /* #20232C */
-  --odoo-skeleton: 61 65 80;
-  --odoo-column-head: 30 33 43; /* #1E212B */
-  --odoo-board-canvas: 27 29 38;
-  --odoo-board-column: 30 33 43;
-  --odoo-board-card: 36 39 51;
-  --odoo-board-card-hover: 43 47 61;
-  --odoo-track: 60 62 75; /* #3C3E4B */
+  --odoo-bg: 20 21 24; /* #141518 — почти-чёрный нейтральный фон приложения */
+  --odoo-surface: 37 38 43; /* #25262B — графитовый лист/панель/поле */
+  --odoo-surface-hover: 48 49 55; /* #303137 */
+  --odoo-surface-sunken: 28 29 33; /* #1C1D21 */
+  --odoo-skeleton: 58 59 64; /* #3A3B40 */
+  --odoo-column-head: 28 29 33; /* #1C1D21 */
+  --odoo-board-canvas: 20 21 24; /* #141518 */
+  --odoo-board-column: 28 29 33; /* #1C1D21 */
+  --odoo-board-card: 37 38 43; /* #25262B */
+  --odoo-board-card-hover: 48 49 55; /* #303137 */
+  --odoo-track: 58 59 64; /* #3A3B40 */
 
-  --odoo-border: 60 62 75; /* #3C3E4B */
-  --odoo-border-light: 52 55 68; /* #343744 */
+  --odoo-border: 58 59 64; /* #3A3B40 */
+  --odoo-border-light: 42 43 49; /* #2A2B31 */
 
   --odoo-text: 228 228 230; /* #E4E4E6 */
   --odoo-text-soft: 200 200 204; /* #C8C8CC */
@@ -223,17 +229,17 @@
   --odoo-danger: 232 87 101; /* #E85765 */
   --odoo-info: 71 187 220; /* #47BBDC */
 
-  --odoo-nav: 38 42 54;
+  --odoo-nav: 37 38 43;
   --odoo-focus: 31 166 160;
-  --odoo-overlay: 5 7 12;
-  --odoo-title-band: 48 36 48;
-  --odoo-statusbar: 60 62 75;
-  --odoo-statusbar-segment: 48 52 66;
-  --odoo-statusbar-text: 228 228 230;
-  --odoo-statusbar-current: 31 70 73;
+  --odoo-overlay: 3 3 5;
+  --odoo-title-band: 45 46 51; /* #2D2E33 — нейтральный бокс заголовка (не фиолетовый) */
+  --odoo-statusbar: 58 59 64;
+  --odoo-statusbar-segment: 45 46 51;
+  --odoo-statusbar-text: 154 154 160;
+  --odoo-statusbar-current: 28 29 33;
   --odoo-statusbar-current-border: 31 166 160;
-  --odoo-statusbar-current-text: 228 228 230;
-  --odoo-drop: 34 39 50;
+  --odoo-statusbar-current-text: 31 166 160;
+  --odoo-drop: 34 35 40;
   --odoo-accent-soft: 27 57 58;
   --odoo-accent-line: 31 166 160;
   --odoo-search-divider: 58 89 87;
@@ -243,7 +249,7 @@
   --odoo-search-action-hover: 38 64 64;
   --odoo-chip: 61 48 62;
   --odoo-chip-text: 211 198 211;
-  --odoo-avatar: 66 70 82;
+  --odoo-avatar: 64 65 71;
   --odoo-link: 31 166 160;
   --odoo-action: 31 166 160;
   --odoo-tag-blue-bg: 40 71 92;
@@ -258,8 +264,8 @@
   --odoo-tag-purple-text: 228 187 231;
   --odoo-tag-orange-bg: 90 59 34;
   --odoo-tag-orange-text: 247 190 133;
-  --odoo-chatter-divider: 52 55 68;
-  --border: 230 10% 24%;
+  --odoo-chatter-divider: 42 43 49;
+  --border: 230 6% 24%;
 }
 
 /*
