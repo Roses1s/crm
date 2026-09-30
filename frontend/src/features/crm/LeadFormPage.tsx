@@ -18,6 +18,8 @@ import {
   useArchiveLead,
   useCreateLead,
   useDeleteAttachment,
+  useDeleteTimelineEntry,
+  useEditNote,
   useLead,
   useLeadAttachments,
   useLeadPager,
@@ -74,6 +76,8 @@ function LeadForm({ id }: { id?: string }) {
   const updateLead = useUpdateLead(id);
   const archiveLead = useArchiveLead();
   const addNote = useAddNote(id);
+  const editNote = useEditNote(id);
+  const deleteTimelineEntry = useDeleteTimelineEntry(id);
   const uploadAttachment = useUploadAttachment(lead?.id);
   const transferLead = useTransferLead(lead?.id);
   const deleteAttachment = useDeleteAttachment(lead?.id);
@@ -299,6 +303,8 @@ function LeadForm({ id }: { id?: string }) {
       onUpload={(file) => uploadAttachment.mutate({ file })}
       onDelete={(file) => deleteAttachment.mutate(file.id)}
       onPreview={(file) => setPreview(file)}
+      onEditNote={(entryId, body) => editNote.mutate({ entryId, body })}
+      onDeleteEntry={(entry) => deleteTimelineEntry.mutate(Number(entry.id))}
     />
   ) : undefined;
 

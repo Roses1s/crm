@@ -1,6 +1,6 @@
 import { format, formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
-import { Download, Paperclip, Search, Trash2, X } from "lucide-react";
+import { Check, Download, Paperclip, Pencil, Search, Trash2, X } from "lucide-react";
 import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { downloadAttachment } from "@/shared/api/hooks";
@@ -87,6 +87,10 @@ interface ChatterProps {
   onDelete?: (attachment: Attachment) => void;
   uploading?: boolean;
   onPreview?: (attachment: Attachment) => void;
+  /** Правка текста примечания в ленте. */
+  onEditNote?: (entryId: number, body: string) => void;
+  /** Удаление записи ленты (примечание или событие истории). */
+  onDeleteEntry?: (entry: TimelineEntry) => void;
 }
 
 export function Chatter({
@@ -99,8 +103,12 @@ export function Chatter({
   onDelete,
   uploading = false,
   onPreview,
+  onEditNote,
+  onDeleteEntry,
 }: ChatterProps) {
   const [text, setText] = useState("");
+  const [editingId, setEditingId] = useState<number | null>(null);
+  const [editText, setEditText] = useState("");
   const [mode, setMode] = useState("note");
   const [searchOpen, setSearchOpen] = useState(false);
   const [query, setQuery] = useState("");
@@ -318,6 +326,16 @@ export function Chatter({
               aria-label="Текст внутреннего примечания"
               value={text}
               onChange={(e) => setText(e.target.value)}
+              onPaste={(e) => {
+                // Скриншот из буфера (Ctrl+V) сразу уходит во вложения записи.
+                const images = Array.from(e.clipboardData.files).filter((f) =>
+                  f.type.startsWith("image/"),
+                );
+                if (images.length) {
+                  e.preventDefault();
+                  setPending((list) => [...list, ...images]);
+                }
+              }}
               placeholder={current.placeholder}
               className="min-h-[var(--odoo-chatter-composer-min-height)] w-full resize-none overflow-hidden border-0 bg-transparent px-2 py-2 text-[13px] leading-[19px] text-odoo-text outline-none placeholder:text-odoo-text-light"
             />
@@ -401,7 +419,7 @@ export function Chatter({
             {entries.map((entry) => (
               <div
                 key={entry.id}
-                className={`flex items-start gap-2 ${entry.type === "note" ? "py-2.5" : "py-2"}`}
+                className={`group relative flex items-start gap-2 ${entry.type === "note" ? "py-2.5" : "py-2"}`}
               >
                 <span className="mt-0.5 flex h-[var(--odoo-chatter-avatar-size)] w-[var(--odoo-chatter-avatar-size)] shrink-0 items-center justify-center rounded-[4px] bg-odoo-avatar text-[11px] font-semibold text-white">
                   {entry.author_initials ?? "—"}
@@ -426,6 +444,38 @@ export function Chatter({
                       <span className="text-odoo-text-light">→</span>
                       <span className="font-medium text-odoo-link">{entry.new_value || "—"}</span>
                       <span className="italic text-odoo-text-muted">({entry.field_label})</span>
+                    </div>
+                  ) : editingId === Number(entry.id) ? (
+                    <div className="mt-1 overflow-hidden rounded-[4px] border border-odoo-border bg-odoo-surface focus-within:border-odoo-focus/40">
+                      <textarea
+                        rows={2}
+                        autoFocus
+                        aria-label="Изменить примечание"
+                        value={editText}
+                        onChange={(e) => setEditText(e.target.value)}
+                        className="w-full resize-none border-0 bg-transparent px-2 py-2 text-[13px] leading-[19px] text-odoo-text outline-none"
+                      />
+                      <div className="flex h-8 items-center gap-1 border-t border-odoo-chatter-divider px-1">
+                        <button
+                          type="button"
+                          disabled={!editText.trim()}
+                          onClick={() => {
+                            const body = editText.trim();
+                            if (body && body !== entry.body) onEditNote?.(Number(entry.id), body);
+                            setEditingId(null);
+                          }}
+                          className="inline-flex h-6 items-center gap-1 rounded-[4px] bg-odoo-primary px-2 text-[12px] font-medium text-white transition-colors hover:bg-odoo-primary-hover disabled:opacity-50"
+                        >
+                          <Check className="h-3 w-3" /> Сохранить
+                        </button>
+                        <button
+                          type="button"
+                          onClick={() => setEditingId(null)}
+                          className="inline-flex h-6 items-center rounded-[4px] px-2 text-[12px] text-odoo-text-muted transition-colors hover:text-odoo-text"
+                        >
+                          Отмена
+                        </button>
+                      </div>
                     </div>
                   ) : (
                     entry.body && (
@@ -466,6 +516,38 @@ export function Chatter({
                     </ul>
                   )}
                 </div>
+
+                {editingId !== entry.id && (onEditNote || onDeleteEntry) && (
+                  <div className="absolute right-0 top-1.5 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                    {onEditNote && entry.type === "note" && (
+                      <button
+                        type="button"
+                        aria-label="Изменить примечание"
+                        title="Изменить"
+                        onClick={() => {
+                          setEditingId(Number(entry.id));
+                          setEditText(entry.body);
+                        }}
+                        className="inline-flex h-6 w-6 items-center justify-center rounded-sm text-odoo-text-muted transition-colors hover:bg-odoo-bg hover:text-odoo-text"
+                      >
+                        <Pencil className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                    {onDeleteEntry && (
+                      <button
+                        type="button"
+                        aria-label="Удалить запись"
+                        title="Удалить"
+                        onClick={() => {
+                          if (window.confirm("Удалить эту запись из ленты?")) onDeleteEntry(entry);
+                        }}
+                        className="inline-flex h-6 w-6 items-center justify-center rounded-sm text-odoo-text-muted transition-colors hover:bg-odoo-bg hover:text-odoo-danger"
+                      >
+                        <Trash2 className="h-3.5 w-3.5" />
+                      </button>
+                    )}
+                  </div>
+                )}
               </div>
             ))}
           </div>

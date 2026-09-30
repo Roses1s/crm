@@ -382,6 +382,29 @@ export function useAddNote(id: string | undefined) {
   });
 }
 
+export function useEditNote(id: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ entryId, body }: { entryId: number; body: string }) =>
+      api<TimelineEntry>(`/crm/leads/${id}/timeline/${entryId}`, {
+        method: "PATCH",
+        body: { body },
+      }),
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: keys.timeline(id ?? "") }),
+  });
+}
+
+export function useDeleteTimelineEntry(id: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (entryId: number) =>
+      api<void>(`/crm/leads/${id}/timeline/${entryId}`, { method: "DELETE" }),
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: keys.timeline(id ?? "") }),
+  });
+}
+
 // --- передача лида -----------------------------------------------------------
 export interface Colleague {
   id: number;

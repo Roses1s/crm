@@ -27,6 +27,7 @@ from app.schemas.crm import (
     LeadTransfer,
     LeadUpdate,
     NoteCreate,
+    NoteUpdate,
     TimelineEntryRead,
 )
 
@@ -228,6 +229,52 @@ async def add_note(
     await session.commit()
     await session.refresh(entry)
     return entry
+
+
+async def _get_entry_or_404(
+    session: AsyncSession, lead_id: int, entry_id: int
+) -> TimelineEntry:
+    entry = await session.get(TimelineEntry, entry_id)
+    if entry is None or entry.lead_id != lead_id:
+        raise NotFoundError(f"Запись {entry_id} не найдена")
+    return entry
+
+
+@router.patch(
+    "/{lead_id}/timeline/{entry_id}",
+    response_model=TimelineEntryRead,
+    summary="Изменить примечание",
+)
+async def update_timeline_entry(
+    lead_id: int,
+    entry_id: int,
+    payload: NoteUpdate,
+    session: SessionDep,
+    user: CurrentUser,
+) -> TimelineEntry:
+    await get_lead_or_404(session, lead_id, user)
+    entry = await _get_entry_or_404(session, lead_id, entry_id)
+    if entry.type is not EntryType.note:
+        raise AppError("Изменять можно только примечания", code="not_editable")
+    entry.body = payload.body
+    await session.commit()
+    await session.refresh(entry)
+    return entry
+
+
+@router.delete(
+    "/{lead_id}/timeline/{entry_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Удалить запись из ленты",
+)
+async def delete_timeline_entry(
+    lead_id: int, entry_id: int, session: SessionDep, user: CurrentUser
+) -> None:
+    await get_lead_or_404(session, lead_id, user)
+    entry = await _get_entry_or_404(session, lead_id, entry_id)
+    await session.delete(entry)
+    await session.commit()
+    log.info("timeline.entry_deleted", lead_id=lead_id, entry_id=entry_id, by=user.id)
 
 
 @router.post(

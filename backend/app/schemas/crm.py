@@ -150,6 +150,10 @@ class NoteCreate(BaseModel):
     body: str = Field(min_length=1, max_length=5000)
 
 
+class NoteUpdate(BaseModel):
+    body: str = Field(min_length=1, max_length=5000)
+
+
 def _inn_checksum_ok(inn: str) -> bool:
     """Контрольная сумма ИНН по алгоритму ФНС."""
 
