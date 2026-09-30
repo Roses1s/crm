@@ -271,8 +271,8 @@
  */
 .crm-kanban-renderer {
   --odoo-kanban-group-padding-x: 8px;
-  --odoo-kanban-record-width: 240px;
-  --odoo-kanban-record-small-width: 216px;
+  --odoo-kanban-record-width: 300px;
+  --odoo-kanban-record-small-width: 240px;
   --odoo-kanban-group-width: 90vw;
   --odoo-kanban-record-current-width: calc(
     90vw - (var(--odoo-kanban-group-padding-x) * 2)
