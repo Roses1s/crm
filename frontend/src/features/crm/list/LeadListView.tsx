@@ -317,7 +317,7 @@ export function LeadListView({
   const hidden = leads.length - shownCount;
 
   return (
-    <div className="h-[calc(100dvh-90px)] min-h-0 overflow-auto overscroll-contain border-t border-odoo-border-light bg-odoo-bg [scrollbar-gutter:stable]">
+    <div className="h-[calc(100dvh-var(--odoo-record-control-panel-height))] min-h-0 overflow-auto overscroll-contain border-t border-odoo-border-light bg-odoo-bg [scrollbar-gutter:stable]">
       {selectedCount > 0 && (
         <div className="sticky top-0 z-20 flex min-h-[38px] items-center gap-3 border-b border-odoo-border-light bg-odoo-surface px-4 py-1.5 text-[13px] shadow-xs">
           <span className="font-medium text-odoo-text">

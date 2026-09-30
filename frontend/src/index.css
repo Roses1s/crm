@@ -177,7 +177,7 @@
   --odoo-chatter-divider: 236 233 237;
 
   /* Геометрия карточки: отдельные имена не дают расползаться числам по JSX. */
-  --odoo-record-control-panel-height: 90px;
+  --odoo-record-control-panel-height: 84px;
   --odoo-record-aside-width: 34.3%;
   --odoo-form-workspace-padding: 16px;
   --odoo-form-sheet-padding: 16px;
