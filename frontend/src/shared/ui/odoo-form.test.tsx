@@ -50,10 +50,33 @@ describe("Статусбар карточки", () => {
 
     const current = screen.getByRole("button", { name: "В работе" });
     expect(current).toHaveAttribute("aria-current", "step");
-    expect(current).toHaveClass("bg-odoo-statusbar-current", "text-white");
-    expect(current).not.toHaveClass("bg-odoo-surface");
+    expect(current).toHaveStyle("background-color: rgb(var(--odoo-statusbar-current))");
+    expect(current).toHaveTextContent("В работе");
 
     fireEvent.click(screen.getByRole("button", { name: "Переговоры" }));
     expect(onSelect).toHaveBeenCalledWith(3);
+  });
+
+  it("оставляет текущий этап в центре и открывает скрытые этапы с обеих сторон", () => {
+    const onSelect = vi.fn();
+    const items = Array.from({ length: 7 }, (_, index) => ({
+      id: index + 1,
+      name: `Этап ${index + 1}`,
+    }));
+    renderWithProviders(
+      <FormStatusbar current={4} items={items} onSelect={onSelect} visibleCount={3} />,
+    );
+
+    expect(screen.getByRole("button", { name: "Этап 4" })).toHaveAttribute(
+      "aria-current",
+      "step",
+    );
+    fireEvent.click(screen.getByRole("button", { name: "Предыдущие этапы" }));
+    fireEvent.click(screen.getByRole("button", { name: "Этап 1" }));
+    expect(onSelect).toHaveBeenCalledWith(1);
+
+    fireEvent.click(screen.getByRole("button", { name: "Следующие этапы" }));
+    fireEvent.click(screen.getByRole("button", { name: "Этап 7" }));
+    expect(onSelect).toHaveBeenCalledWith(7);
   });
 });

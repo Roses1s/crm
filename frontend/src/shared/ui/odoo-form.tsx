@@ -92,9 +92,19 @@ function arrowClip(shape: "start" | "middle" | "end", inset = 0) {
   return `polygon(${i}px ${i}px, calc(100% - ${tip}px) ${i}px, calc(100% - ${i}px) 50%, calc(100% - ${tip}px) calc(100% - ${i}px), ${i}px calc(100% - ${i}px), ${tip + i}px 50%)`;
 }
 
+type StatusbarOverflowSide = "before" | "after";
+
+type StatusbarItem = { id: number; name: string };
+
+type StatusbarSegment = {
+  key: string;
+  item?: StatusbarItem;
+  overflow?: StatusbarOverflowSide;
+};
+
 /**
- * o_field_statusbar — стрелки этапов справа, текущий выделен цветом действия.
- * Не поместившиеся этапы сворачиваются в «…».
+ * Цепочка этапов в стиле Odoo: текущий этап остаётся видимым, а скрытые
+ * предшествующие и следующие этапы открываются отдельными «…» по краям.
  */
 export function FormStatusbar({
   items,
@@ -104,120 +114,127 @@ export function FormStatusbar({
   left,
   visibleCount = 5,
 }: {
-  items: { id: number; name: string }[];
+  items: StatusbarItem[];
   current?: number;
   onSelect: (id: number) => void;
   disabled?: boolean;
   left?: ReactNode;
   visibleCount?: number;
 }) {
-  const [moreOpen, setMoreOpen] = useState(false);
+  const [moreOpen, setMoreOpen] = useState<StatusbarOverflowSide | null>(null);
+  const count = Math.max(1, visibleCount);
+  const visibleLength = Math.min(count, items.length);
+  const currentIndex = Math.max(
+    items.findIndex((item) => item.id === current),
+    0,
+  );
+  const maxStart = Math.max(items.length - visibleLength, 0);
+  const start = visibleLength
+    ? Math.min(Math.max(currentIndex - Math.floor(visibleLength / 2), 0), maxStart)
+    : 0;
+  const before = items.slice(0, start);
+  const visible = items.slice(start, start + visibleLength);
+  const after = items.slice(start + visibleLength);
+  const moreItems = moreOpen === "before" ? before : after;
 
-  let visible = items.slice(0, visibleCount);
-  let hidden = items.slice(visibleCount);
-  const currentHidden = hidden.find((s) => s.id === current);
-  if (currentHidden && visible.length > 0) {
-    // Odoo всегда держит текущий этап видимым.
-    const dropped = visible[visible.length - 1];
-    visible = [...visible.slice(0, -1), currentHidden];
-    hidden = hidden.filter((s) => s.id !== currentHidden.id).concat(dropped);
-    hidden.sort((a, b) => items.indexOf(a) - items.indexOf(b));
-  }
+  const segments: StatusbarSegment[] = [
+    ...(before.length > 0
+      ? [{ key: "before", overflow: "before" as const }]
+      : []),
+    ...visible.map((item) => ({ key: `stage-${item.id}`, item })),
+    ...(after.length > 0 ? [{ key: "after", overflow: "after" as const }] : []),
+  ];
 
   return (
     <div className="-mx-4 -mt-4 mb-4 flex min-h-[41px] flex-wrap items-center justify-between gap-2 border-b border-odoo-border px-4 py-1 lg:-mx-6 lg:-mt-6 lg:px-6">
       <div className="flex flex-wrap items-center gap-1">{left}</div>
-      <div className="relative flex min-w-0 flex-wrap items-stretch justify-end">
-        {visible.map((item, i) => {
-          const isFirst = i === 0;
-          const isLast = i === visible.length - 1 && hidden.length === 0;
+      <div className="relative flex min-w-0 flex-nowrap items-stretch justify-end overflow-x-auto py-px">
+        {segments.map((segment, index) => {
+          const isFirst = index === 0;
+          const isLast = index === segments.length - 1;
+          const single = segments.length === 1;
           const shape = isFirst ? "start" : isLast ? "end" : "middle";
-          const active = item.id === current;
-          const single = visible.length === 1 && hidden.length === 0;
+          const active = segment.item?.id === current;
+          const label = segment.item?.name ?? "…";
+          const overflowSide = segment.overflow;
+          const overflowLabel =
+            overflowSide === "before" ? "Предыдущие этапы" : "Следующие этапы";
+
           return (
             <span
-              key={item.id}
+              key={segment.key}
               style={{
                 height: STATUSBAR_HEIGHT,
                 clipPath: single ? undefined : arrowClip(shape),
                 marginLeft: isFirst ? 0 : -(ARROW_WIDTH - 2),
                 backgroundColor: active
-                  ? "rgb(var(--odoo-statusbar-current))"
+                  ? "rgb(var(--odoo-statusbar-current-border))"
                   : "rgb(var(--odoo-statusbar))",
+                zIndex: active ? 1 : undefined,
               }}
-              className="relative inline-flex"
+              className="relative inline-flex shrink-0"
             >
               <button
                 type="button"
                 disabled={disabled}
                 aria-current={active ? "step" : undefined}
-                onClick={() => onSelect(item.id)}
-                title={item.name}
-                style={{ clipPath: single ? undefined : arrowClip(shape, 1) }}
-                className={`max-w-[200px] truncate text-[13px] transition-colors disabled:cursor-wait ${
+                aria-label={overflowSide ? overflowLabel : undefined}
+                onClick={() => {
+                  if (overflowSide) {
+                    setMoreOpen((side) => (side === overflowSide ? null : overflowSide));
+                  } else if (segment.item) {
+                    onSelect(segment.item.id);
+                  }
+                }}
+                title={overflowSide ? overflowLabel : label}
+                style={{
+                  clipPath: single ? undefined : arrowClip(shape, 1),
+                  backgroundColor: active
+                    ? "rgb(var(--odoo-statusbar-current))"
+                    : "rgb(var(--odoo-statusbar-segment))",
+                  color: active
+                    ? "rgb(var(--odoo-statusbar-current-text))"
+                    : "rgb(var(--odoo-statusbar-text))",
+                }}
+                className={`max-w-[200px] truncate pr-4 text-[13px] transition-opacity hover:opacity-90 disabled:cursor-wait disabled:hover:opacity-100 ${
                   isFirst ? "pl-4" : "pl-5"
-                } pr-4 ${
-                  active
-                    ? "bg-odoo-statusbar-current font-semibold text-white"
-                    : "bg-odoo-surface font-medium text-odoo-statusbar-text hover:bg-odoo-bg"
-                }`}
+                } ${active ? "font-semibold" : "font-medium"}`}
               >
-                {item.name}
+                {label}
               </button>
             </span>
           );
         })}
 
-        {hidden.length > 0 && (
+        {moreOpen && (
           <>
-            <span
-              style={{
-                height: STATUSBAR_HEIGHT,
-                clipPath: arrowClip("end"),
-                marginLeft: -(ARROW_WIDTH - 2),
-                backgroundColor: "rgb(var(--odoo-statusbar))",
-              }}
-              className="relative inline-flex"
+            <button
+              type="button"
+              className="fixed inset-0 z-10"
+              aria-label="Закрыть"
+              onClick={() => setMoreOpen(null)}
+            />
+            <div
+              className={`absolute top-[38px] z-50 max-h-[260px] min-w-[220px] overflow-auto rounded-[3px] border border-odoo-border bg-odoo-surface py-1 shadow-lg ${
+                moreOpen === "before" ? "left-0" : "right-0"
+              }`}
             >
-              <button
-                type="button"
-                disabled={disabled}
-                title="Другие этапы"
-                aria-label="Другие этапы"
-                onClick={() => setMoreOpen((v) => !v)}
-                style={{ clipPath: arrowClip("end", 1) }}
-                className="bg-odoo-surface pl-5 pr-4 text-[13px] font-medium text-odoo-statusbar-text transition-colors hover:bg-odoo-bg"
-              >
-                …
-              </button>
-            </span>
-            {moreOpen && (
-              <>
+              {moreItems.map((item) => (
                 <button
+                  key={item.id}
                   type="button"
-                  className="fixed inset-0 z-10"
-                  aria-label="Закрыть"
-                  onClick={() => setMoreOpen(false)}
-                />
-                <div className="absolute right-0 top-[38px] z-50 max-h-[260px] min-w-[220px] overflow-auto rounded-[3px] border border-odoo-border bg-odoo-surface py-1 shadow-lg">
-                  {hidden.map((item) => (
-                    <button
-                      key={item.id}
-                      type="button"
-                      className={`block w-full px-3 py-1.5 text-left text-[13px] hover:bg-odoo-bg ${
-                        item.id === current ? "font-semibold text-odoo-text" : "text-odoo-text"
-                      }`}
-                      onClick={() => {
-                        setMoreOpen(false);
-                        onSelect(item.id);
-                      }}
-                    >
-                      {item.name}
-                    </button>
-                  ))}
-                </div>
-              </>
-            )}
+                  className={`block w-full px-3 py-1.5 text-left text-[13px] hover:bg-odoo-bg ${
+                    item.id === current ? "font-semibold text-odoo-text" : "text-odoo-text"
+                  }`}
+                  onClick={() => {
+                    setMoreOpen(null);
+                    onSelect(item.id);
+                  }}
+                >
+                  {item.name}
+                </button>
+              ))}
+            </div>
           </>
         )}
       </div>
