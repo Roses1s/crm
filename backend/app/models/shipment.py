@@ -81,6 +81,11 @@ class Shipment(Base, TimestampMixin):
         return self.carrier.name if self.carrier else None
 
     @property
+    def seller_name(self) -> str | None:
+        """Продавец заявки — это ответственный за лид."""
+        return self.lead.assigned_to_name if self.lead else None
+
+    @property
     def route(self) -> str:
         if self.city_loading and self.city_unloading:
             return f"{self.city_loading} → {self.city_unloading}"

@@ -80,6 +80,7 @@ export interface Shipment {
   id: number;
   lead_id: number;
   lead_name: string;
+  seller_name?: string | null;
   status: string;
   route: string;
   carrier_id: number | null;

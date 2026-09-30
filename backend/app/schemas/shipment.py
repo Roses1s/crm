@@ -80,6 +80,7 @@ class ShipmentListItem(ORMModel):
     id: int
     lead_id: int
     lead_name: str
+    seller_name: str | None
     status: ShipmentStatus
     route: str
     carrier_id: int | None
