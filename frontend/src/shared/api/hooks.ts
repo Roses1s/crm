@@ -58,6 +58,8 @@ export const keys = {
   attachments: (id: string | number) => ["attachments", String(id)] as const,
   shipmentAttachments: (id: string | number) =>
     ["shipment-attachments", String(id)] as const,
+  shipmentTimeline: (id: string | number) =>
+    ["shipment-timeline", String(id)] as const,
   carriers: ["carriers"] as const,
   users: ["users"] as const,
   backups: ["backups"] as const,
@@ -488,11 +490,17 @@ export function useUploadShipmentAttachment(
 ) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (file: File) =>
-      apiUpload<Attachment>(`/shipments/${shipmentId}/attachments`, file),
+    mutationFn: ({ file, entryId }: { file: File; entryId?: number }) =>
+      apiUpload<Attachment>(
+        `/shipments/${shipmentId}/attachments${entryId ? `?entry_id=${entryId}` : ""}`,
+        file,
+      ),
     onSuccess: () => {
       void qc.invalidateQueries({
         queryKey: keys.shipmentAttachments(shipmentId ?? ""),
+      });
+      void qc.invalidateQueries({
+        queryKey: keys.shipmentTimeline(shipmentId ?? ""),
       });
     },
   });
@@ -510,7 +518,55 @@ export function useDeleteShipmentAttachment(
       void qc.invalidateQueries({
         queryKey: keys.shipmentAttachments(shipmentId ?? ""),
       });
+      void qc.invalidateQueries({
+        queryKey: keys.shipmentTimeline(shipmentId ?? ""),
+      });
     },
+  });
+}
+
+// --- лента заявки ------------------------------------------------------------
+export function useShipmentTimeline(id: string | undefined) {
+  return useQuery({
+    queryKey: keys.shipmentTimeline(id ?? "new"),
+    queryFn: () => api<TimelineEntry[]>(`/shipments/${id}/timeline`),
+    enabled: Boolean(id) && id !== "new",
+  });
+}
+
+export function useAddShipmentNote(id: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: string) =>
+      api<TimelineEntry>(`/shipments/${id}/notes`, {
+        method: "POST",
+        body: { body },
+      }),
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: keys.shipmentTimeline(id ?? "") }),
+  });
+}
+
+export function useEditShipmentNote(id: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ entryId, body }: { entryId: number; body: string }) =>
+      api<TimelineEntry>(`/shipments/${id}/timeline/${entryId}`, {
+        method: "PATCH",
+        body: { body },
+      }),
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: keys.shipmentTimeline(id ?? "") }),
+  });
+}
+
+export function useDeleteShipmentTimelineEntry(id: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (entryId: number) =>
+      api<void>(`/shipments/${id}/timeline/${entryId}`, { method: "DELETE" }),
+    onSuccess: () =>
+      void qc.invalidateQueries({ queryKey: keys.shipmentTimeline(id ?? "") }),
   });
 }
 
@@ -604,6 +660,7 @@ export function useSetShipmentStatus(id: string | undefined) {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.shipment(id ?? "") });
       void qc.invalidateQueries({ queryKey: ["shipments"] });
+      void qc.invalidateQueries({ queryKey: keys.shipmentTimeline(id ?? "") });
     },
   });
 }

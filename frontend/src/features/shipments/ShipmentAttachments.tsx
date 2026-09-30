@@ -27,7 +27,7 @@ export function ShipmentAttachments({ shipmentId }: { shipmentId: number }) {
   function send(file: File | undefined) {
     if (!file) return;
     setError("");
-    upload.mutate(file, {
+    upload.mutate({ file }, {
       // Причину отказа (тип файла, размер) показываем прямо в панели:
       // иначе пользователь видит только то, что файл не появился в списке.
       onError: (err: Error) =>
