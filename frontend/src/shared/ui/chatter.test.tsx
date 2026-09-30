@@ -44,6 +44,33 @@ describe("Лента примечаний", () => {
     expect(screen.getByText("Перезвонить")).toBeInTheDocument();
   });
 
+  it("использует единые токены геометрии для редактора и ленты", () => {
+    renderWithProviders(<Chatter timeline={TIMELINE} authorInitials="М" />);
+
+    expect(screen.getByTitle("Вы")).toHaveClass(
+      "h-[var(--odoo-chatter-avatar-size)]",
+      "w-[var(--odoo-chatter-avatar-size)]",
+    );
+    for (const avatar of screen.getAllByText("МИ")) {
+      expect(avatar).toHaveClass(
+        "h-[var(--odoo-chatter-avatar-size)]",
+        "w-[var(--odoo-chatter-avatar-size)]",
+      );
+    }
+
+    const submitRow = screen.getByRole("button", { name: "Лог" }).parentElement;
+    expect(submitRow).toHaveStyle(
+      "margin-inline-start: var(--odoo-chatter-composer-indent)",
+    );
+    expect(screen.getByRole("textbox", { name: "Текст внутреннего примечания" }).closest("form")).toHaveStyle(
+      "padding-inline: var(--odoo-chatter-panel-padding)",
+    );
+
+    const date = screen.getByText("30 сентября 2026 г.");
+    expect(date.previousElementSibling).toHaveClass("bg-odoo-chatter-divider");
+    expect(date.nextElementSibling).toHaveClass("bg-odoo-chatter-divider");
+  });
+
   it("автоматически увеличивает редактор и не показывает внутреннюю прокрутку", () => {
     renderWithProviders(<Chatter timeline={[]} authorInitials="М" />);
     const editor = screen.getByRole("textbox", { name: "Текст внутреннего примечания" });
