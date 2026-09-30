@@ -9,6 +9,7 @@ from typing import Any
 from fastapi import APIRouter, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
+from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import AdminUser, SessionDep
 from app.api.v1.stages import ensure_default_stages
@@ -133,21 +134,27 @@ async def delete_user(user_id: int, session: SessionDep, current: AdminUser) -> 
 
 
 # --- безопасность ------------------------------------------------------------
+def _scan_backups(directory: Path) -> tuple[list[dict[str, Any]], float | None]:
+    """Синхронное чтение каталога бэкапов — вызывается в пуле потоков."""
+    files = sorted(directory.glob("crm-*.dump"), key=lambda f: f.stat().st_mtime, reverse=True)
+    results: list[dict[str, Any]] = [{"name": f.name, "size": f.stat().st_size} for f in files]
+    last_mtime = files[0].stat().st_mtime if files else None
+    return results, last_mtime
+
+
 @router.get("/backups", summary="Список резервных копий")
 async def list_backups(_: AdminUser) -> dict[str, Any]:
     """Файлы из каталога бэкапов + признак «копия устарела»."""
-    directory = Path(settings.backup_dir)
-    files = sorted(directory.glob("crm-*.dump"), key=lambda f: f.stat().st_mtime, reverse=True)
+    from app.api.v1.attachments import disk_usage
 
-    results = [{"name": f.name, "size": f.stat().st_size} for f in files]
-    last_mtime = files[0].stat().st_mtime if files else None
+    # Чтение каталога — блокирующие вызовы, выносим в пул потоков.
+    results, last_mtime = await run_in_threadpool(_scan_backups, Path(settings.backup_dir))
     age_hours = (
         round((datetime.now(tz=UTC).timestamp() - last_mtime) / 3600, 1) if last_mtime else None
     )
-    from app.api.v1.attachments import disk_usage
 
     return {
-        "storage": disk_usage(),
+        "storage": await disk_usage(),
         "results": results,
         "last_backup_at": (
             datetime.fromtimestamp(last_mtime, tz=UTC).isoformat() if last_mtime else None

@@ -15,6 +15,7 @@ from typing import Annotated
 from fastapi import APIRouter, File, Query, UploadFile, status
 from fastapi.responses import FileResponse
 from sqlalchemy import select
+from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import CurrentUser, SessionDep
 from app.api.v1.leads import get_lead_or_404
@@ -63,22 +64,34 @@ def _storage_root() -> Path:
 
 
 async def _save_upload(upload: UploadFile, target: Path) -> int:
-    """Пишет файл на диск, следя за лимитом размера. Возвращает размер."""
+    """Пишет файл на диск в отдельном потоке, следя за лимитом. Возвращает размер.
+
+    Запись на диск — блокирующая операция. Выносим её в пул потоков через
+    ``run_in_threadpool``, чтобы загрузка большого файла не «замораживала» весь
+    асинхронный воркер: пока один пользователь заливает документ, остальные
+    продолжают получать ответы.
+    """
     limit = settings.max_upload_mb * 1024 * 1024
     written = 0
-    target.parent.mkdir(parents=True, exist_ok=True)
-    with target.open("wb") as out:
+    await run_in_threadpool(target.parent.mkdir, parents=True, exist_ok=True)
+    out = await run_in_threadpool(target.open, "wb")
+    try:
         while chunk := await upload.read(CHUNK):
             written += len(chunk)
             if written > limit:
-                out.close()
-                target.unlink(missing_ok=True)
                 raise AppError(
                     f"Файл больше {settings.max_upload_mb} МБ",
                     code="file_too_large",
                     status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
                 )
-            out.write(chunk)
+            await run_in_threadpool(out.write, chunk)
+    except BaseException:
+        # Любой сбой (превышен лимит, обрыв соединения) — недописанный файл
+        # не должен остаться на диске.
+        await run_in_threadpool(out.close)
+        await run_in_threadpool(target.unlink, missing_ok=True)
+        raise
+    await run_in_threadpool(out.close)
     return written
 
 
@@ -279,8 +292,8 @@ async def delete_attachment(attachment_id: int, session: SessionDep, user: Curre
     log.info("attachment.deleted", attachment_id=attachment_id, by=user.id)
 
 
-def disk_usage() -> dict[str, int]:
-    """Сколько места занимают вложения — показывается в разделе «Безопасность»."""
+def _scan_disk_usage() -> dict[str, int]:
+    """Синхронный обход каталога вложений — вызывается в пуле потоков."""
     root = _storage_root()
     if not root.exists():
         return {"files": 0, "bytes": 0, "free_bytes": 0}
@@ -290,3 +303,12 @@ def disk_usage() -> dict[str, int]:
         "bytes": sum(p.stat().st_size for p in files),
         "free_bytes": shutil.disk_usage(root).free,
     }
+
+
+async def disk_usage() -> dict[str, int]:
+    """Сколько места занимают вложения — показывается в разделе «Безопасность».
+
+    Обход всех файлов на диске блокирующий, поэтому выполняется в пуле потоков,
+    чтобы не задерживать остальные запросы.
+    """
+    return await run_in_threadpool(_scan_disk_usage)

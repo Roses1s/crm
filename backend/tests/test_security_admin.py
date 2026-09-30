@@ -55,6 +55,25 @@ async def test_backups_report_missing_directory(auth_client: AsyncClient) -> Non
     assert body["last_backup_at"] is None
 
 
+async def test_backups_report_counts_uploaded_files(
+    auth_client: AsyncClient, seeded: dict[str, object]
+) -> None:
+    """После загрузки файла сводка по месту на диске видит его размер."""
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    payload = b"%PDF-1.4 " + b"x" * 500
+    upload = await auth_client.post(
+        f"/api/v1/crm/leads/{lead_id}/attachments",
+        files={"file": ("Договор.pdf", payload, "application/pdf")},
+    )
+    assert upload.status_code == 201, upload.text
+
+    response = await auth_client.get("/api/v1/admin/backups")
+    assert response.status_code == 200
+    storage = response.json()["storage"]
+    assert storage["files"] == 1
+    assert storage["bytes"] == len(payload)
+
+
 async def test_deleting_user_moves_leads_to_admin(
     auth_client: AsyncClient, client: AsyncClient, seeded: dict[str, object]
 ) -> None:
