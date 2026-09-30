@@ -25,6 +25,8 @@ const MODES: { id: string; label: string; placeholder: string; action: string }[
 /** Картинки крупнее этого размера не разворачиваем в ленте — только чипом. */
 const INLINE_IMAGE_MAX = 5 * 1024 * 1024;
 
+const CHATTER_INSET_STYLE = { paddingInline: "var(--odoo-chatter-panel-padding)" };
+
 function relativeTime(iso: string): string {
   const date = new Date(iso);
   if (Number.isNaN(date.getTime())) return "";
@@ -146,7 +148,10 @@ export function Chatter({
 
   return (
     <div className="flex h-full min-h-[420px] flex-col bg-odoo-surface">
-      <div className="flex shrink-0 flex-wrap items-center gap-1 border-b border-odoo-border-light px-3 py-2">
+      <div
+        style={CHATTER_INSET_STYLE}
+        className="flex shrink-0 flex-wrap items-center gap-1 border-b border-odoo-chatter-divider py-2"
+      >
         {MODES.map((m) => (
           <button
             key={m.id}
@@ -196,7 +201,7 @@ export function Chatter({
       </div>
 
       {filesOpen && (
-        <div className="border-b border-odoo-border-light px-3 pb-2">
+        <div style={CHATTER_INSET_STYLE} className="border-b border-odoo-chatter-divider pb-2">
           <input
             ref={panelInput}
             type="file"
@@ -224,7 +229,7 @@ export function Chatter({
               {files.map((file) => (
                 <li
                   key={file.id}
-                  className="flex items-center gap-2 border-t border-odoo-border-light py-1 text-[13px] first:border-t-0"
+                  className="flex items-center gap-2 border-t border-odoo-chatter-divider py-1 text-[13px] first:border-t-0"
                 >
                   <Paperclip className="h-3.5 w-3.5 shrink-0 text-odoo-text-light" />
                   <button
@@ -266,7 +271,7 @@ export function Chatter({
       )}
 
       {searchOpen && (
-        <div className="flex items-center gap-1 px-3 pb-2">
+        <div style={CHATTER_INSET_STYLE} className="flex items-center gap-1 pb-2">
           <input
             autoFocus
             value={query}
@@ -288,7 +293,8 @@ export function Chatter({
       )}
 
       <form
-        className="shrink-0 border-b border-odoo-border-light px-3 py-3"
+        style={CHATTER_INSET_STYLE}
+        className="shrink-0 border-b border-odoo-chatter-divider py-3"
         onSubmit={(event) => {
           event.preventDefault();
           if (!onSubmit) return;
@@ -301,7 +307,7 @@ export function Chatter({
         <div className="flex items-start gap-2">
           <span
             title="Вы"
-            className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[4px] bg-odoo-primary text-[13px] font-semibold text-white"
+            className="mt-0.5 flex h-[var(--odoo-chatter-avatar-size)] w-[var(--odoo-chatter-avatar-size)] shrink-0 items-center justify-center rounded-[4px] bg-odoo-primary text-[13px] font-semibold text-white"
           >
             {authorInitials}
           </span>
@@ -317,7 +323,7 @@ export function Chatter({
             />
 
             {pending.length > 0 && (
-              <ul className="flex flex-wrap gap-1 border-t border-odoo-border-light px-2 py-1">
+              <ul className="flex flex-wrap gap-1 border-t border-odoo-chatter-divider px-2 py-1">
                 {pending.map((file, i) => (
                   <li
                     key={`${file.name}-${i}`}
@@ -343,7 +349,7 @@ export function Chatter({
               </ul>
             )}
 
-            <div className="flex h-8 items-center border-t border-odoo-border-light px-1">
+            <div className="flex h-8 items-center border-t border-odoo-chatter-divider px-1">
               <input
                 ref={composerInput}
                 type="file"
@@ -368,7 +374,7 @@ export function Chatter({
             </div>
           </div>
         </div>
-        <div className="ml-10 mt-2 flex items-center">
+        <div style={{ marginInlineStart: "var(--odoo-chatter-composer-indent)" }} className="mt-2 flex items-center">
           <button
             type="submit"
             disabled={posting || !onSubmit || (!text.trim() && pending.length === 0)}
@@ -379,7 +385,7 @@ export function Chatter({
         </div>
       </form>
 
-      <div className="flex-1 overflow-y-auto px-3 pb-4">
+      <div style={CHATTER_INSET_STYLE} className="flex-1 overflow-y-auto pb-4">
         {groups.length === 0 && (
           <p className="py-6 text-center text-[12px] text-odoo-text-light">
             {query ? "Ничего не найдено" : "Пока нет записей"}
@@ -388,16 +394,16 @@ export function Chatter({
         {groups.map(([day, entries]) => (
           <div key={day}>
             <div className="my-5 flex items-center gap-2 first:mt-4">
-              <span className="h-px flex-1 bg-odoo-border-light" />
+              <span className="h-px flex-1 bg-odoo-chatter-divider" />
               <span className="shrink-0 text-[11px] font-semibold text-odoo-text-muted">{day}</span>
-              <span className="h-px flex-1 bg-odoo-border-light" />
+              <span className="h-px flex-1 bg-odoo-chatter-divider" />
             </div>
             {entries.map((entry) => (
               <div
                 key={entry.id}
                 className={`flex items-start gap-2 ${entry.type === "note" ? "py-2.5" : "py-2"}`}
               >
-                <span className="mt-0.5 flex h-8 w-8 shrink-0 items-center justify-center rounded-[4px] bg-odoo-avatar text-[11px] font-semibold text-white">
+                <span className="mt-0.5 flex h-[var(--odoo-chatter-avatar-size)] w-[var(--odoo-chatter-avatar-size)] shrink-0 items-center justify-center rounded-[4px] bg-odoo-avatar text-[11px] font-semibold text-white">
                   {entry.author_initials ?? "—"}
                 </span>
                 <div className="min-w-0 flex-1">

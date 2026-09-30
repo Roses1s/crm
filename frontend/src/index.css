@@ -59,6 +59,7 @@
   --color-odoo-avatar: rgb(var(--odoo-avatar));
   --color-odoo-link: rgb(var(--odoo-link));
   --color-odoo-action: rgb(var(--odoo-action));
+  --color-odoo-chatter-divider: rgb(var(--odoo-chatter-divider));
 
   /* Цвета тегов не меняются в тёмной теме — как в оригинале. */
   --color-odoo-tag-blue-bg: #d4e6f9;
@@ -138,6 +139,12 @@
   --odoo-link: 0 160 157; /* #00A09D */
   --odoo-action: 113 75 103; /* #714B67 — интерактивный текст; в тёмной теме синий */
 
+  /* Чаттер: единая геометрия автора, отступов и мягких разделителей ленты. */
+  --odoo-chatter-avatar-size: 36px;
+  --odoo-chatter-panel-padding: 12px;
+  --odoo-chatter-composer-indent: 44px;
+  --odoo-chatter-divider: 233 236 239; /* #E9ECEF */
+
   /* Геометрия карточки: отдельные имена не дают расползаться числам по JSX. */
   --odoo-record-control-panel-height: 90px;
   --odoo-record-aside-width: 34.3%;
@@ -203,6 +210,7 @@
   --odoo-avatar: 75 75 85;
   --odoo-link: 106 176 232;
   --odoo-action: 106 176 232;
+  --odoo-chatter-divider: 52 53 59;
   --border: 220 8% 25%;
 }
 
