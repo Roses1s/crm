@@ -71,7 +71,7 @@ export function FormAlert({
 }) {
   const tones = {
     danger: "border-odoo-danger/30 bg-odoo-danger/10 text-odoo-danger",
-    warning: "border-amber-300 bg-amber-50 text-amber-800",
+    warning: "border-odoo-warning/30 bg-odoo-warning/10 text-odoo-warning",
   };
   return (
     <div role="alert" className={`mb-2 rounded-[4px] border px-3 py-2 text-[13px] ${tones[tone]}`}>
@@ -322,7 +322,7 @@ export function OdooInput({ className = "", ...props }: InputHTMLAttributes<HTML
   return (
     <input
       {...props}
-      className={`w-full rounded-[3px] border border-transparent bg-transparent px-1 py-[2px] text-[13px] leading-[19px] text-odoo-text outline-none transition-colors placeholder:text-odoo-text-light hover:border-odoo-border focus:border-odoo-primary ${className}`}
+      className={`w-full rounded-[3px] border border-transparent bg-transparent px-1 py-[2px] text-[13px] leading-[19px] text-odoo-text outline-none transition-colors placeholder:text-odoo-text-light hover:border-odoo-border focus:border-odoo-focus ${className}`}
     />
   );
 }
@@ -335,7 +335,7 @@ export function OdooTextarea({
   return (
     <textarea
       {...props}
-      className={`w-full resize-y rounded-[3px] border border-transparent bg-transparent px-1 py-[2px] text-[13px] leading-[19px] text-odoo-text outline-none transition-colors placeholder:text-odoo-text-light hover:border-odoo-border focus:border-odoo-primary ${className}`}
+      className={`w-full resize-y rounded-[3px] border border-transparent bg-transparent px-1 py-[2px] text-[13px] leading-[19px] text-odoo-text outline-none transition-colors placeholder:text-odoo-text-light hover:border-odoo-border focus:border-odoo-focus ${className}`}
     />
   );
 }

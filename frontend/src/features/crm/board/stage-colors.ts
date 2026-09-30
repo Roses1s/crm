@@ -1,11 +1,11 @@
-// Цвета этапов одинаковы в обеих темах — референсная тёмная тема их не меняет.
+// Цвета этапов независимы от поверхности: они остаются различимыми в обеих темах.
 export const STAGE_COLORS: Record<string, string> = {
-  slate: "#6C757D",
-  purple: "#714B67",
-  blue: "#17A2B8",
-  green: "#28A745",
-  red: "#DC3545",
-  orange: "#FD7E14",
+  slate: "#9A9AA0",
+  purple: "#6B3E66",
+  blue: "#47BBDC",
+  green: "#46B86A",
+  red: "#E85765",
+  orange: "#E58A37",
   yellow: "#FFC107",
 };
 

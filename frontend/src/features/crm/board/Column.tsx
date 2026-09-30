@@ -169,7 +169,7 @@ export function Column({
                           key={c}
                           type="button"
                           aria-label={`Цвет ${c}`}
-                          className="h-4 w-4 rounded-full border border-white shadow-sm"
+                          className="h-4 w-4 rounded-full border border-odoo-surface shadow-sm"
                           style={{ background: STAGE_COLORS[c] }}
                           onClick={() => {
                             setMenu(false);
@@ -210,7 +210,7 @@ export function Column({
         </div>
       </div>
       {confirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-odoo-overlay/30 p-4">
           <div className="w-full max-w-sm rounded-lg bg-odoo-surface p-4 shadow-lg">
             <h3 className="text-[15px] font-semibold text-odoo-text">
               Удалить этап «{stage.name}»?

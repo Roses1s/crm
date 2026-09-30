@@ -36,7 +36,7 @@ export function TransferDialog({
   }, [colleagues, query]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-black/30 p-4">
+    <div className="fixed inset-0 z-50 flex items-center justify-center bg-odoo-overlay/30 p-4">
       <div className="w-full max-w-md rounded-lg bg-odoo-surface p-4 shadow-lg">
         {chosen ? (
           <>

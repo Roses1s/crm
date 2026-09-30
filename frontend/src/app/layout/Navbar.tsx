@@ -117,7 +117,7 @@ export function Navbar() {
       </div>
 
       {sheet && (
-        <div className="fixed inset-0 z-[60] bg-black/20 md:hidden" onClick={() => setSheet(false)}>
+        <div className="fixed inset-0 z-[60] bg-odoo-overlay/20 md:hidden" onClick={() => setSheet(false)}>
           <div
             className="h-full w-64 bg-odoo-surface p-4 shadow-lg"
             onClick={(e) => e.stopPropagation()}

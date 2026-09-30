@@ -64,7 +64,7 @@ export function FilePreview({ file, onClose }: { file: Attachment; onClose: () =
 
   return (
     <div
-      className="fixed inset-0 z-[70] flex items-center justify-center bg-black/60 p-4"
+      className="fixed inset-0 z-[70] flex items-center justify-center bg-odoo-overlay/60 p-4"
       onClick={onClose}
     >
       <div

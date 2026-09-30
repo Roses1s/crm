@@ -62,21 +62,22 @@
   --color-odoo-nav: rgb(var(--odoo-nav));
   --color-odoo-nav-border: rgb(var(--odoo-nav-border));
   --color-odoo-focus: rgb(var(--odoo-focus));
+  --color-odoo-overlay: rgb(var(--odoo-overlay));
   --color-odoo-chatter-divider: rgb(var(--odoo-chatter-divider));
 
-  /* Цвета тегов не меняются в тёмной теме — как в оригинале. */
-  --color-odoo-tag-blue-bg: #d4e6f9;
-  --color-odoo-tag-blue-text: #1a5276;
-  --color-odoo-tag-green-bg: #d5f5e3;
-  --color-odoo-tag-green-text: #1e8449;
-  --color-odoo-tag-red-bg: #fadbd8;
-  --color-odoo-tag-red-text: #922b21;
-  --color-odoo-tag-yellow-bg: #fcf3cf;
-  --color-odoo-tag-yellow-text: #7d6608;
-  --color-odoo-tag-purple-bg: #e8daef;
-  --color-odoo-tag-purple-text: #6c3483;
-  --color-odoo-tag-orange-bg: #fdebd0;
-  --color-odoo-tag-orange-text: #935116;
+  /* Теги подстраиваются под тему, сохраняя смысл цвета и читаемость. */
+  --color-odoo-tag-blue-bg: rgb(var(--odoo-tag-blue-bg));
+  --color-odoo-tag-blue-text: rgb(var(--odoo-tag-blue-text));
+  --color-odoo-tag-green-bg: rgb(var(--odoo-tag-green-bg));
+  --color-odoo-tag-green-text: rgb(var(--odoo-tag-green-text));
+  --color-odoo-tag-red-bg: rgb(var(--odoo-tag-red-bg));
+  --color-odoo-tag-red-text: rgb(var(--odoo-tag-red-text));
+  --color-odoo-tag-yellow-bg: rgb(var(--odoo-tag-yellow-bg));
+  --color-odoo-tag-yellow-text: rgb(var(--odoo-tag-yellow-text));
+  --color-odoo-tag-purple-bg: rgb(var(--odoo-tag-purple-bg));
+  --color-odoo-tag-purple-text: rgb(var(--odoo-tag-purple-text));
+  --color-odoo-tag-orange-bg: rgb(var(--odoo-tag-orange-bg));
+  --color-odoo-tag-orange-text: rgb(var(--odoo-tag-orange-text));
 
   /* Цвет рамки по умолчанию для всех элементов (см. @layer base ниже). */
   --color-border: hsl(var(--border));
@@ -124,6 +125,7 @@
   --odoo-nav: 255 255 255;
   --odoo-nav-border: 221 217 223;
   --odoo-focus: 107 62 102;
+  --odoo-overlay: 42 32 42;
   --odoo-title-band: 249 241 247;
   --odoo-statusbar: 221 217 223;
   --odoo-statusbar-segment: 247 246 248;
@@ -144,6 +146,18 @@
   --odoo-avatar: 81 75 84;
   --odoo-link: 0 125 115;
   --odoo-action: 0 125 115;
+  --odoo-tag-blue-bg: 212 230 249;
+  --odoo-tag-blue-text: 26 82 118;
+  --odoo-tag-green-bg: 213 245 227;
+  --odoo-tag-green-text: 30 132 73;
+  --odoo-tag-red-bg: 250 219 216;
+  --odoo-tag-red-text: 146 43 33;
+  --odoo-tag-yellow-bg: 252 243 207;
+  --odoo-tag-yellow-text: 125 102 8;
+  --odoo-tag-purple-bg: 232 218 239;
+  --odoo-tag-purple-text: 108 52 131;
+  --odoo-tag-orange-bg: 253 235 208;
+  --odoo-tag-orange-text: 147 81 22;
 
   /* Чаттер: единая геометрия автора, отступов и мягких разделителей ленты. */
   --odoo-chatter-avatar-size: 36px;
@@ -200,6 +214,7 @@
   --odoo-nav: 27 29 38;
   --odoo-nav-border: 60 62 75;
   --odoo-focus: 2 199 181;
+  --odoo-overlay: 5 7 12;
   --odoo-title-band: 48 36 48;
   --odoo-statusbar: 60 62 75;
   --odoo-statusbar-segment: 48 52 66;
@@ -220,6 +235,18 @@
   --odoo-avatar: 66 70 82;
   --odoo-link: 2 199 181;
   --odoo-action: 2 199 181;
+  --odoo-tag-blue-bg: 40 71 92;
+  --odoo-tag-blue-text: 142 207 240;
+  --odoo-tag-green-bg: 34 82 58;
+  --odoo-tag-green-text: 145 224 169;
+  --odoo-tag-red-bg: 95 44 55;
+  --odoo-tag-red-text: 255 174 181;
+  --odoo-tag-yellow-bg: 88 69 25;
+  --odoo-tag-yellow-text: 255 221 121;
+  --odoo-tag-purple-bg: 76 54 79;
+  --odoo-tag-purple-text: 228 187 231;
+  --odoo-tag-orange-bg: 90 59 34;
+  --odoo-tag-orange-text: 247 190 133;
   --odoo-chatter-divider: 52 55 68;
   --border: 230 10% 24%;
 }
