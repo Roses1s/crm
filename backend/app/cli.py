@@ -189,7 +189,7 @@ async def seed() -> None:
                     lead_id=leads[0].id,
                     city_loading="Челябинск",
                     city_unloading="Новосибирск",
-                    status=ShipmentStatus.in_transit,
+                    status=ShipmentStatus.loaded,
                 )
             )
             await session.commit()

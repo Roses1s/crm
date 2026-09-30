@@ -21,19 +21,12 @@ import { Button } from "@/shared/ui/button";
 import { FormSection } from "@/shared/ui/form-section";
 import { FormSkeleton } from "@/shared/ui/skeleton";
 
-const STATUSES = [
-  "new",
-  "in_progress",
-  "in_transit",
-  "delivered",
-  "cancelled",
-] as const;
+const STATUSES = ["new", "checked", "loaded", "unloaded"] as const;
 const STATUS_LABEL: Record<string, string> = {
   new: "Новая",
-  in_progress: "В работе",
-  in_transit: "В пути",
-  delivered: "Доставлена",
-  cancelled: "Отменена",
+  checked: "Проверена и подписана заявка",
+  loaded: "Машина загрузилась",
+  unloaded: "Машина выгрузилась",
 };
 
 const inputCls =

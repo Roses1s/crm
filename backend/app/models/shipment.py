@@ -15,11 +15,10 @@ if TYPE_CHECKING:
 
 
 class ShipmentStatus(enum.StrEnum):
-    new = "new"
-    in_progress = "in_progress"
-    in_transit = "in_transit"
-    delivered = "delivered"
-    cancelled = "cancelled"
+    new = "new"  # Новая
+    checked = "checked"  # Проверена и подписана заявка
+    loaded = "loaded"  # Машина загрузилась
+    unloaded = "unloaded"  # Машина выгрузилась
 
 
 class TransportType(enum.StrEnum):

@@ -6,10 +6,9 @@ import { useShipments } from "@/shared/api/hooks";
 
 const STATUS: Record<string, { label: string; cls: string }> = {
   new: { label: "Новая", cls: "bg-odoo-tag-yellow-bg text-odoo-tag-yellow-text" },
-  in_progress: { label: "В работе", cls: "bg-odoo-tag-blue-bg text-odoo-tag-blue-text" },
-  in_transit: { label: "В пути", cls: "bg-odoo-tag-green-bg text-odoo-tag-green-text" },
-  delivered: { label: "Доставлена", cls: "bg-odoo-tag-green-bg text-odoo-tag-green-text" },
-  cancelled: { label: "Отменена", cls: "bg-odoo-tag-red-bg text-odoo-tag-red-text" },
+  checked: { label: "Проверена и подписана заявка", cls: "bg-odoo-tag-blue-bg text-odoo-tag-blue-text" },
+  loaded: { label: "Машина загрузилась", cls: "bg-odoo-tag-green-bg text-odoo-tag-green-text" },
+  unloaded: { label: "Машина выгрузилась", cls: "bg-odoo-tag-green-bg text-odoo-tag-green-text" },
 };
 
 /** Инициалы продавца для аватарки (до двух букв). */

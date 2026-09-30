@@ -39,10 +39,10 @@ async def test_status_transition(auth_client: AsyncClient, seeded: dict) -> None
     ]
 
     response = await auth_client.patch(
-        f"/api/v1/shipments/{shipment_id}/status", json={"status": "in_transit"}
+        f"/api/v1/shipments/{shipment_id}/status", json={"status": "loaded"}
     )
     assert response.status_code == 200
-    assert response.json()["status"] == "in_transit"
+    assert response.json()["status"] == "loaded"
 
 
 async def test_carriers_list(auth_client: AsyncClient, seeded: dict) -> None:
