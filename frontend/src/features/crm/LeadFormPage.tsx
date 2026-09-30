@@ -565,9 +565,10 @@ function LeadForm({ id }: { id?: string }) {
 
         {!isNew && (
           <div
-            // Постоянная ширина вместо доли экрана: доля уводила ленту тем
-            // дальше от формы, чем шире монитор.
-            className="w-full shrink-0 bg-odoo-surface lg:w-[420px] lg:overflow-y-auto"
+            // Соотношение как в Odoo CRM 17 на широком экране: чаттер занимает
+            // около трети рабочей области, а не становится визуально уже при
+            // росте разрешения или уменьшении масштаба браузера.
+            className="w-full shrink-0 bg-odoo-surface lg:w-[34.3%] lg:overflow-y-auto"
           >
             <Chatter
               timeline={timeline}
