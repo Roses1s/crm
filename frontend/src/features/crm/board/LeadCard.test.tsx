@@ -3,6 +3,7 @@ import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { LeadCardBody } from "@/features/crm/board/LeadCard";
+import { StarRating } from "@/features/crm/board/StarRating";
 import { renderWithProviders } from "@/test/utils";
 import type { Lead } from "@/shared/types";
 
@@ -41,6 +42,26 @@ describe("Карточка лида на канбане", () => {
     await user.click(screen.getByRole("button", { name: "Приоритет 3" }));
 
     expect(onPriorityChange).toHaveBeenCalledWith(3);
+  });
+
+  it("показывает предпросмотр приоритета при наведении на звезду", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<StarRating value={1} onChange={vi.fn()} />);
+
+    const first = screen.getByRole("button", { name: "Приоритет 1" });
+    const second = screen.getByRole("button", { name: "Приоритет 2" });
+    const third = screen.getByRole("button", { name: "Приоритет 3" });
+    expect(first).toHaveTextContent("★");
+    expect(second).toHaveTextContent("☆");
+
+    await user.hover(third);
+    expect(first).toHaveTextContent("★");
+    expect(second).toHaveTextContent("★");
+    expect(third).toHaveTextContent("★");
+
+    await user.unhover(third);
+    expect(second).toHaveTextContent("☆");
+    expect(third).toHaveTextContent("☆");
   });
 
   it("не показывает часики: активности убраны из CRM", () => {
