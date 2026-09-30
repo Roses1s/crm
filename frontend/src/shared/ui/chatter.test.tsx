@@ -78,6 +78,8 @@ describe("Лента примечаний", () => {
   it("автоматически увеличивает редактор и не показывает внутреннюю прокрутку", () => {
     renderWithProviders(<Chatter timeline={[]} authorInitials="М" />);
     const editor = screen.getByRole("textbox", { name: "Текст внутреннего примечания" });
+    expect(editor).toHaveAttribute("rows", "1");
+    expect(editor).toHaveClass("min-h-[var(--odoo-chatter-composer-min-height)]");
     Object.defineProperty(editor, "scrollHeight", { configurable: true, value: 138 });
 
     fireEvent.change(editor, { target: { value: "Длинная внутренняя запись" } });

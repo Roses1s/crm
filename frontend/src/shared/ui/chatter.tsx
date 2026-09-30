@@ -119,7 +119,7 @@ export function Chatter({
     // Сначала снимаем прежнюю высоту: иначе scrollHeight не уменьшается после
     // сохранения или удаления части текста и редактор остаётся слишком высоким.
     field.style.height = "auto";
-    field.style.height = `${Math.max(field.scrollHeight, 58)}px`;
+    field.style.height = `${field.scrollHeight}px`;
   }, [text]);
 
   const groups = useMemo(() => {
@@ -314,12 +314,12 @@ export function Chatter({
           <div className="min-w-0 flex-1 overflow-hidden rounded-[4px] border border-odoo-border bg-odoo-surface focus-within:border-odoo-primary">
             <textarea
               ref={composerText}
-              rows={2}
+              rows={1}
               aria-label="Текст внутреннего примечания"
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder={current.placeholder}
-              className="min-h-[58px] w-full resize-none overflow-hidden border-0 bg-transparent px-2 py-2 text-[13px] leading-[19px] text-odoo-text outline-none placeholder:text-odoo-text-light"
+              className="min-h-[var(--odoo-chatter-composer-min-height)] w-full resize-none overflow-hidden border-0 bg-transparent px-2 py-2 text-[13px] leading-[19px] text-odoo-text outline-none placeholder:text-odoo-text-light"
             />
 
             {pending.length > 0 && (
