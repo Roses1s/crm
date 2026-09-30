@@ -295,6 +295,37 @@
   }
 }
 
+@media (hover: hover) and (pointer: fine) {
+  /*
+   * У Odoo в спокойном состоянии видна только кнопка быстрого добавления.
+   * Остальные действия этапа появляются при наведении или клавиатурном фокусе,
+   * поэтому не сужают заголовок, но остаются доступны мышью и клавиатурой.
+   */
+  .crm-kanban-stage-header .crm-kanban-stage-secondary-action {
+    width: 0;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition: width 120ms ease, opacity 120ms ease;
+  }
+
+  .crm-kanban-stage-header:hover .crm-kanban-stage-secondary-action,
+  .crm-kanban-stage-header:focus-within .crm-kanban-stage-secondary-action {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .crm-kanban-stage-header:hover .crm-kanban-stage-secondary-action:nth-child(2),
+  .crm-kanban-stage-header:focus-within .crm-kanban-stage-secondary-action:nth-child(2) {
+    width: 1.25rem;
+  }
+
+  .crm-kanban-stage-header:hover .crm-kanban-stage-secondary-action:nth-child(3),
+  .crm-kanban-stage-header:focus-within .crm-kanban-stage-secondary-action:nth-child(3) {
+    width: 1.5rem;
+  }
+}
+
 @layer base {
   *,
   ::before,

@@ -73,7 +73,7 @@ export function Column({
         isOver ? "bg-odoo-drop" : "bg-odoo-board-canvas"
       }`}
     >
-      <div className="shrink-0 bg-odoo-board-canvas px-[var(--odoo-kanban-group-padding-x)] py-2">
+      <div className="crm-kanban-stage-header shrink-0 bg-odoo-board-canvas px-[var(--odoo-kanban-group-padding-x)] py-2">
         <div className="flex items-start justify-between gap-1">
           <div className="min-w-0">
             {editing ? (
@@ -115,7 +115,7 @@ export function Column({
             </button>
             <button
               type="button"
-              className="inline-flex h-6 w-5 items-center justify-center rounded-sm text-[17px] leading-none text-odoo-text-muted hover:bg-odoo-surface-sunken hover:text-odoo-text"
+              className="crm-kanban-stage-secondary-action inline-flex h-6 w-5 items-center justify-center rounded-sm text-[17px] leading-none text-odoo-text-muted hover:bg-odoo-surface-sunken hover:text-odoo-text"
               onClick={onFold}
               title="Свернуть"
               aria-label="Свернуть этап"
@@ -126,7 +126,7 @@ export function Column({
               <>
                 <button
                   type="button"
-                  className="inline-flex h-6 w-6 items-center justify-center rounded-sm text-odoo-text-muted hover:bg-odoo-surface-sunken hover:text-odoo-text"
+                  className="crm-kanban-stage-secondary-action inline-flex h-6 w-6 items-center justify-center rounded-sm text-odoo-text-muted hover:bg-odoo-surface-sunken hover:text-odoo-text"
                   onClick={() => setMenu((v) => !v)}
                   title="Меню этапа"
                   aria-label="Меню этапа"
@@ -195,7 +195,7 @@ export function Column({
           </div>
         </div>
         <div className="mt-1 flex items-center justify-between gap-2">
-          <div className="h-2.5 w-1/2 overflow-hidden bg-odoo-track">
+          <div className="h-3 w-1/2 overflow-hidden bg-odoo-track">
             <div
               className="h-full min-w-1"
               style={{

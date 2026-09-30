@@ -104,7 +104,7 @@ export function LeadCard({
 
   const inner = (
     <div
-      className={`overflow-hidden bg-odoo-board-card px-2.5 py-1.5 ${
+      className={`overflow-hidden bg-odoo-board-card px-3 py-2 ${
         isOverlay
           ? "w-[var(--odoo-kanban-record-current-width)] -rotate-[3deg] scale-[1.02] cursor-grabbing border border-odoo-primary shadow-2xl transition-transform"
           : isDragging
