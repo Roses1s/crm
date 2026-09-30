@@ -28,8 +28,11 @@ jobs:
 
       - uses: actions/setup-python@v5
         with:
-          # Версия как в проде (backend/Dockerfile: python:3.13-slim).
-          python-version: "3.13"
+          # Быстрые статические проверки (ruff/mypy) и юнит-тесты идут на
+          # стабильной 3.11: mypy и так закреплён на цель 3.11 (см. pyproject),
+          # прогон воспроизводим. Прод-паритет среды выполнения (Python 3.13 +
+          # PostgreSQL) обеспечивает отдельная джоба backend-postgres ниже.
+          python-version: "3.11"
           cache: pip
 
       - name: Установка зависимостей
