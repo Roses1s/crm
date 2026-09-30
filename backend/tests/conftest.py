@@ -1,8 +1,11 @@
 """Общая обвязка тестов.
 
-Тесты идут на SQLite в памяти: не нужен ни Postgres, ни Valkey, прогон
-занимает секунды. Схема создаётся из моделей, а не миграциями — миграции
-проверяются отдельно на настоящем PostgreSQL.
+По умолчанию тесты идут на SQLite в памяти: не нужен ни Postgres, ни Valkey,
+прогон занимает секунды. Но если задать переменную окружения
+``TEST_DATABASE_URL`` (например, на настоящий PostgreSQL), тот же набор тестов
+прогонится на этой базе — так в CI мы ловим отличия поведения PostgreSQL от
+SQLite. Схема создаётся из моделей; миграции проверяются отдельным шагом
+``alembic upgrade head`` на настоящем PostgreSQL.
 """
 
 from __future__ import annotations
@@ -12,12 +15,17 @@ import shutil
 import tempfile
 from collections.abc import AsyncGenerator
 
+# Куда указывать тестовую базу. По умолчанию — SQLite в памяти.
+# В CI на шаге «тесты на PostgreSQL» сюда приходит DSN сервиса postgres.
+TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
+_IS_SQLITE = TEST_DATABASE_URL.startswith("sqlite")
+
 # Переменные окружения выставляются ДО импорта приложения.
 # Вложения в тестах пишутся во временный каталог, который чистится после прогона.
 _ATTACHMENTS_TMP = tempfile.mkdtemp(prefix="crm-test-attachments-")
 
 os.environ.update(
-    DATABASE_URL="sqlite+aiosqlite:///:memory:",
+    DATABASE_URL=TEST_DATABASE_URL,
     ATTACHMENTS_DIR=_ATTACHMENTS_TMP,
     MAX_UPLOAD_MB="1",
     SECRET_KEY="test-secret",
@@ -36,7 +44,7 @@ from sqlalchemy.ext.asyncio import (
     async_sessionmaker,
     create_async_engine,
 )
-from sqlalchemy.pool import StaticPool
+from sqlalchemy.pool import NullPool, StaticPool
 
 from app.core.security import hash_password
 from app.db.base import Base
@@ -68,15 +76,26 @@ async def _cache() -> AsyncGenerator[None, None]:
 
 @pytest.fixture
 async def engine() -> AsyncGenerator:
-    # StaticPool + одно соединение: иначе каждая сессия получит свою пустую БД.
-    test_engine = create_async_engine(
-        "sqlite+aiosqlite:///:memory:",
-        connect_args={"check_same_thread": False},
-        poolclass=StaticPool,
-    )
+    if _IS_SQLITE:
+        # StaticPool + одно соединение: иначе каждая сессия получит свою пустую БД.
+        test_engine = create_async_engine(
+            TEST_DATABASE_URL,
+            connect_args={"check_same_thread": False},
+            poolclass=StaticPool,
+        )
+    else:
+        # На настоящей базе (PostgreSQL) соединения не переиспользуем между
+        # тестами, чтобы не тащить состояние: NullPool закрывает их сразу.
+        test_engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
+
     async with test_engine.begin() as conn:
+        # На постоянной базе таблицы могли остаться от прошлого теста —
+        # начинаем с чистого листа. Для SQLite в памяти это безвредный no-op.
+        await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     yield test_engine
+    async with test_engine.begin() as conn:
+        await conn.run_sync(Base.metadata.drop_all)
     await test_engine.dispose()
 
 

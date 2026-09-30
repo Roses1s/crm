@@ -1,8 +1,12 @@
 # Автопроверки кода.
 #
 # Запускаются при каждой отправке в рабочую ветку и при открытии pull request.
-# Повторяют ровно то, что агент делает вручную: линтеры, типы, тесты, сборка.
-# Docker, PostgreSQL и Valkey здесь не нужны — тесты бэкенда идут на SQLite.
+# Повторяют то, что агент делает вручную: линтеры, типы, тесты, сборка.
+#
+# Быстрый прогон бэкенда идёт на SQLite (секунды). Дополнительно есть отдельная
+# джоба на настоящем PostgreSQL той же версии, что и в проде: она гоняет
+# миграции и тесты на реальной базе, чтобы ловить несовместимости, которых
+# на SQLite не видно (например, SQLite-only функции в миграциях).
 
 name: Проверки
 
@@ -45,6 +49,50 @@ jobs:
         env:
           DATABASE_URL: sqlite+aiosqlite:////tmp/checks.db
         run: alembic upgrade head
+
+  backend-postgres:
+    name: Бэкенд на PostgreSQL — миграции и тесты
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: backend
+    # PostgreSQL той же версии, что и в проде (docker-compose: postgres:18-alpine).
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: crm
+          POSTGRES_PASSWORD: crm
+          POSTGRES_DB: crm_test
+        ports:
+          - 5432:5432
+        # Джоба стартует только когда база готова принимать соединения.
+        options: >-
+          --health-cmd "pg_isready -U crm"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v4
+
+      - uses: actions/setup-python@v5
+        with:
+          # Версия как в проде (backend/Dockerfile: python:3.13-slim).
+          python-version: "3.13"
+          cache: pip
+
+      - name: Установка зависимостей
+        run: pip install -e ".[dev]"
+
+      - name: Миграции на настоящем PostgreSQL
+        env:
+          DATABASE_URL: postgresql+asyncpg://crm:crm@localhost:5432/crm_test
+        run: alembic upgrade head
+
+      - name: Тесты на PostgreSQL
+        env:
+          TEST_DATABASE_URL: postgresql+asyncpg://crm:crm@localhost:5432/crm_test
+        run: python -m pytest -q
 
   frontend:
     name: Фронтенд — типы, тесты, сборка
