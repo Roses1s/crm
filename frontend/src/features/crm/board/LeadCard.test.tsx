@@ -1,5 +1,6 @@
 import { screen } from "@testing-library/react";
-import { describe, expect, it } from "vitest";
+import userEvent from "@testing-library/user-event";
+import { describe, expect, it, vi } from "vitest";
 
 import { LeadCardBody } from "@/features/crm/board/LeadCard";
 import { renderWithProviders } from "@/test/utils";
@@ -25,7 +26,21 @@ describe("Карточка лида на канбане", () => {
     ).toBeInTheDocument();
     expect(screen.getByText(/7451234565/)).toBeInTheDocument();
     expect(screen.getByText("Громов Сергей")).toBeInTheDocument();
-    expect(screen.getByText("Крупный клиент")).toBeInTheDocument();
+    const tag = screen.getByText("Крупный клиент");
+    expect(tag).toBeInTheDocument();
+    expect(tag.parentElement).toHaveClass("bg-odoo-tag-green-bg");
+  });
+
+  it("меняет приоритет по звезде без открытия карточки", async () => {
+    const user = userEvent.setup();
+    const onPriorityChange = vi.fn();
+    renderWithProviders(
+      <LeadCardBody lead={LEAD} onPriorityChange={onPriorityChange} />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Приоритет 3" }));
+
+    expect(onPriorityChange).toHaveBeenCalledWith(3);
   });
 
   it("не показывает часики: активности убраны из CRM", () => {

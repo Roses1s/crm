@@ -2,15 +2,7 @@
 import { Plus, X } from "lucide-react";
 import { useState } from "react";
 import type { Tag } from "@/shared/types";
-
-const TAG_STYLES: Record<string, string> = {
-  blue: "bg-odoo-tag-blue-bg text-odoo-tag-blue-text",
-  green: "bg-odoo-tag-green-bg text-odoo-tag-green-text",
-  red: "bg-odoo-tag-red-bg text-odoo-tag-red-text",
-  yellow: "bg-odoo-tag-yellow-bg text-odoo-tag-yellow-text",
-  purple: "bg-odoo-tag-purple-bg text-odoo-tag-purple-text",
-  orange: "bg-odoo-tag-orange-bg text-odoo-tag-orange-text",
-};
+import { DEFAULT_TAG_STYLE, TAG_STYLES } from "@/shared/ui/tag-styles";
 
 export function TagsField({
   all,
@@ -34,7 +26,7 @@ export function TagsField({
         <span
           key={tag.id}
           className={`inline-flex max-w-[220px] items-center gap-1 rounded-full px-2 py-0.5 text-[11px] leading-[16px] ${
-            TAG_STYLES[tag.color] ?? "bg-odoo-chip text-odoo-chip-text"
+            TAG_STYLES[tag.color] ?? DEFAULT_TAG_STYLE
           }`}
         >
           <span className="truncate" title={tag.name}>

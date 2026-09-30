@@ -4,16 +4,20 @@ import { MoreVertical } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { useUpdateLeadPriority } from "@/shared/api/hooks";
 import { ownerInitials, ownerLabel } from "@/shared/lib/owner";
 import type { Lead } from "@/shared/types";
+import { DEFAULT_TAG_STYLE, TAG_STYLES } from "@/shared/ui/tag-styles";
 import { StarRating } from "./StarRating";
 
 export function LeadCardBody({
   lead,
   menuSpace = false,
+  onPriorityChange,
 }: {
   lead: Lead;
   menuSpace?: boolean;
+  onPriorityChange?: (priority: number) => void;
 }) {
   const title = `${lead.name} — ${lead.inn}`;
 
@@ -40,7 +44,7 @@ export function LeadCardBody({
             <span
               key={tag.id}
               title={tag.name}
-              className="inline-flex max-w-full items-center rounded-full bg-odoo-chip px-1.5 py-px text-[10px] font-normal leading-[13px] text-odoo-chip-text"
+              className={`inline-flex max-w-full items-center rounded-full px-1.5 py-px text-[10px] font-normal leading-[13px] ${TAG_STYLES[tag.color] ?? DEFAULT_TAG_STYLE}`}
             >
               <span className="max-w-[150px] truncate">{tag.name}</span>
             </span>
@@ -50,7 +54,7 @@ export function LeadCardBody({
 
       <div className="mt-0.5 flex shrink-0 items-end justify-between gap-2">
         <div className="flex items-center gap-1.5">
-          <StarRating value={lead.priority} />
+          <StarRating value={lead.priority} onChange={onPriorityChange} />
         </div>
         <span
           title={
@@ -79,6 +83,7 @@ export function LeadCard({
   isOverlay?: boolean;
 }) {
   const [menuOpen, setMenuOpen] = useState(false);
+  const updatePriority = useUpdateLeadPriority();
   const {
     attributes,
     listeners,
@@ -112,7 +117,19 @@ export function LeadCard({
             : "cursor-grab transition-colors duration-150 hover:bg-odoo-board-card-hover"
       }`}
     >
-      <LeadCardBody lead={lead} menuSpace={!isOverlay} />
+      <LeadCardBody
+        lead={lead}
+        menuSpace={!isOverlay}
+        onPriorityChange={
+          isOverlay
+            ? undefined
+            : (priority) => {
+                if (!updatePriority.isPending) {
+                  updatePriority.mutate({ id: lead.id, priority });
+                }
+              }
+        }
+      />
     </div>
   );
 

@@ -8,7 +8,7 @@ export function StarRating({
 }) {
   return (
     <span
-      className="text-[15px] leading-none tracking-tight text-odoo-warning"
+      className="text-[15px] leading-none tracking-tight"
       aria-label={`Приоритет: ${value} из 3`}
     >
       {[1, 2, 3].map((n) =>
@@ -16,7 +16,7 @@ export function StarRating({
           <button
             key={n}
             type="button"
-            className="px-px"
+            className={`px-px ${value >= n ? "text-odoo-warning" : "text-odoo-text-muted"}`}
             aria-label={`Приоритет ${n}`}
             onClick={(e) => {
               e.preventDefault();
@@ -27,7 +27,11 @@ export function StarRating({
             {value >= n ? "★" : "☆"}
           </button>
         ) : (
-          <span key={n} className="px-px" aria-hidden="true">
+          <span
+            key={n}
+            className={`px-px ${value >= n ? "text-odoo-warning" : "text-odoo-text-muted"}`}
+            aria-hidden="true"
+          >
             {value >= n ? "★" : "☆"}
           </span>
         ),

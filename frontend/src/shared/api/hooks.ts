@@ -287,6 +287,48 @@ export function useMoveLead() {
   });
 }
 
+/** Быстрая смена приоритета на доске: звёзды меняются до ответа сервера. */
+export function useUpdateLeadPriority() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, priority }: { id: number; priority: number }) =>
+      api<Lead>(`/crm/leads/${id}`, { method: "PATCH", body: { priority } }),
+    onMutate: async ({ id, priority }) => {
+      await qc.cancelQueries({ queryKey: ["leads"] });
+      const leadsSnapshot = qc.getQueriesData<Page<Lead>>({
+        queryKey: ["leads"],
+      });
+      const leadSnapshot = qc.getQueryData<Lead>(keys.lead(id));
+
+      qc.setQueriesData<Page<Lead>>({ queryKey: ["leads"] }, (old) =>
+        old
+          ? {
+              ...old,
+              results: old.results.map((lead) =>
+                lead.id === id ? { ...lead, priority } : lead,
+              ),
+            }
+          : old,
+      );
+      qc.setQueryData<Lead>(keys.lead(id), (old) =>
+        old ? { ...old, priority } : old,
+      );
+      return { leadsSnapshot, leadSnapshot, id };
+    },
+    onError: (_error, _variables, context) => {
+      context?.leadsSnapshot.forEach(([key, data]) => qc.setQueryData(key, data));
+      if (context?.leadSnapshot) {
+        qc.setQueryData(keys.lead(context.id), context.leadSnapshot);
+      }
+    },
+    onSuccess: (_data, { id }) => {
+      void qc.invalidateQueries({ queryKey: ["leads"] });
+      void qc.invalidateQueries({ queryKey: keys.lead(id) });
+      void qc.invalidateQueries({ queryKey: keys.timeline(id) });
+    },
+  });
+}
+
 export function useArchiveLead() {
   const qc = useQueryClient();
   return useMutation({
