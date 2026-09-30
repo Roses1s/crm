@@ -212,7 +212,10 @@ export function Column({
               }}
             />
           </div>
-          <span className="shrink-0 text-[13px] font-semibold leading-4 text-odoo-text [font-variant-numeric:tabular-nums]">
+          <span
+            className="flex h-3 w-5 shrink-0 items-center justify-end text-right text-[13px] font-semibold leading-none text-odoo-text [font-variant-numeric:tabular-nums]"
+            aria-label={`Лидов в этапе: ${leads.length}`}
+          >
             {leads.length}
           </span>
         </div>

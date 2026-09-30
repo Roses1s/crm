@@ -159,7 +159,7 @@ export function ControlPanel({
         {onSearch && (
           <div className="pointer-events-none order-last flex w-full justify-center md:absolute md:inset-x-0 md:order-none md:w-auto">
             <div className="pointer-events-auto relative w-full md:w-[min(100%,600px)]">
-              <div className="flex h-8 w-full items-stretch overflow-hidden rounded-[3px] border border-odoo-accent-line bg-odoo-surface-sunken shadow-xs focus-within:ring-1 focus-within:ring-odoo-accent-line">
+              <div className="flex h-8 w-full items-stretch overflow-hidden rounded-[3px] border border-odoo-border bg-odoo-surface-sunken shadow-xs transition-[border-color,box-shadow] focus-within:border-odoo-accent-line/70 focus-within:ring-1 focus-within:ring-odoo-accent-line/20">
                 <span className="flex items-center pl-3 pr-2">
                   <Search className="h-4 w-4 shrink-0 text-odoo-search-icon" />
                 </span>

@@ -238,7 +238,7 @@ export function KanbanPage() {
       {view === "list" && <LeadListView leads={leads} groupBy="stage" />}
 
       {view !== "list" && (
-        <div className="crm-kanban-renderer flex h-[calc(100dvh-var(--odoo-record-control-panel-height))] min-h-0 snap-x snap-mandatory gap-0 overflow-x-auto overflow-y-hidden overscroll-x-contain bg-odoo-board-canvas md:snap-none">
+        <div className="crm-kanban-renderer flex h-[calc(100dvh-var(--odoo-record-control-panel-height))] min-h-0 snap-x snap-mandatory gap-0 overflow-x-auto overflow-y-hidden overscroll-x-contain bg-odoo-board-canvas pl-2 md:snap-none">
           <DndContext
             sensors={sensors}
             collisionDetection={collisionDetection}
