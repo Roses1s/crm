@@ -154,12 +154,12 @@ export function FormStatusbar({
                 onClick={() => onSelect(item.id)}
                 title={item.name}
                 style={{ clipPath: single ? undefined : arrowClip(shape, 1) }}
-                className={`max-w-[200px] truncate bg-odoo-surface text-[13px] transition-colors disabled:cursor-wait ${
+                className={`max-w-[200px] truncate text-[13px] transition-colors disabled:cursor-wait ${
                   isFirst ? "pl-4" : "pl-5"
                 } pr-4 ${
                   active
                     ? "bg-odoo-statusbar-current font-semibold text-white"
-                    : "font-medium text-odoo-statusbar-text hover:bg-odoo-bg"
+                    : "bg-odoo-surface font-medium text-odoo-statusbar-text hover:bg-odoo-bg"
                 }`}
               >
                 {item.name}

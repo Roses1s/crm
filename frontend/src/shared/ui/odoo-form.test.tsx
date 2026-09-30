@@ -51,6 +51,7 @@ describe("Статусбар карточки", () => {
     const current = screen.getByRole("button", { name: "В работе" });
     expect(current).toHaveAttribute("aria-current", "step");
     expect(current).toHaveClass("bg-odoo-statusbar-current", "text-white");
+    expect(current).not.toHaveClass("bg-odoo-surface");
 
     fireEvent.click(screen.getByRole("button", { name: "Переговоры" }));
     expect(onSelect).toHaveBeenCalledWith(3);
