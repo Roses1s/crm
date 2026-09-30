@@ -77,11 +77,11 @@ export function ControlPanel({
 }) {
   return (
     <div className="sticky top-10 z-30 shrink-0 border-b border-odoo-border-light bg-odoo-surface">
-      <div className="relative flex min-h-[44px] flex-wrap items-center gap-2 px-3 py-1 md:flex-nowrap md:py-0">
+      <div className="relative flex min-h-14 flex-wrap items-center gap-2 px-4 py-1 md:flex-nowrap md:py-0">
         {createTo && (
           <Link
             to={createTo}
-            className="inline-flex h-7 items-center rounded-[3px] px-3 text-[13px] font-medium text-white hover:opacity-90"
+            className="inline-flex h-8 items-center rounded-[3px] px-3 text-[13px] font-medium text-white hover:opacity-90"
             style={{ backgroundColor: "rgb(var(--odoo-primary))" }}
           >
             Новый
@@ -91,7 +91,7 @@ export function ControlPanel({
           <button
             type="button"
             onClick={onNew}
-            className="inline-flex h-7 shrink-0 items-center rounded-[4px] border border-odoo-border bg-odoo-surface px-3 text-[13px] text-odoo-text transition-colors hover:bg-odoo-bg"
+            className="inline-flex h-8 shrink-0 items-center rounded-[4px] border border-odoo-border bg-odoo-surface px-3 text-[13px] text-odoo-text transition-colors hover:bg-odoo-bg"
           >
             Новый
           </button>
@@ -148,7 +148,7 @@ export function ControlPanel({
         {onSettings && (
           <button
             type="button"
-            className="inline-flex h-7 w-7 items-center justify-center rounded-sm text-odoo-text-muted hover:bg-odoo-bg hover:text-odoo-text"
+            className="inline-flex h-8 w-8 items-center justify-center rounded-sm text-odoo-text-muted hover:bg-odoo-bg hover:text-odoo-text"
             onClick={onSettings}
             title="Настройки"
             aria-label="Настройки"
@@ -159,7 +159,7 @@ export function ControlPanel({
         {onSearch && (
           <div className="pointer-events-none order-last flex w-full justify-center md:absolute md:inset-x-0 md:order-none md:w-auto">
             <div className="pointer-events-auto relative w-full md:w-[min(100%,600px)]">
-              <div className="flex h-7 w-full items-stretch overflow-hidden rounded-[3px] border border-odoo-accent-line bg-odoo-surface-sunken shadow-xs focus-within:ring-1 focus-within:ring-odoo-accent-line">
+              <div className="flex h-8 w-full items-stretch overflow-hidden rounded-[3px] border border-odoo-accent-line bg-odoo-surface-sunken shadow-xs focus-within:ring-1 focus-within:ring-odoo-accent-line">
                 <span className="flex items-center pl-3 pr-2">
                   <Search className="h-4 w-4 shrink-0 text-odoo-search-icon" />
                 </span>
@@ -197,10 +197,10 @@ export function ControlPanel({
             </span>
           )}
           {onView && (
-            <span className="mr-1 inline-flex h-7 overflow-hidden rounded-[3px] border border-odoo-border bg-odoo-surface-sunken">
+            <span className="mr-1 inline-flex h-8 overflow-hidden rounded-[3px] border border-odoo-border bg-odoo-surface-sunken">
               <button
                 type="button"
-                className={`inline-flex w-7 items-center justify-center border-r border-odoo-border transition-colors ${view !== "list" ? "bg-odoo-accent-soft text-odoo-action" : "text-odoo-text-muted hover:bg-odoo-bg"}`}
+                className={`inline-flex w-8 items-center justify-center border-r border-odoo-border transition-colors ${view !== "list" ? "bg-odoo-accent-soft text-odoo-action" : "text-odoo-text-muted hover:bg-odoo-bg"}`}
                 onClick={() => onView("kanban")}
                 title="Канбан"
               >
@@ -208,7 +208,7 @@ export function ControlPanel({
               </button>
               <button
                 type="button"
-                className={`inline-flex w-7 items-center justify-center transition-colors ${view === "list" ? "bg-odoo-accent-soft text-odoo-action" : "text-odoo-text-muted hover:bg-odoo-bg"}`}
+                className={`inline-flex w-8 items-center justify-center transition-colors ${view === "list" ? "bg-odoo-accent-soft text-odoo-action" : "text-odoo-text-muted hover:bg-odoo-bg"}`}
                 onClick={() => onView("list")}
                 title="Список"
               >
