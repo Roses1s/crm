@@ -103,7 +103,7 @@ class Shipment(Base, TimestampMixin):
     cargo_type: Mapped[str] = mapped_column(String(255), default="", nullable=False)
     cargo_packaging: Mapped[str] = mapped_column(String(255), default="", nullable=False)
     capacity: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
-    body_type: Mapped[str] = mapped_column(String(120), default="", nullable=False)
+    body_type: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     loading_method: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
 
     lead: Mapped[Lead] = relationship(back_populates="shipments", lazy="joined")

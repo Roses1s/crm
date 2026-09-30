@@ -1,5 +1,11 @@
 import { FileText } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
+import {
+  useEffect,
+  useRef,
+  useState,
+  type InputHTMLAttributes,
+  type TextareaHTMLAttributes,
+} from "react";
 import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { AppShell, ControlPanel } from "@/app/layout/AppShell";
@@ -36,14 +42,25 @@ import {
   InnerGroup,
   Notebook,
   OdooCheckbox,
-  OdooInput,
-  OdooTextarea,
 } from "@/shared/ui/odoo-form";
 import { FormSkeleton } from "@/shared/ui/skeleton";
 import { TokenField } from "./TokenField";
 
-// Наша компания — статичная шапка бланка (как «АДК Транс» в реальном Odoo).
-const OWN_COMPANY = "АДК Транс";
+// Наша компания — статичная шапка бланка.
+const OWN_COMPANY = 'ООО "Детроид"';
+
+// Поля ввода на карточке видны всегда (мягкая рамка + едва заметный фон),
+// но не выбиваются из общего стиля; рамка чуть темнеет при наведении/фокусе.
+const fieldCls =
+  "w-full rounded-[3px] border border-odoo-border/50 bg-odoo-surface/60 px-1.5 py-[3px] text-[13px] leading-[19px] text-odoo-text outline-none transition-colors placeholder:text-odoo-text-light hover:border-odoo-border focus:border-odoo-focus/60";
+
+function SInput({ className = "", ...props }: InputHTMLAttributes<HTMLInputElement>) {
+  return <input {...props} className={`${fieldCls} ${className}`} />;
+}
+
+function STextarea({ className = "", ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
+  return <textarea {...props} className={`${fieldCls} resize-y ${className}`} />;
+}
 
 // Этапы заявки — единая воронка (Новая → … → Машина выгрузилась). Статусбар
 // работает по числовым id, поэтому держим и id (позиция), и значение статуса.
@@ -63,8 +80,7 @@ const TRANSPORT_OPTIONS: { value: string; label: string }[] = [
   { value: "other", label: "Другое" },
 ];
 
-const selectCls =
-  "w-full rounded-[3px] border border-transparent bg-transparent px-1 py-[2px] text-[13px] leading-[19px] text-odoo-text outline-none transition-colors hover:border-odoo-border focus:border-odoo-focus/40";
+const selectCls = fieldCls;
 
 const emptyForm = {
   lead_id: 0,
@@ -81,23 +97,19 @@ const emptyForm = {
   comment: "",
 
   // Заказчик (шапка).
-  customer_address: "",
   customer_contact: "",
-  customer_signer: "",
 
   // Погрузка.
   loading_cities: [] as string[],
   loading_date_from: "",
   loading_date_to: "",
   loading_time_from: "",
-  loading_time_to: "",
 
   // Выгрузка.
   unloading_cities: [] as string[],
   unloading_date_from: "",
   unloading_date_to: "",
   unloading_time_from: "",
-  unloading_time_to: "",
 
   // Перевозчик.
   carrier_contact: "",
@@ -114,7 +126,7 @@ const emptyForm = {
   cargo_type: "",
   cargo_packaging: "",
   capacity: "",
-  body_type: "",
+  body_type: [] as string[],
   loading_method: [] as string[],
 };
 
@@ -179,21 +191,17 @@ function ShipmentForm({ id }: { id?: string }) {
         cargo_volume: shipment.cargo_volume ?? "",
         comment: shipment.comment ?? "",
 
-        customer_address: shipment.customer_address ?? "",
         customer_contact: shipment.customer_contact ?? "",
-        customer_signer: shipment.customer_signer ?? "",
 
         loading_cities: shipment.loading_cities ?? [],
         loading_date_from: shipment.loading_date_from ?? "",
         loading_date_to: shipment.loading_date_to ?? "",
         loading_time_from: shipment.loading_time_from ?? "",
-        loading_time_to: shipment.loading_time_to ?? "",
 
         unloading_cities: shipment.unloading_cities ?? [],
         unloading_date_from: shipment.unloading_date_from ?? "",
         unloading_date_to: shipment.unloading_date_to ?? "",
         unloading_time_from: shipment.unloading_time_from ?? "",
-        unloading_time_to: shipment.unloading_time_to ?? "",
 
         carrier_contact: shipment.carrier_contact ?? "",
         vehicle: shipment.vehicle ?? "",
@@ -208,7 +216,7 @@ function ShipmentForm({ id }: { id?: string }) {
         cargo_type: shipment.cargo_type ?? "",
         cargo_packaging: shipment.cargo_packaging ?? "",
         capacity: shipment.capacity ?? "",
-        body_type: shipment.body_type ?? "",
+        body_type: shipment.body_type ?? [],
         loading_method: shipment.loading_method ?? [],
       };
       setForm(next);
@@ -370,51 +378,27 @@ function ShipmentForm({ id }: { id?: string }) {
                   </span>
                 </FormTitle>
 
-                {/* --- Шапка: своя компания и заказчик --- */}
+                {/* --- Шапка: своя компания и заказчик (заказчик привязан к лиду) --- */}
                 <FormGroup>
                   <div>
                     <InnerGroup title="Заявка">
                       <Field label="Компания">
-                        <span className="px-1 py-[2px] text-odoo-text">
+                        <span className="px-1.5 py-[3px] text-odoo-text">
                           {OWN_COMPANY}
                         </span>
                       </Field>
-                      <Field label="Заказчик" htmlFor="ship-lead">
-                        <select
-                          id="ship-lead"
-                          className={selectCls}
-                          value={form.lead_id || ""}
-                          onChange={(e) => set("lead_id", Number(e.target.value))}
-                        >
-                          <option value="">Выберите заказчика</option>
-                          {leads.map((l) => (
-                            <option key={l.id} value={l.id}>
-                              {l.name}
-                            </option>
-                          ))}
-                        </select>
+                      <Field label="Заказчик">
+                        <span className="px-1.5 py-[3px] text-odoo-text">
+                          {selectedLead?.name || title}
+                        </span>
                       </Field>
                       <Field label="ИНН заказчика">
-                        <span className="px-1 py-[2px] text-odoo-text-muted">
+                        <span className="px-1.5 py-[3px] text-odoo-text-muted">
                           {selectedLead?.inn || "—"}
                         </span>
                       </Field>
-                    </InnerGroup>
-                  </div>
-
-                  <div>
-                    <InnerGroup title="Реквизиты заказчика">
-                      <Field label="Адрес заказчика" htmlFor="ship-cust-addr">
-                        <OdooInput
-                          id="ship-cust-addr"
-                          value={form.customer_address}
-                          onChange={(e) =>
-                            set("customer_address", e.target.value)
-                          }
-                        />
-                      </Field>
                       <Field label="Контакт заказчика" htmlFor="ship-cust-contact">
-                        <OdooInput
+                        <SInput
                           id="ship-cust-contact"
                           value={form.customer_contact}
                           onChange={(e) =>
@@ -422,17 +406,9 @@ function ShipmentForm({ id }: { id?: string }) {
                           }
                         />
                       </Field>
-                      <Field label="Кто подписывает" htmlFor="ship-cust-signer">
-                        <OdooInput
-                          id="ship-cust-signer"
-                          value={form.customer_signer}
-                          onChange={(e) =>
-                            set("customer_signer", e.target.value)
-                          }
-                        />
-                      </Field>
                     </InnerGroup>
                   </div>
+                  <div />
                 </FormGroup>
 
                 {/* --- Погрузка / Выгрузка --- */}
@@ -448,14 +424,14 @@ function ShipmentForm({ id }: { id?: string }) {
                         />
                       </Field>
                       <Field label="Адрес погрузки" htmlFor="ship-addr-load">
-                        <OdooInput
+                        <SInput
                           id="ship-addr-load"
                           value={form.address_loading}
                           onChange={(e) => set("address_loading", e.target.value)}
                         />
                       </Field>
                       <Field label="Контакт" htmlFor="ship-load-name">
-                        <OdooInput
+                        <SInput
                           id="ship-load-name"
                           placeholder="Фамилия Имя"
                           value={form.contact_loading_name}
@@ -465,7 +441,7 @@ function ShipmentForm({ id }: { id?: string }) {
                         />
                       </Field>
                       <Field label="Телефон" htmlFor="ship-load-phone">
-                        <OdooInput
+                        <SInput
                           id="ship-load-phone"
                           placeholder="+7 900 000-00-00"
                           value={form.contact_loading_phone}
@@ -475,7 +451,7 @@ function ShipmentForm({ id }: { id?: string }) {
                         />
                       </Field>
                       <Field label="Дата погрузки с" htmlFor="ship-load-date-from">
-                        <OdooInput
+                        <SInput
                           id="ship-load-date-from"
                           type="date"
                           value={form.loading_date_from}
@@ -485,7 +461,7 @@ function ShipmentForm({ id }: { id?: string }) {
                         />
                       </Field>
                       <Field label="Дата погрузки по" htmlFor="ship-load-date-to">
-                        <OdooInput
+                        <SInput
                           id="ship-load-date-to"
                           type="date"
                           value={form.loading_date_to}
@@ -494,23 +470,13 @@ function ShipmentForm({ id }: { id?: string }) {
                           }
                         />
                       </Field>
-                      <Field label="Время с" htmlFor="ship-load-time-from">
-                        <OdooInput
+                      <Field label="Время" htmlFor="ship-load-time-from">
+                        <SInput
                           id="ship-load-time-from"
                           placeholder="09:00"
                           value={form.loading_time_from}
                           onChange={(e) =>
                             set("loading_time_from", e.target.value)
-                          }
-                        />
-                      </Field>
-                      <Field label="Время по" htmlFor="ship-load-time-to">
-                        <OdooInput
-                          id="ship-load-time-to"
-                          placeholder="18:00"
-                          value={form.loading_time_to}
-                          onChange={(e) =>
-                            set("loading_time_to", e.target.value)
                           }
                         />
                       </Field>
@@ -528,7 +494,7 @@ function ShipmentForm({ id }: { id?: string }) {
                         />
                       </Field>
                       <Field label="Адрес выгрузки" htmlFor="ship-addr-unload">
-                        <OdooInput
+                        <SInput
                           id="ship-addr-unload"
                           value={form.address_unloading}
                           onChange={(e) =>
@@ -537,7 +503,7 @@ function ShipmentForm({ id }: { id?: string }) {
                         />
                       </Field>
                       <Field label="Контакт" htmlFor="ship-unload-name">
-                        <OdooInput
+                        <SInput
                           id="ship-unload-name"
                           placeholder="Фамилия Имя"
                           value={form.contact_unloading_name}
@@ -547,7 +513,7 @@ function ShipmentForm({ id }: { id?: string }) {
                         />
                       </Field>
                       <Field label="Телефон" htmlFor="ship-unload-phone">
-                        <OdooInput
+                        <SInput
                           id="ship-unload-phone"
                           placeholder="+7 900 000-00-00"
                           value={form.contact_unloading_phone}
@@ -560,7 +526,7 @@ function ShipmentForm({ id }: { id?: string }) {
                         label="Дата выгрузки с"
                         htmlFor="ship-unload-date-from"
                       >
-                        <OdooInput
+                        <SInput
                           id="ship-unload-date-from"
                           type="date"
                           value={form.unloading_date_from}
@@ -573,7 +539,7 @@ function ShipmentForm({ id }: { id?: string }) {
                         label="Дата выгрузки по"
                         htmlFor="ship-unload-date-to"
                       >
-                        <OdooInput
+                        <SInput
                           id="ship-unload-date-to"
                           type="date"
                           value={form.unloading_date_to}
@@ -582,23 +548,13 @@ function ShipmentForm({ id }: { id?: string }) {
                           }
                         />
                       </Field>
-                      <Field label="Время с" htmlFor="ship-unload-time-from">
-                        <OdooInput
+                      <Field label="Время" htmlFor="ship-unload-time-from">
+                        <SInput
                           id="ship-unload-time-from"
                           placeholder="09:00"
                           value={form.unloading_time_from}
                           onChange={(e) =>
                             set("unloading_time_from", e.target.value)
-                          }
-                        />
-                      </Field>
-                      <Field label="Время по" htmlFor="ship-unload-time-to">
-                        <OdooInput
-                          id="ship-unload-time-to"
-                          placeholder="18:00"
-                          value={form.unloading_time_to}
-                          onChange={(e) =>
-                            set("unloading_time_to", e.target.value)
                           }
                         />
                       </Field>
@@ -631,7 +587,7 @@ function ShipmentForm({ id }: { id?: string }) {
                         </select>
                       </Field>
                       <Field label="Контакт перевозчика" htmlFor="ship-carr-contact">
-                        <OdooInput
+                        <SInput
                           id="ship-carr-contact"
                           value={form.carrier_contact}
                           onChange={(e) =>
@@ -640,14 +596,14 @@ function ShipmentForm({ id }: { id?: string }) {
                         />
                       </Field>
                       <Field label="ТС (марка)" htmlFor="ship-vehicle">
-                        <OdooInput
+                        <SInput
                           id="ship-vehicle"
                           value={form.vehicle}
                           onChange={(e) => set("vehicle", e.target.value)}
                         />
                       </Field>
                       <Field label="Номер ТС" htmlFor="ship-vehicle-num">
-                        <OdooInput
+                        <SInput
                           id="ship-vehicle-num"
                           value={form.vehicle_number}
                           onChange={(e) => set("vehicle_number", e.target.value)}
@@ -663,7 +619,7 @@ function ShipmentForm({ id }: { id?: string }) {
                       </Field>
                       {form.has_trailer && (
                         <Field label="Номер прицепа" htmlFor="ship-trailer-num">
-                          <OdooInput
+                          <SInput
                             id="ship-trailer-num"
                             value={form.trailer_number}
                             onChange={(e) =>
@@ -673,14 +629,14 @@ function ShipmentForm({ id }: { id?: string }) {
                         </Field>
                       )}
                       <Field label="ФИО водителя" htmlFor="ship-driver-name">
-                        <OdooInput
+                        <SInput
                           id="ship-driver-name"
                           value={form.driver_name}
                           onChange={(e) => set("driver_name", e.target.value)}
                         />
                       </Field>
                       <Field label="Телефон водителя" htmlFor="ship-driver-phone">
-                        <OdooInput
+                        <SInput
                           id="ship-driver-phone"
                           placeholder="+7 900 000-00-00"
                           value={form.driver_phone}
@@ -688,7 +644,7 @@ function ShipmentForm({ id }: { id?: string }) {
                         />
                       </Field>
                       <Field label="Паспорт водителя" htmlFor="ship-driver-pass">
-                        <OdooInput
+                        <SInput
                           id="ship-driver-pass"
                           value={form.driver_passport}
                           onChange={(e) =>
@@ -697,7 +653,7 @@ function ShipmentForm({ id }: { id?: string }) {
                         />
                       </Field>
                       <Field label="Кто подписывает" htmlFor="ship-carr-signer">
-                        <OdooInput
+                        <SInput
                           id="ship-carr-signer"
                           value={form.carrier_signer}
                           onChange={(e) =>
@@ -711,14 +667,14 @@ function ShipmentForm({ id }: { id?: string }) {
                   <div>
                     <InnerGroup title="Информация о грузе">
                       <Field label="Тип груза" htmlFor="ship-cargo-type">
-                        <OdooInput
+                        <SInput
                           id="ship-cargo-type"
                           value={form.cargo_type}
                           onChange={(e) => set("cargo_type", e.target.value)}
                         />
                       </Field>
                       <Field label="Упаковка" htmlFor="ship-cargo-pack">
-                        <OdooInput
+                        <SInput
                           id="ship-cargo-pack"
                           value={form.cargo_packaging}
                           onChange={(e) =>
@@ -727,15 +683,15 @@ function ShipmentForm({ id }: { id?: string }) {
                         />
                       </Field>
                       <Field label="Объём кузова, м³" htmlFor="ship-volume">
-                        <OdooInput
+                        <SInput
                           id="ship-volume"
                           inputMode="decimal"
                           value={form.cargo_volume}
                           onChange={(e) => set("cargo_volume", e.target.value)}
                         />
                       </Field>
-                      <Field label="Масса, т" htmlFor="ship-weight">
-                        <OdooInput
+                      <Field label="Вес груза, т" htmlFor="ship-weight">
+                        <SInput
                           id="ship-weight"
                           inputMode="decimal"
                           value={form.cargo_weight}
@@ -743,7 +699,7 @@ function ShipmentForm({ id }: { id?: string }) {
                         />
                       </Field>
                       <Field label="Грузоподъёмность, т" htmlFor="ship-capacity">
-                        <OdooInput
+                        <SInput
                           id="ship-capacity"
                           inputMode="decimal"
                           value={form.capacity}
@@ -751,10 +707,11 @@ function ShipmentForm({ id }: { id?: string }) {
                         />
                       </Field>
                       <Field label="Тип кузова" htmlFor="ship-body-type">
-                        <OdooInput
+                        <TokenField
                           id="ship-body-type"
+                          placeholder="Например: изотерм + Enter"
                           value={form.body_type}
-                          onChange={(e) => set("body_type", e.target.value)}
+                          onChange={(v) => set("body_type", v)}
                         />
                       </Field>
                       <Field label="Способ погрузки" htmlFor="ship-load-method">
@@ -792,7 +749,7 @@ function ShipmentForm({ id }: { id?: string }) {
                       id: "info",
                       label: "Прочая информация",
                       content: (
-                        <OdooTextarea
+                        <STextarea
                           id="ship-comment"
                           rows={4}
                           placeholder="Дополнительные условия, комментарии…"

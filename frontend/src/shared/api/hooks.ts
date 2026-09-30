@@ -666,7 +666,7 @@ export interface ShipmentPayload {
   cargo_type?: string;
   cargo_packaging?: string;
   capacity?: string | null;
-  body_type?: string;
+  body_type?: string[];
   loading_method?: string[];
 }
 

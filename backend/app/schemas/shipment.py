@@ -58,7 +58,7 @@ class ShipmentBase(BaseModel):
     cargo_type: str = ""
     cargo_packaging: str = ""
     capacity: Decimal | None = None
-    body_type: str = ""
+    body_type: list[str] = Field(default_factory=list)
     loading_method: list[str] = Field(default_factory=list)
 
 
@@ -113,7 +113,7 @@ class ShipmentUpdate(BaseModel):
     cargo_type: str | None = None
     cargo_packaging: str | None = None
     capacity: Decimal | None = None
-    body_type: str | None = None
+    body_type: list[str] | None = None
     loading_method: list[str] | None = None
 
 
@@ -173,7 +173,7 @@ class ShipmentRead(ORMModel):
     cargo_type: str
     cargo_packaging: str
     capacity: Decimal | None
-    body_type: str
+    body_type: list[str]
     loading_method: list[str]
 
     created_at: datetime

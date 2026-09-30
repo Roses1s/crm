@@ -23,7 +23,7 @@ export function TokenField({
   }
 
   return (
-    <div className="flex w-full flex-wrap items-center gap-1 rounded-[3px] border border-transparent px-1 py-[2px] transition-colors focus-within:border-odoo-focus/40 hover:border-odoo-border">
+    <div className="flex w-full flex-wrap items-center gap-1 rounded-[3px] border border-odoo-border/50 bg-odoo-surface/60 px-1.5 py-[3px] transition-colors focus-within:border-odoo-focus/60 hover:border-odoo-border">
       {value.map((tag) => (
         <span
           key={tag}
