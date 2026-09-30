@@ -21,7 +21,7 @@ export function LeadCardBody({
     <div className="flex h-full min-h-0 flex-col overflow-hidden">
       <div className={menuSpace ? "pr-7" : ""}>
         <h3
-          className="line-clamp-2 text-[13px] font-medium leading-[17px] text-odoo-text"
+          className="line-clamp-2 text-[13px] font-semibold leading-[17px] text-odoo-text"
           title={title}
         >
           {title}
@@ -104,9 +104,9 @@ export function LeadCard({
 
   const inner = (
     <div
-      className={`overflow-hidden rounded-[2px] bg-odoo-board-card px-2.5 py-1.5 ${
+      className={`overflow-hidden bg-odoo-board-card px-2.5 py-1.5 ${
         isOverlay
-          ? "w-[var(--odoo-kanban-record-current-width)] rotate-2 scale-[1.02] cursor-grabbing border border-odoo-primary shadow-2xl transition-transform"
+          ? "w-[var(--odoo-kanban-record-current-width)] -rotate-[3deg] scale-[1.02] cursor-grabbing border border-odoo-primary shadow-2xl transition-transform"
           : isDragging
             ? "cursor-grabbing opacity-40 transition-opacity duration-150"
             : "cursor-grab transition-colors duration-150 hover:bg-odoo-board-card-hover"
@@ -124,7 +124,7 @@ export function LeadCard({
       style={style}
       {...attributes}
       {...listeners}
-      className="group relative mx-2 mb-1 touch-none"
+      className="group relative mx-[var(--odoo-kanban-group-padding-x)] mb-px touch-none"
       aria-label={`Переместить ${lead.name}`}
     >
       {!isDragging && (
