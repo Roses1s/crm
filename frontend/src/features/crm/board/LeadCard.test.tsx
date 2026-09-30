@@ -64,6 +64,30 @@ describe("Карточка лида на канбане", () => {
     expect(third).toHaveTextContent("☆");
   });
 
+  it("сохраняет выбранный приоритет по клику и убирает предпросмотр", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderWithProviders(<StarRating value={1} onChange={onChange} />);
+
+    const third = screen.getByRole("button", { name: "Приоритет 3" });
+    await user.click(third);
+    expect(onChange).toHaveBeenCalledWith(3);
+
+    // После клика курсор ещё над звездой, но виджет должен показывать
+    // сохранённое значение, а не предпросмотр.
+    await user.unhover(third);
+    expect(third).toHaveTextContent("☆");
+  });
+
+  it("снимает приоритет повторным кликом по текущей звезде", async () => {
+    const user = userEvent.setup();
+    const onChange = vi.fn();
+    renderWithProviders(<StarRating value={1} onChange={onChange} />);
+
+    await user.click(screen.getByRole("button", { name: "Приоритет 1" }));
+    expect(onChange).toHaveBeenCalledWith(0);
+  });
+
   it("не показывает часики: активности убраны из CRM", () => {
     const { container } = renderWithProviders(<LeadCardBody lead={LEAD} />);
     expect(container.querySelector(".lucide-clock-3")).toBeNull();

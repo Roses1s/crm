@@ -3,6 +3,7 @@ import { useEffect, useRef, useState } from "react";
 import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { AppShell, ControlPanel } from "@/app/layout/AppShell";
+import { StarRating } from "@/features/crm/board/StarRating";
 import { TagsField } from "@/features/crm/lead-form/TagsField";
 import {
   empty,
@@ -513,20 +514,16 @@ function LeadForm({ id }: { id?: string }) {
                     <div>
                       <InnerGroup>
                         <Field label="Приоритет">
-                          <span className="inline-flex items-center pt-[2px] text-[16px] leading-none text-odoo-warning">
-                            {[1, 2, 3].map((n) => (
-                              <button
-                                key={n}
-                                type="button"
-                                className="px-px"
-                                aria-label={`Приоритет ${n}`}
-                                onClick={() =>
-                                  set("priority", form.priority === n ? 0 : n)
-                                }
-                              >
-                                {form.priority >= n ? "★" : "☆"}
-                              </button>
-                            ))}
+                          {/*
+                            Тот же виджет звёзд, что на канбане: при наведении
+                            подсвечивает звёзды до курсора, при уходе возвращает
+                            сохранённый приоритет, по клику сохраняет значение.
+                          */}
+                          <span className="inline-flex items-center pt-[2px]">
+                            <StarRating
+                              value={form.priority}
+                              onChange={(n) => set("priority", n)}
+                            />
                           </span>
                         </Field>
                         <Field
