@@ -1,4 +1,3 @@
-@import url("https://fonts.googleapis.com/css2?family=Inter:wght@300;400;500;600;700&display=swap");
 @import "tailwindcss";
 
 /*
@@ -334,12 +333,26 @@
   }
 
   body {
+    /*
+     * Системный стек шрифтов — тот же, что использует Odoo 17 (наследует его из
+     * Bootstrap). Odoo своего шрифта не грузит, поэтому на одной ОС и Odoo, и
+     * наша CRM рисуются одним системным шрифтом (на Windows — Segoe UI). Так
+     * достигается совпадение шрифта с образцом без подгрузки Google Fonts.
+     */
     font-family:
-      "Inter",
       -apple-system,
       BlinkMacSystemFont,
       "Segoe UI",
-      sans-serif;
+      Roboto,
+      "Helvetica Neue",
+      Arial,
+      "Noto Sans",
+      "Liberation Sans",
+      sans-serif,
+      "Apple Color Emoji",
+      "Segoe UI Emoji",
+      "Segoe UI Symbol",
+      "Noto Color Emoji";
     font-size: 13px;
     line-height: 1.5;
     color: rgb(var(--odoo-text));
