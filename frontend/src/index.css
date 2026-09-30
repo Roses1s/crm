@@ -59,6 +59,9 @@
   --color-odoo-avatar: rgb(var(--odoo-avatar));
   --color-odoo-link: rgb(var(--odoo-link));
   --color-odoo-action: rgb(var(--odoo-action));
+  --color-odoo-nav: rgb(var(--odoo-nav));
+  --color-odoo-nav-border: rgb(var(--odoo-nav-border));
+  --color-odoo-focus: rgb(var(--odoo-focus));
   --color-odoo-chatter-divider: rgb(var(--odoo-chatter-divider));
 
   /* Цвета тегов не меняются в тёмной теме — как в оригинале. */
@@ -86,58 +89,61 @@
 /*
  * Токены тем.
  *
- * Светлые значения — ровно те, с которыми приложение задумано: светлая тема
- * должна остаться пиксель-в-пиксель. Тёмные взяты из референсных скриншотов.
+ * Обе темы построены на собственных семантических ролях. Тёмная опирается на
+ * slate-палитру с образца, а светлая сохраняет соответствующие роли и контраст.
  */
 :root {
   color-scheme: light;
 
-  --odoo-primary: 113 75 103; /* #714B67 */
-  --odoo-primary-hover: 91 58 82; /* #5B3A52 */
-  --odoo-secondary: 0 160 157; /* #00A09D */
+  /* Базовые роли всей CRM: спокойная светлая тема с тем же фиолетово-бирюзовым ритмом. */
+  --odoo-primary: 107 62 102; /* #6B3E66 */
+  --odoo-primary-hover: 89 52 82; /* #593452 */
+  --odoo-secondary: 0 143 132; /* #008F84 */
 
-  --odoo-bg: 248 249 250; /* #F8F9FA */
+  --odoo-bg: 247 246 248; /* #F7F6F8 */
   --odoo-surface: 255 255 255; /* #FFFFFF */
-  --odoo-surface-hover: 250 248 249; /* #faf8f9 */
-  --odoo-surface-sunken: 238 236 238; /* #eeecee */
-  --odoo-column-head: 250 249 250; /* #faf9fa */
-  --odoo-track: 222 220 223; /* #dedcdf */
+  --odoo-surface-hover: 248 243 247; /* #F8F3F7 */
+  --odoo-surface-sunken: 240 238 241; /* #F0EEF1 */
+  --odoo-column-head: 247 246 248; /* #F7F6F8 */
+  --odoo-track: 221 217 223; /* #DDD9DF */
 
-  --odoo-border: 222 226 230; /* #DEE2E6 */
-  --odoo-border-light: 233 236 239; /* #E9ECEF */
+  --odoo-border: 221 217 223; /* #DDD9DF */
+  --odoo-border-light: 236 233 237; /* #ECE9ED */
 
-  --odoo-text: 33 37 41; /* #212529 */
-  --odoo-text-soft: 73 80 87; /* #495057 */
-  --odoo-text-muted: 108 117 125; /* #6C757D */
-  --odoo-text-light: 173 181 189; /* #ADB5BD */
+  --odoo-text: 41 37 42; /* #29252A */
+  --odoo-text-soft: 98 91 99; /* #625B63 */
+  --odoo-text-muted: 124 116 125; /* #7C747D */
+  --odoo-text-light: 164 157 165; /* #A49DA5 */
 
-  --odoo-success: 40 167 69; /* #28A745 */
-  --odoo-warning: 255 193 7; /* #FFC107 */
-  --odoo-danger: 220 53 69; /* #DC3545 */
-  --odoo-info: 23 162 184; /* #17A2B8 */
+  --odoo-success: 35 134 74; /* #23864A */
+  --odoo-warning: 168 106 0; /* #A86A00 */
+  --odoo-danger: 184 58 75; /* #B83A4B */
+  --odoo-info: 31 132 163; /* #1F84A3 */
 
-  /* Контекстные токены: цвета, которые раньше писались инлайном. */
-  --odoo-title-band: 253 239 241; /* #fdeff1 */
-  /* Лента этапов: нейтральный трек, сегменты и активный бирюзовый контур. */
-  --odoo-statusbar: 222 226 230; /* #DEE2E6 */
-  --odoo-statusbar-segment: 248 249 250; /* #F8F9FA */
-  --odoo-statusbar-text: 73 80 87; /* #495057 */
-  --odoo-statusbar-current: 233 242 242; /* #E9F2F2 */
-  --odoo-statusbar-current-border: 0 160 157; /* #00A09D */
-  --odoo-statusbar-current-text: 33 37 41; /* #212529 */
-  --odoo-drop: 244 247 251; /* #f4f7fb */
-  --odoo-accent-soft: 233 242 242; /* #e9f2f2 */
-  --odoo-accent-line: 143 185 184; /* #8FB9B8 */
-  --odoo-search-divider: 200 216 216; /* #c8d8d8 */
-  --odoo-search-icon: 95 107 112; /* #5f6b70 */
-  --odoo-search-placeholder: 139 147 151; /* #8b9397 */
-  --odoo-search-action: 78 92 97; /* #4e5c61 */
-  --odoo-search-action-hover: 244 247 247; /* #f4f7f7 */
-  --odoo-chip: 238 234 234; /* #eeeaea */
-  --odoo-chip-text: 111 102 106; /* #6f666a */
-  --odoo-avatar: 75 75 85; /* #4b4b55 */
-  --odoo-link: 0 160 157; /* #00A09D */
-  --odoo-action: 113 75 103; /* #714B67 — интерактивный текст; в тёмной теме синий */
+  /* Контекстные роли, чтобы экран не зависел от случайных локальных HEX. */
+  --odoo-nav: 255 255 255;
+  --odoo-nav-border: 221 217 223;
+  --odoo-focus: 107 62 102;
+  --odoo-title-band: 249 241 247;
+  --odoo-statusbar: 221 217 223;
+  --odoo-statusbar-segment: 247 246 248;
+  --odoo-statusbar-text: 98 91 99;
+  --odoo-statusbar-current: 230 243 240;
+  --odoo-statusbar-current-border: 0 143 132;
+  --odoo-statusbar-current-text: 41 37 42;
+  --odoo-drop: 243 247 247;
+  --odoo-accent-soft: 230 243 240;
+  --odoo-accent-line: 98 174 165;
+  --odoo-search-divider: 198 218 214;
+  --odoo-search-icon: 88 104 102;
+  --odoo-search-placeholder: 139 132 140;
+  --odoo-search-action: 64 93 89;
+  --odoo-search-action-hover: 240 247 246;
+  --odoo-chip: 240 235 239;
+  --odoo-chip-text: 105 91 103;
+  --odoo-avatar: 81 75 84;
+  --odoo-link: 0 125 115;
+  --odoo-action: 0 125 115;
 
   /* Чаттер: единая геометрия автора, отступов и мягких разделителей ленты. */
   --odoo-chatter-avatar-size: 36px;
@@ -146,7 +152,7 @@
   --odoo-chatter-composer-min-height: 36px;
   --odoo-chatter-log-button-width: 42px;
   --odoo-chatter-log-button-height: 30px;
-  --odoo-chatter-divider: 233 236 239; /* #E9ECEF */
+  --odoo-chatter-divider: 236 233 237;
 
   /* Геометрия карточки: отдельные имена не дают расползаться числам по JSX. */
   --odoo-record-control-panel-height: 90px;
@@ -159,62 +165,63 @@
   --odoo-form-section-gap: 20px;
   --odoo-form-field-gap: 8px;
 
-  --border: 210 14% 89%;
+  --border: 300 10% 87%;
   --radius: 0.375rem;
 }
 
 .dark {
   color-scheme: dark;
 
-  /* Залитые кнопки сохраняют фирменный цвет; синим становится только текст-действие. */
-  --odoo-primary: 113 75 103;
-  --odoo-primary-hover: 138 92 125;
-  --odoo-secondary: 0 176 173;
+  /* Три уровня slate-поверхностей отделяют приложение, панели и hover без чёрных провалов. */
+  --odoo-primary: 107 62 102; /* #6B3E66 */
+  --odoo-primary-hover: 130 81 124; /* #82517C */
+  --odoo-secondary: 2 199 181; /* #02C7B5 */
 
-  --odoo-bg: 27 28 31;
-  --odoo-surface: 43 44 48;
-  --odoo-surface-hover: 51 52 57;
-  --odoo-surface-sunken: 35 36 40;
-  --odoo-column-head: 39 40 45;
-  --odoo-track: 58 59 64;
+  --odoo-bg: 27 29 38; /* #1B1D26 */
+  --odoo-surface: 38 42 54; /* #262A36 */
+  --odoo-surface-hover: 48 52 66; /* #303442 */
+  --odoo-surface-sunken: 32 35 44; /* #20232C */
+  --odoo-column-head: 38 42 54; /* #262A36 */
+  --odoo-track: 60 62 75; /* #3C3E4B */
 
-  --odoo-border: 62 64 70;
-  --odoo-border-light: 52 53 59;
+  --odoo-border: 60 62 75; /* #3C3E4B */
+  --odoo-border-light: 52 55 68; /* #343744 */
 
-  --odoo-text: 228 228 230;
-  --odoo-text-soft: 200 200 204;
-  --odoo-text-muted: 154 154 160;
-  /* Было 90 91 97 — подсказки почти сливались с поверхностью. */
-  --odoo-text-light: 133 134 141;
+  --odoo-text: 228 228 230; /* #E4E4E6 */
+  --odoo-text-soft: 200 200 204; /* #C8C8CC */
+  --odoo-text-muted: 154 154 160; /* #9A9AA0 */
+  --odoo-text-light: 128 130 139; /* #80828B */
 
-  --odoo-success: 61 184 94;
-  --odoo-warning: 255 193 7;
-  --odoo-danger: 232 87 101;
-  --odoo-info: 54 183 205;
+  --odoo-success: 70 184 106; /* #46B86A */
+  --odoo-warning: 255 193 7; /* #FFC107 */
+  --odoo-danger: 232 87 101; /* #E85765 */
+  --odoo-info: 71 187 220; /* #47BBDC */
 
-  --odoo-title-band: 61 47 58;
-  /* В тёмной теме активный этап — приглушённая бирюзовая заливка и яркая рамка. */
-  --odoo-statusbar: 53 54 59;
-  --odoo-statusbar-segment: 60 62 75;
+  --odoo-nav: 27 29 38;
+  --odoo-nav-border: 60 62 75;
+  --odoo-focus: 2 199 181;
+  --odoo-title-band: 48 36 48;
+  --odoo-statusbar: 60 62 75;
+  --odoo-statusbar-segment: 48 52 66;
   --odoo-statusbar-text: 228 228 230;
-  --odoo-statusbar-current: 54 76 86;
+  --odoo-statusbar-current: 31 70 73;
   --odoo-statusbar-current-border: 2 199 181;
   --odoo-statusbar-current-text: 228 228 230;
-  --odoo-drop: 38 49 61;
-  --odoo-accent-soft: 34 52 54;
-  --odoo-accent-line: 61 110 109;
-  --odoo-search-divider: 61 74 74;
-  --odoo-search-icon: 154 164 168;
-  --odoo-search-placeholder: 122 131 135;
-  --odoo-search-action: 176 194 196;
-  --odoo-search-action-hover: 42 56 57;
-  --odoo-chip: 58 52 56;
-  --odoo-chip-text: 201 195 203;
-  --odoo-avatar: 75 75 85;
-  --odoo-link: 106 176 232;
-  --odoo-action: 106 176 232;
-  --odoo-chatter-divider: 52 53 59;
-  --border: 220 8% 25%;
+  --odoo-drop: 34 39 50;
+  --odoo-accent-soft: 27 57 58;
+  --odoo-accent-line: 2 146 135;
+  --odoo-search-divider: 58 89 87;
+  --odoo-search-icon: 163 177 180;
+  --odoo-search-placeholder: 139 149 153;
+  --odoo-search-action: 181 208 205;
+  --odoo-search-action-hover: 38 64 64;
+  --odoo-chip: 61 48 62;
+  --odoo-chip-text: 211 198 211;
+  --odoo-avatar: 66 70 82;
+  --odoo-link: 2 199 181;
+  --odoo-action: 2 199 181;
+  --odoo-chatter-divider: 52 55 68;
+  --border: 230 10% 24%;
 }
 
 @layer base {
@@ -276,6 +283,21 @@
   input::placeholder,
   textarea::placeholder {
     color: rgb(var(--odoo-text-muted));
+  }
+
+  /* Единый заметный, но спокойный фокус для клавиатурной навигации всей CRM. */
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid rgb(var(--odoo-focus));
+    outline-offset: 1px;
+  }
+
+  ::selection {
+    background-color: rgb(var(--odoo-accent-soft));
+    color: rgb(var(--odoo-text));
   }
 
   ::-webkit-scrollbar {
