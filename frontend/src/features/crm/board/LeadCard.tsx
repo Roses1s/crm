@@ -104,9 +104,9 @@ export function LeadCard({
 
   const inner = (
     <div
-      className={`overflow-hidden rounded-[2px] border border-odoo-border-light bg-odoo-board-card px-2.5 py-1.5 ${
+      className={`overflow-hidden rounded-[2px] bg-odoo-board-card px-2.5 py-1.5 ${
         isOverlay
-          ? "w-[340px] rotate-2 scale-[1.02] cursor-grabbing border-odoo-primary shadow-2xl transition-transform"
+          ? "w-[340px] rotate-2 scale-[1.02] cursor-grabbing border border-odoo-primary shadow-2xl transition-transform"
           : isDragging
             ? "cursor-grabbing opacity-40 transition-opacity duration-150"
             : "cursor-grab transition-colors duration-150 hover:bg-odoo-board-card-hover"
