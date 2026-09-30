@@ -1,14 +1,17 @@
 import { useDroppable } from "@dnd-kit/core";
 import {
   SortableContext,
+  useSortable,
   verticalListSortingStrategy,
 } from "@dnd-kit/sortable";
+import { CSS } from "@dnd-kit/utilities";
 import { MoreHorizontal } from "lucide-react";
-import { useState } from "react";
+import { useCallback, useState } from "react";
 
 import { useDeleteStage, useUpdateStage } from "@/shared/api/hooks";
 import type { Lead, Stage } from "@/shared/types";
 import { LeadCard } from "./LeadCard";
+import { stageDragId } from "./stage-order";
 import { STAGE_COLORS, stageColor } from "./stage-colors";
 
 // Колонка рисует страницу карточек, остальное — по кнопке, как в канбане Odoo.
@@ -16,7 +19,8 @@ const CARDS_PER_COLUMN = 20;
 
 /**
  * Колонка канбана: приёмник для перетаскивания карточек и меню управления
- * этапом (переименовать, закрывающий, цвет, удалить).
+ * этапом (переименовать, цвет, удалить). Заголовок служит ручкой для
+ * горизонтального перетаскивания этапа.
  */
 export function Column({
   stage,
@@ -34,7 +38,24 @@ export function Column({
   const [visible, setVisible] = useState(CARDS_PER_COLUMN);
   const shown = leads.slice(0, visible);
   const hidden = leads.length - shown.length;
-  const { setNodeRef, isOver } = useDroppable({ id: `stage-${stage.id}` });
+  const { setNodeRef: setDropNodeRef, isOver } = useDroppable({
+    id: `stage-${stage.id}`,
+  });
+  const {
+    attributes: stageDragAttributes,
+    listeners: stageDragListeners,
+    setNodeRef: setStageSortNodeRef,
+    transform: stageTransform,
+    transition: stageTransition,
+    isDragging: isStageDragging,
+  } = useSortable({ id: stageDragId(stage.id) });
+  const setNodeRef = useCallback(
+    (node: HTMLDivElement | HTMLButtonElement | null) => {
+      setDropNodeRef(node);
+      setStageSortNodeRef(node);
+    },
+    [setDropNodeRef, setStageSortNodeRef],
+  );
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(stage.name);
   const [menu, setMenu] = useState(false);
@@ -50,9 +71,16 @@ export function Column({
     return (
       <button
         type="button"
+        ref={setNodeRef}
         onClick={onFold}
-        className="flex h-full w-10 shrink-0 flex-col items-center bg-odoo-board-canvas py-3"
-        style={{ borderTop: `3px solid ${color}` }}
+        {...stageDragAttributes}
+        {...stageDragListeners}
+        className="flex h-full w-10 shrink-0 cursor-grab flex-col items-center bg-odoo-board-canvas py-3 active:cursor-grabbing"
+        style={{
+          borderTop: `3px solid ${color}`,
+          transform: CSS.Translate.toString(stageTransform),
+          transition: stageTransition,
+        }}
       >
         <span className="mt-8 origin-center rotate-180 text-[12px] font-semibold tracking-wide text-odoo-text [writing-mode:vertical-rl]">
           {stage.name} ({leads.length})
@@ -67,9 +95,13 @@ export function Column({
     // проходил мимо — карточка возвращалась на место.
     <div
       ref={setNodeRef}
+      style={{
+        transform: CSS.Translate.toString(stageTransform),
+        transition: stageTransition,
+      }}
       className={`flex h-full w-[var(--odoo-kanban-group-width)] shrink-0 snap-center flex-col transition-colors duration-200 ${
         isOver ? "bg-odoo-drop" : "bg-odoo-board-canvas"
-      }`}
+      } ${isStageDragging ? "opacity-40" : ""}`}
     >
       <div className="crm-kanban-stage-header shrink-0 bg-odoo-board-canvas px-[var(--odoo-kanban-group-padding-x)] py-2">
         <div className="flex items-start justify-between gap-1">
@@ -93,7 +125,9 @@ export function Column({
             ) : (
               <button
                 type="button"
-                className="truncate text-[13px] font-semibold leading-[18px] text-odoo-text"
+                {...stageDragAttributes}
+                {...stageDragListeners}
+                className="cursor-grab truncate text-[13px] font-semibold leading-[18px] text-odoo-text active:cursor-grabbing"
                 onDoubleClick={() => setEditing(true)}
                 title="Двойной клик — переименовать"
               >
@@ -104,7 +138,7 @@ export function Column({
           <div className="relative flex items-center gap-px">
             <button
               type="button"
-              className="crm-kanban-stage-secondary-action inline-flex h-6 w-5 items-center justify-center rounded-sm text-[17px] leading-none text-odoo-text-muted hover:bg-odoo-surface-sunken hover:text-odoo-text"
+              className="crm-kanban-stage-secondary-action crm-kanban-stage-fold-action inline-flex h-6 w-5 items-center justify-center rounded-sm text-[17px] leading-none text-odoo-text-muted hover:bg-odoo-surface-sunken hover:text-odoo-text"
               onClick={onFold}
               title="Свернуть"
               aria-label="Свернуть этап"
@@ -115,7 +149,7 @@ export function Column({
               <>
                 <button
                   type="button"
-                  className="crm-kanban-stage-secondary-action inline-flex h-6 w-6 items-center justify-center rounded-sm text-odoo-text-muted hover:bg-odoo-surface-sunken hover:text-odoo-text"
+                  className="crm-kanban-stage-secondary-action crm-kanban-stage-menu-action inline-flex h-6 w-6 items-center justify-center rounded-sm text-odoo-text-muted hover:bg-odoo-surface-sunken hover:text-odoo-text"
                   onClick={() => setMenu((v) => !v)}
                   title="Меню этапа"
                   aria-label="Меню этапа"

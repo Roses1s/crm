@@ -12,7 +12,7 @@ from app.api.deps import CurrentUser, SessionDep
 from app.core.errors import AppError, NotFoundError, PermissionDeniedError
 from app.models.crm import Lead, Stage
 from app.models.user import Role, User
-from app.schemas.crm import StageCreate, StageRead, StageUpdate
+from app.schemas.crm import StageCreate, StageRead, StageReorder, StageUpdate
 
 router = APIRouter(prefix="/crm/stages", tags=["crm: этапы"])
 
@@ -110,6 +110,44 @@ async def create_stage(
     await session.commit()
     await session.refresh(stage)
     return stage
+
+
+@router.post("/reorder", response_model=list[StageRead], summary="Изменить порядок этапов")
+async def reorder_stages(
+    payload: StageReorder, session: SessionDep, user: CurrentUser
+) -> list[Stage]:
+    """Сохраняет полный порядок только одной доступной пользователю доски."""
+    stages = list(
+        (await session.execute(select(Stage).where(Stage.id.in_(payload.stage_ids)))).scalars()
+    )
+    if len(stages) != len(payload.stage_ids):
+        raise NotFoundError("Один или несколько этапов не найдены")
+
+    owner_ids = {stage.owner_id for stage in stages}
+    if len(owner_ids) != 1:
+        raise AppError(
+            "Этапы должны принадлежать одной доске",
+            code="stages_from_different_boards",
+        )
+    board_owner = owner_ids.pop()
+    if board_owner != user.id and user.role != Role.admin:
+        raise PermissionDeniedError("Этапы принадлежат другому сотруднику")
+
+    board_stages = list(
+        (await session.execute(select(Stage).where(Stage.owner_id == board_owner))).scalars()
+    )
+    if {stage.id for stage in board_stages} != set(payload.stage_ids):
+        raise AppError(
+            "Передайте полный порядок этапов доски",
+            code="incomplete_stage_order",
+        )
+
+    by_id = {stage.id: stage for stage in board_stages}
+    for sequence, stage_id in enumerate(payload.stage_ids, start=1):
+        by_id[stage_id].sequence = sequence
+
+    await session.commit()
+    return [by_id[stage_id] for stage_id in payload.stage_ids]
 
 
 @router.patch("/{stage_id}", response_model=StageRead, summary="Изменить этап")

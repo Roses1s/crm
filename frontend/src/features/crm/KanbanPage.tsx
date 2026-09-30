@@ -13,6 +13,7 @@ import {
   type DragStartEvent,
   type DropAnimation,
 } from "@dnd-kit/core";
+import { horizontalListSortingStrategy, SortableContext } from "@dnd-kit/sortable";
 import { Plus } from "lucide-react";
 import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
@@ -22,12 +23,18 @@ import { BoardBanner } from "@/features/crm/board/BoardBanner";
 import { BoardSuggestions } from "@/features/crm/board/BoardSuggestions";
 import { Column } from "@/features/crm/board/Column";
 import { LeadCard } from "@/features/crm/board/LeadCard";
+import {
+  isStageDragId,
+  reorderedStageIds,
+  stageDragId,
+} from "@/features/crm/board/stage-order";
 import { LeadListView } from "@/features/crm/list/LeadListView";
 import {
   useCreateStage,
   useLeads,
   useMe,
   useMoveLead,
+  useReorderStages,
   useStages,
 } from "@/shared/api/hooks";
 import type { Lead } from "@/shared/types";
@@ -101,6 +108,7 @@ export function KanbanPage() {
   const { data: leads = [] } = useLeads({ search, assigned: boardUserId });
   const { data: stages = [] } = useStages(boardUserId);
   const moveLead = useMoveLead();
+  const reorderStages = useReorderStages();
   const createStage = useCreateStage();
 
   function setFilter(key: string, value: string) {
@@ -116,8 +124,15 @@ export function KanbanPage() {
    * колонки угол мог оказаться ближе, чем у той, куда целится пользователь.
    */
   function collisionDetection(args: Parameters<typeof closestCorners>[0]) {
-    const pointer = pointerWithin(args);
-    return pointer.length > 0 ? pointer : closestCorners(args);
+    const stageIsDragged = isStageDragId(args.active.id);
+    const relevant = (collisions: ReturnType<typeof pointerWithin>) =>
+      collisions.filter((collision) =>
+        stageIsDragged
+          ? isStageDragId(collision.id)
+          : !isStageDragId(collision.id),
+      );
+    const pointer = relevant(pointerWithin(args));
+    return pointer.length > 0 ? pointer : relevant(closestCorners(args));
   }
 
   /**
@@ -141,6 +156,10 @@ export function KanbanPage() {
   );
 
   function onDragStart(event: DragStartEvent) {
+    if (isStageDragId(event.active.id)) {
+      setActiveLead(null);
+      return;
+    }
     const id = Number(String(event.active.id).replace("lead-", ""));
     setActiveLead(leads.find((l) => l.id === id) ?? null);
   }
@@ -148,7 +167,12 @@ export function KanbanPage() {
   function onDragEnd(event: DragEndEvent) {
     setActiveLead(null);
     const { active, over } = event;
-    if (!over) return;
+    const nextStageOrder = reorderedStageIds(stages, active.id, over?.id ?? null);
+    if (nextStageOrder) {
+      reorderStages.mutate(nextStageOrder);
+      return;
+    }
+    if (isStageDragId(active.id) || !over) return;
 
     const leadId = Number(String(active.id).replace("lead-", ""));
     let stageId: number | null = null;
@@ -200,12 +224,14 @@ export function KanbanPage() {
         />
       )}
 
-      {moveLead.isError && (
+      {(moveLead.isError || reorderStages.isError) && (
         <div
           role="alert"
           className="mx-4 mt-3 rounded-[4px] border border-odoo-danger/30 bg-odoo-danger/10 px-3 py-2 text-sm text-odoo-danger"
         >
-          Не удалось переместить лид. Изменение отменено.
+          {reorderStages.isError
+            ? "Не удалось изменить порядок этапов. Изменение отменено."
+            : "Не удалось переместить лид. Изменение отменено."}
         </div>
       )}
 
@@ -223,22 +249,27 @@ export function KanbanPage() {
             onDragCancel={() => setActiveLead(null)}
             onDragEnd={onDragEnd}
           >
-            {stages.map((stage) => (
-              <Column
-                key={stage.id}
-                stage={stage}
-                leads={columnLeads(stage.id)}
-                folded={folded.includes(stage.id)}
-                onFold={() =>
-                  setFolded((f) =>
-                    f.includes(stage.id)
-                      ? f.filter((x) => x !== stage.id)
-                      : [...f, stage.id],
-                  )
-                }
-                allStages={stages}
-              />
-            ))}
+            <SortableContext
+              items={stages.map((stage) => stageDragId(stage.id))}
+              strategy={horizontalListSortingStrategy}
+            >
+              {stages.map((stage) => (
+                <Column
+                  key={stage.id}
+                  stage={stage}
+                  leads={columnLeads(stage.id)}
+                  folded={folded.includes(stage.id)}
+                  onFold={() =>
+                    setFolded((f) =>
+                      f.includes(stage.id)
+                        ? f.filter((x) => x !== stage.id)
+                        : [...f, stage.id],
+                    )
+                  }
+                  allStages={stages}
+                />
+              ))}
+            </SortableContext>
             <DragOverlay dropAnimation={dropAnimation} zIndex={50}>
               {activeLead ? <LeadCard lead={activeLead} isOverlay /> : null}
             </DragOverlay>

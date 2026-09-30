@@ -315,13 +315,13 @@
     pointer-events: auto;
   }
 
-  .crm-kanban-stage-header:hover .crm-kanban-stage-secondary-action:nth-child(2),
-  .crm-kanban-stage-header:focus-within .crm-kanban-stage-secondary-action:nth-child(2) {
+  .crm-kanban-stage-header:hover .crm-kanban-stage-fold-action,
+  .crm-kanban-stage-header:focus-within .crm-kanban-stage-fold-action {
     width: 1.25rem;
   }
 
-  .crm-kanban-stage-header:hover .crm-kanban-stage-secondary-action:nth-child(3),
-  .crm-kanban-stage-header:focus-within .crm-kanban-stage-secondary-action:nth-child(3) {
+  .crm-kanban-stage-header:hover .crm-kanban-stage-menu-action,
+  .crm-kanban-stage-header:focus-within .crm-kanban-stage-menu-action {
     width: 1.5rem;
   }
 }

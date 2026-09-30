@@ -163,6 +163,37 @@ export function useUpdateStage() {
   });
 }
 
+/** Полный порядок этапов меняется одним запросом после горизонтального DnD. */
+export function useReorderStages() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (stageIds: number[]) =>
+      api<Stage[]>("/crm/stages/reorder", {
+        method: "POST",
+        body: { stage_ids: stageIds },
+      }),
+    onMutate: async (stageIds) => {
+      await qc.cancelQueries({ queryKey: keys.stages });
+      const snapshot = qc.getQueriesData<Stage[]>({ queryKey: keys.stages });
+
+      qc.setQueriesData<Stage[]>({ queryKey: keys.stages }, (old) => {
+        if (!old || old.length !== stageIds.length) return old;
+        const byId = new Map(old.map((stage) => [stage.id, stage]));
+        if (stageIds.some((id) => !byId.has(id))) return old;
+        return stageIds.map((id, index) => ({
+          ...byId.get(id)!,
+          sequence: index + 1,
+        }));
+      });
+      return { snapshot };
+    },
+    onError: (_error, _stageIds, context) => {
+      context?.snapshot.forEach(([key, data]) => qc.setQueryData(key, data));
+    },
+    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.stages }),
+  });
+}
+
 export function useDeleteStage() {
   const qc = useQueryClient();
   return useMutation({

@@ -108,3 +108,72 @@ async def test_manager_cannot_open_foreign_board(
         headers={"Authorization": f"Bearer {token}"},
     )
     assert response.status_code == 403
+
+
+async def test_reorder_stages_persists_full_board_order(
+    auth_client: AsyncClient, seeded: dict[str, object]
+) -> None:
+    """Горизонтальное перетаскивание меняет порядок этапов после обновления доски."""
+    before = (await auth_client.get("/api/v1/crm/stages")).json()
+    order = [stage["id"] for stage in reversed(before)]
+
+    response = await auth_client.post("/api/v1/crm/stages/reorder", json={"stage_ids": order})
+
+    assert response.status_code == 200
+    assert [stage["id"] for stage in response.json()] == order
+    assert [stage["sequence"] for stage in response.json()] == list(range(1, len(order) + 1))
+
+    persisted = (await auth_client.get("/api/v1/crm/stages")).json()
+    assert [stage["id"] for stage in persisted] == order
+
+
+async def test_manager_cannot_reorder_foreign_board(
+    auth_client: AsyncClient, client: AsyncClient, seeded: dict[str, object]
+) -> None:
+    """Менеджер не может переставить этапы администратора по их идентификаторам."""
+    admin_stage_ids = [
+        stage["id"] for stage in (await auth_client.get("/api/v1/crm/stages")).json()
+    ]
+    token = await manager_token(client)
+
+    response = await client.post(
+        "/api/v1/crm/stages/reorder",
+        json={"stage_ids": list(reversed(admin_stage_ids))},
+        headers={"Authorization": f"Bearer {token}"},
+    )
+
+    assert response.status_code == 403
+
+
+async def test_reorder_rejects_stages_from_different_boards(
+    auth_client: AsyncClient, client: AsyncClient, seeded: dict[str, object]
+) -> None:
+    """Даже админ не может одним запросом смешать этапы двух досок."""
+    admin_stage_id = (await auth_client.get("/api/v1/crm/stages")).json()[0]["id"]
+    token = await manager_token(client)
+    manager_stages = (
+        await client.get("/api/v1/crm/stages", headers={"Authorization": f"Bearer {token}"})
+    ).json()
+
+    response = await auth_client.post(
+        "/api/v1/crm/stages/reorder",
+        json={"stage_ids": [admin_stage_id, manager_stages[0]["id"]]},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "stages_from_different_boards"
+
+
+async def test_reorder_requires_complete_board_order(
+    auth_client: AsyncClient, seeded: dict[str, object]
+) -> None:
+    """Нельзя случайно исключить этап из порядка и потерять его позицию."""
+    stages = (await auth_client.get("/api/v1/crm/stages")).json()
+
+    response = await auth_client.post(
+        "/api/v1/crm/stages/reorder",
+        json={"stage_ids": [stage["id"] for stage in stages[:-1]]},
+    )
+
+    assert response.status_code == 400
+    assert response.json()["code"] == "incomplete_stage_order"

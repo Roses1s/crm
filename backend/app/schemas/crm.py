@@ -31,6 +31,20 @@ class StageUpdate(BaseModel):
     color: str | None = None
 
 
+class StageReorder(BaseModel):
+    """Полный порядок этапов одной доски после горизонтального перетаскивания."""
+
+    stage_ids: list[int] = Field(min_length=1)
+
+    @field_validator("stage_ids")
+    @classmethod
+    def stage_ids_are_unique(cls, value: list[int]) -> list[int]:
+        """Один этап в новом порядке нельзя передать дважды."""
+        if len(value) != len(set(value)):
+            raise ValueError("Каждый этап должен встречаться в порядке один раз")
+        return value
+
+
 # --- теги --------------------------------------------------------------------
 class TagRead(ORMModel):
     id: int
