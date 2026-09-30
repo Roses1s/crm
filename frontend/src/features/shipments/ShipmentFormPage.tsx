@@ -34,9 +34,16 @@ import {
   FormTitle,
   FormWorkspace,
   InnerGroup,
+  Notebook,
+  OdooCheckbox,
   OdooInput,
+  OdooTextarea,
 } from "@/shared/ui/odoo-form";
 import { FormSkeleton } from "@/shared/ui/skeleton";
+import { TokenField } from "./TokenField";
+
+// Наша компания — статичная шапка бланка (как «АДК Транс» в реальном Odoo).
+const OWN_COMPANY = "АДК Транс";
 
 // Этапы заявки — единая воронка (Новая → … → Машина выгрузилась). Статусбар
 // работает по числовым id, поэтому держим и id (позиция), и значение статуса.
@@ -62,8 +69,6 @@ const selectCls =
 const emptyForm = {
   lead_id: 0,
   carrier_id: null as number | null,
-  city_loading: "",
-  city_unloading: "",
   address_loading: "",
   address_unloading: "",
   contact_loading_name: "",
@@ -74,6 +79,43 @@ const emptyForm = {
   cargo_weight: "",
   cargo_volume: "",
   comment: "",
+
+  // Заказчик (шапка).
+  customer_address: "",
+  customer_contact: "",
+  customer_signer: "",
+
+  // Погрузка.
+  loading_cities: [] as string[],
+  loading_date_from: "",
+  loading_date_to: "",
+  loading_time_from: "",
+  loading_time_to: "",
+
+  // Выгрузка.
+  unloading_cities: [] as string[],
+  unloading_date_from: "",
+  unloading_date_to: "",
+  unloading_time_from: "",
+  unloading_time_to: "",
+
+  // Перевозчик.
+  carrier_contact: "",
+  vehicle: "",
+  vehicle_number: "",
+  has_trailer: false,
+  trailer_number: "",
+  driver_name: "",
+  driver_phone: "",
+  driver_passport: "",
+  carrier_signer: "",
+
+  // Груз.
+  cargo_type: "",
+  cargo_packaging: "",
+  capacity: "",
+  body_type: "",
+  loading_method: [] as string[],
 };
 
 type FormState = typeof emptyForm;
@@ -108,6 +150,7 @@ function ShipmentForm({ id }: { id?: string }) {
   const [pristine, setPristine] = useState<FormState>(emptyForm);
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<Attachment | null>(null);
+  const [tab, setTab] = useState("info");
   const loadedId = useRef<number | null>(null);
 
   // Заявка из карточки лида приходит со ссылкой /shipments/new?lead=42.
@@ -125,8 +168,6 @@ function ShipmentForm({ id }: { id?: string }) {
       const next: FormState = {
         lead_id: shipment.lead_id,
         carrier_id: shipment.carrier_id,
-        city_loading: shipment.city_loading ?? "",
-        city_unloading: shipment.city_unloading ?? "",
         address_loading: shipment.address_loading ?? "",
         address_unloading: shipment.address_unloading ?? "",
         contact_loading_name: shipment.contact_loading_name ?? "",
@@ -137,6 +178,38 @@ function ShipmentForm({ id }: { id?: string }) {
         cargo_weight: shipment.cargo_weight ?? "",
         cargo_volume: shipment.cargo_volume ?? "",
         comment: shipment.comment ?? "",
+
+        customer_address: shipment.customer_address ?? "",
+        customer_contact: shipment.customer_contact ?? "",
+        customer_signer: shipment.customer_signer ?? "",
+
+        loading_cities: shipment.loading_cities ?? [],
+        loading_date_from: shipment.loading_date_from ?? "",
+        loading_date_to: shipment.loading_date_to ?? "",
+        loading_time_from: shipment.loading_time_from ?? "",
+        loading_time_to: shipment.loading_time_to ?? "",
+
+        unloading_cities: shipment.unloading_cities ?? [],
+        unloading_date_from: shipment.unloading_date_from ?? "",
+        unloading_date_to: shipment.unloading_date_to ?? "",
+        unloading_time_from: shipment.unloading_time_from ?? "",
+        unloading_time_to: shipment.unloading_time_to ?? "",
+
+        carrier_contact: shipment.carrier_contact ?? "",
+        vehicle: shipment.vehicle ?? "",
+        vehicle_number: shipment.vehicle_number ?? "",
+        has_trailer: shipment.has_trailer ?? false,
+        trailer_number: shipment.trailer_number ?? "",
+        driver_name: shipment.driver_name ?? "",
+        driver_phone: shipment.driver_phone ?? "",
+        driver_passport: shipment.driver_passport ?? "",
+        carrier_signer: shipment.carrier_signer ?? "",
+
+        cargo_type: shipment.cargo_type ?? "",
+        cargo_packaging: shipment.cargo_packaging ?? "",
+        capacity: shipment.capacity ?? "",
+        body_type: shipment.body_type ?? "",
+        loading_method: shipment.loading_method ?? [],
       };
       setForm(next);
       setPristine(next);
@@ -174,6 +247,11 @@ function ShipmentForm({ id }: { id?: string }) {
       ...form,
       cargo_weight: form.cargo_weight || null,
       cargo_volume: form.cargo_volume || null,
+      capacity: form.capacity || null,
+      loading_date_from: form.loading_date_from || null,
+      loading_date_to: form.loading_date_to || null,
+      unloading_date_from: form.unloading_date_from || null,
+      unloading_date_to: form.unloading_date_to || null,
     };
     save.mutate(payload, {
       onSuccess: (saved) => {
@@ -292,17 +370,23 @@ function ShipmentForm({ id }: { id?: string }) {
                   </span>
                 </FormTitle>
 
+                {/* --- Шапка: своя компания и заказчик --- */}
                 <FormGroup>
                   <div>
-                    <InnerGroup title="Клиент и перевозчик">
-                      <Field label="Клиент (лид)" htmlFor="ship-lead">
+                    <InnerGroup title="Заявка">
+                      <Field label="Компания">
+                        <span className="px-1 py-[2px] text-odoo-text">
+                          {OWN_COMPANY}
+                        </span>
+                      </Field>
+                      <Field label="Заказчик" htmlFor="ship-lead">
                         <select
                           id="ship-lead"
                           className={selectCls}
                           value={form.lead_id || ""}
                           onChange={(e) => set("lead_id", Number(e.target.value))}
                         >
-                          <option value="">Выберите лид</option>
+                          <option value="">Выберите заказчика</option>
                           {leads.map((l) => (
                             <option key={l.id} value={l.id}>
                               {l.name}
@@ -310,6 +394,222 @@ function ShipmentForm({ id }: { id?: string }) {
                           ))}
                         </select>
                       </Field>
+                      <Field label="ИНН заказчика">
+                        <span className="px-1 py-[2px] text-odoo-text-muted">
+                          {selectedLead?.inn || "—"}
+                        </span>
+                      </Field>
+                    </InnerGroup>
+                  </div>
+
+                  <div>
+                    <InnerGroup title="Реквизиты заказчика">
+                      <Field label="Адрес заказчика" htmlFor="ship-cust-addr">
+                        <OdooInput
+                          id="ship-cust-addr"
+                          value={form.customer_address}
+                          onChange={(e) =>
+                            set("customer_address", e.target.value)
+                          }
+                        />
+                      </Field>
+                      <Field label="Контакт заказчика" htmlFor="ship-cust-contact">
+                        <OdooInput
+                          id="ship-cust-contact"
+                          value={form.customer_contact}
+                          onChange={(e) =>
+                            set("customer_contact", e.target.value)
+                          }
+                        />
+                      </Field>
+                      <Field label="Кто подписывает" htmlFor="ship-cust-signer">
+                        <OdooInput
+                          id="ship-cust-signer"
+                          value={form.customer_signer}
+                          onChange={(e) =>
+                            set("customer_signer", e.target.value)
+                          }
+                        />
+                      </Field>
+                    </InnerGroup>
+                  </div>
+                </FormGroup>
+
+                {/* --- Погрузка / Выгрузка --- */}
+                <FormGroup>
+                  <div>
+                    <InnerGroup title="Информация о погрузке">
+                      <Field label="Города погрузки" htmlFor="ship-load-cities">
+                        <TokenField
+                          id="ship-load-cities"
+                          placeholder="Город + Enter"
+                          value={form.loading_cities}
+                          onChange={(v) => set("loading_cities", v)}
+                        />
+                      </Field>
+                      <Field label="Адрес погрузки" htmlFor="ship-addr-load">
+                        <OdooInput
+                          id="ship-addr-load"
+                          value={form.address_loading}
+                          onChange={(e) => set("address_loading", e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Контакт" htmlFor="ship-load-name">
+                        <OdooInput
+                          id="ship-load-name"
+                          placeholder="Фамилия Имя"
+                          value={form.contact_loading_name}
+                          onChange={(e) =>
+                            set("contact_loading_name", e.target.value)
+                          }
+                        />
+                      </Field>
+                      <Field label="Телефон" htmlFor="ship-load-phone">
+                        <OdooInput
+                          id="ship-load-phone"
+                          placeholder="+7 900 000-00-00"
+                          value={form.contact_loading_phone}
+                          onChange={(e) =>
+                            set("contact_loading_phone", e.target.value)
+                          }
+                        />
+                      </Field>
+                      <Field label="Дата погрузки с" htmlFor="ship-load-date-from">
+                        <OdooInput
+                          id="ship-load-date-from"
+                          type="date"
+                          value={form.loading_date_from}
+                          onChange={(e) =>
+                            set("loading_date_from", e.target.value)
+                          }
+                        />
+                      </Field>
+                      <Field label="Дата погрузки по" htmlFor="ship-load-date-to">
+                        <OdooInput
+                          id="ship-load-date-to"
+                          type="date"
+                          value={form.loading_date_to}
+                          onChange={(e) =>
+                            set("loading_date_to", e.target.value)
+                          }
+                        />
+                      </Field>
+                      <Field label="Время с" htmlFor="ship-load-time-from">
+                        <OdooInput
+                          id="ship-load-time-from"
+                          placeholder="09:00"
+                          value={form.loading_time_from}
+                          onChange={(e) =>
+                            set("loading_time_from", e.target.value)
+                          }
+                        />
+                      </Field>
+                      <Field label="Время по" htmlFor="ship-load-time-to">
+                        <OdooInput
+                          id="ship-load-time-to"
+                          placeholder="18:00"
+                          value={form.loading_time_to}
+                          onChange={(e) =>
+                            set("loading_time_to", e.target.value)
+                          }
+                        />
+                      </Field>
+                    </InnerGroup>
+                  </div>
+
+                  <div>
+                    <InnerGroup title="Информация о выгрузке">
+                      <Field label="Города выгрузки" htmlFor="ship-unload-cities">
+                        <TokenField
+                          id="ship-unload-cities"
+                          placeholder="Город + Enter"
+                          value={form.unloading_cities}
+                          onChange={(v) => set("unloading_cities", v)}
+                        />
+                      </Field>
+                      <Field label="Адрес выгрузки" htmlFor="ship-addr-unload">
+                        <OdooInput
+                          id="ship-addr-unload"
+                          value={form.address_unloading}
+                          onChange={(e) =>
+                            set("address_unloading", e.target.value)
+                          }
+                        />
+                      </Field>
+                      <Field label="Контакт" htmlFor="ship-unload-name">
+                        <OdooInput
+                          id="ship-unload-name"
+                          placeholder="Фамилия Имя"
+                          value={form.contact_unloading_name}
+                          onChange={(e) =>
+                            set("contact_unloading_name", e.target.value)
+                          }
+                        />
+                      </Field>
+                      <Field label="Телефон" htmlFor="ship-unload-phone">
+                        <OdooInput
+                          id="ship-unload-phone"
+                          placeholder="+7 900 000-00-00"
+                          value={form.contact_unloading_phone}
+                          onChange={(e) =>
+                            set("contact_unloading_phone", e.target.value)
+                          }
+                        />
+                      </Field>
+                      <Field
+                        label="Дата выгрузки с"
+                        htmlFor="ship-unload-date-from"
+                      >
+                        <OdooInput
+                          id="ship-unload-date-from"
+                          type="date"
+                          value={form.unloading_date_from}
+                          onChange={(e) =>
+                            set("unloading_date_from", e.target.value)
+                          }
+                        />
+                      </Field>
+                      <Field
+                        label="Дата выгрузки по"
+                        htmlFor="ship-unload-date-to"
+                      >
+                        <OdooInput
+                          id="ship-unload-date-to"
+                          type="date"
+                          value={form.unloading_date_to}
+                          onChange={(e) =>
+                            set("unloading_date_to", e.target.value)
+                          }
+                        />
+                      </Field>
+                      <Field label="Время с" htmlFor="ship-unload-time-from">
+                        <OdooInput
+                          id="ship-unload-time-from"
+                          placeholder="09:00"
+                          value={form.unloading_time_from}
+                          onChange={(e) =>
+                            set("unloading_time_from", e.target.value)
+                          }
+                        />
+                      </Field>
+                      <Field label="Время по" htmlFor="ship-unload-time-to">
+                        <OdooInput
+                          id="ship-unload-time-to"
+                          placeholder="18:00"
+                          value={form.unloading_time_to}
+                          onChange={(e) =>
+                            set("unloading_time_to", e.target.value)
+                          }
+                        />
+                      </Field>
+                    </InnerGroup>
+                  </div>
+                </FormGroup>
+
+                {/* --- Перевозчик / Груз --- */}
+                <FormGroup>
+                  <div>
+                    <InnerGroup title="Сведения о перевозчике">
                       <Field label="Перевозчик" htmlFor="ship-carrier">
                         <select
                           id="ship-carrier"
@@ -330,6 +630,141 @@ function ShipmentForm({ id }: { id?: string }) {
                           ))}
                         </select>
                       </Field>
+                      <Field label="Контакт перевозчика" htmlFor="ship-carr-contact">
+                        <OdooInput
+                          id="ship-carr-contact"
+                          value={form.carrier_contact}
+                          onChange={(e) =>
+                            set("carrier_contact", e.target.value)
+                          }
+                        />
+                      </Field>
+                      <Field label="ТС (марка)" htmlFor="ship-vehicle">
+                        <OdooInput
+                          id="ship-vehicle"
+                          value={form.vehicle}
+                          onChange={(e) => set("vehicle", e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Номер ТС" htmlFor="ship-vehicle-num">
+                        <OdooInput
+                          id="ship-vehicle-num"
+                          value={form.vehicle_number}
+                          onChange={(e) => set("vehicle_number", e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Прицеп" htmlFor="ship-has-trailer">
+                        <OdooCheckbox
+                          id="ship-has-trailer"
+                          label="Есть прицеп"
+                          checked={form.has_trailer}
+                          onChange={(v) => set("has_trailer", v)}
+                        />
+                      </Field>
+                      {form.has_trailer && (
+                        <Field label="Номер прицепа" htmlFor="ship-trailer-num">
+                          <OdooInput
+                            id="ship-trailer-num"
+                            value={form.trailer_number}
+                            onChange={(e) =>
+                              set("trailer_number", e.target.value)
+                            }
+                          />
+                        </Field>
+                      )}
+                      <Field label="ФИО водителя" htmlFor="ship-driver-name">
+                        <OdooInput
+                          id="ship-driver-name"
+                          value={form.driver_name}
+                          onChange={(e) => set("driver_name", e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Телефон водителя" htmlFor="ship-driver-phone">
+                        <OdooInput
+                          id="ship-driver-phone"
+                          placeholder="+7 900 000-00-00"
+                          value={form.driver_phone}
+                          onChange={(e) => set("driver_phone", e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Паспорт водителя" htmlFor="ship-driver-pass">
+                        <OdooInput
+                          id="ship-driver-pass"
+                          value={form.driver_passport}
+                          onChange={(e) =>
+                            set("driver_passport", e.target.value)
+                          }
+                        />
+                      </Field>
+                      <Field label="Кто подписывает" htmlFor="ship-carr-signer">
+                        <OdooInput
+                          id="ship-carr-signer"
+                          value={form.carrier_signer}
+                          onChange={(e) =>
+                            set("carrier_signer", e.target.value)
+                          }
+                        />
+                      </Field>
+                    </InnerGroup>
+                  </div>
+
+                  <div>
+                    <InnerGroup title="Информация о грузе">
+                      <Field label="Тип груза" htmlFor="ship-cargo-type">
+                        <OdooInput
+                          id="ship-cargo-type"
+                          value={form.cargo_type}
+                          onChange={(e) => set("cargo_type", e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Упаковка" htmlFor="ship-cargo-pack">
+                        <OdooInput
+                          id="ship-cargo-pack"
+                          value={form.cargo_packaging}
+                          onChange={(e) =>
+                            set("cargo_packaging", e.target.value)
+                          }
+                        />
+                      </Field>
+                      <Field label="Объём кузова, м³" htmlFor="ship-volume">
+                        <OdooInput
+                          id="ship-volume"
+                          inputMode="decimal"
+                          value={form.cargo_volume}
+                          onChange={(e) => set("cargo_volume", e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Масса, т" htmlFor="ship-weight">
+                        <OdooInput
+                          id="ship-weight"
+                          inputMode="decimal"
+                          value={form.cargo_weight}
+                          onChange={(e) => set("cargo_weight", e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Грузоподъёмность, т" htmlFor="ship-capacity">
+                        <OdooInput
+                          id="ship-capacity"
+                          inputMode="decimal"
+                          value={form.capacity}
+                          onChange={(e) => set("capacity", e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Тип кузова" htmlFor="ship-body-type">
+                        <OdooInput
+                          id="ship-body-type"
+                          value={form.body_type}
+                          onChange={(e) => set("body_type", e.target.value)}
+                        />
+                      </Field>
+                      <Field label="Способ погрузки" htmlFor="ship-load-method">
+                        <TokenField
+                          id="ship-load-method"
+                          placeholder="Например: задняя + Enter"
+                          value={form.loading_method}
+                          onChange={(v) => set("loading_method", v)}
+                        />
+                      </Field>
                       <Field label="Тип транспорта" htmlFor="ship-transport">
                         <select
                           id="ship-transport"
@@ -345,117 +780,38 @@ function ShipmentForm({ id }: { id?: string }) {
                         </select>
                       </Field>
                     </InnerGroup>
+                  </div>
+                </FormGroup>
 
-                    <InnerGroup title="Груз">
-                      <Field label="Вес, т" htmlFor="ship-weight">
-                        <OdooInput
-                          id="ship-weight"
-                          inputMode="decimal"
-                          value={form.cargo_weight}
-                          onChange={(e) => set("cargo_weight", e.target.value)}
-                        />
-                      </Field>
-                      <Field label="Объём, м³" htmlFor="ship-volume">
-                        <OdooInput
-                          id="ship-volume"
-                          inputMode="decimal"
-                          value={form.cargo_volume}
-                          onChange={(e) => set("cargo_volume", e.target.value)}
-                        />
-                      </Field>
-                      <Field label="Комментарий" htmlFor="ship-comment">
-                        <textarea
+                {/* --- Вкладки: позиции заказа / прочая информация --- */}
+                <Notebook
+                  active={tab}
+                  onSelect={setTab}
+                  tabs={[
+                    {
+                      id: "info",
+                      label: "Прочая информация",
+                      content: (
+                        <OdooTextarea
                           id="ship-comment"
-                          rows={2}
-                          className={`${selectCls} resize-none`}
+                          rows={4}
+                          placeholder="Дополнительные условия, комментарии…"
                           value={form.comment}
                           onChange={(e) => set("comment", e.target.value)}
                         />
-                      </Field>
-                    </InnerGroup>
-                  </div>
-
-                  <div>
-                    <InnerGroup title="Маршрут">
-                      <Field label="Город погрузки" htmlFor="ship-city-load">
-                        <OdooInput
-                          id="ship-city-load"
-                          value={form.city_loading}
-                          onChange={(e) => set("city_loading", e.target.value)}
-                        />
-                      </Field>
-                      <Field label="Адрес погрузки" htmlFor="ship-addr-load">
-                        <OdooInput
-                          id="ship-addr-load"
-                          value={form.address_loading}
-                          onChange={(e) => set("address_loading", e.target.value)}
-                        />
-                      </Field>
-                      <Field label="Город выгрузки" htmlFor="ship-city-unload">
-                        <OdooInput
-                          id="ship-city-unload"
-                          value={form.city_unloading}
-                          onChange={(e) => set("city_unloading", e.target.value)}
-                        />
-                      </Field>
-                      <Field label="Адрес выгрузки" htmlFor="ship-addr-unload">
-                        <OdooInput
-                          id="ship-addr-unload"
-                          value={form.address_unloading}
-                          onChange={(e) =>
-                            set("address_unloading", e.target.value)
-                          }
-                        />
-                      </Field>
-                    </InnerGroup>
-
-                    <InnerGroup title="Контакты">
-                      <Field label="Контакт на погрузке" htmlFor="ship-load-name">
-                        <OdooInput
-                          id="ship-load-name"
-                          placeholder="Фамилия Имя"
-                          value={form.contact_loading_name}
-                          onChange={(e) =>
-                            set("contact_loading_name", e.target.value)
-                          }
-                        />
-                      </Field>
-                      <Field label="Телефон на погрузке" htmlFor="ship-load-phone">
-                        <OdooInput
-                          id="ship-load-phone"
-                          placeholder="+7 900 000-00-00"
-                          value={form.contact_loading_phone}
-                          onChange={(e) =>
-                            set("contact_loading_phone", e.target.value)
-                          }
-                        />
-                      </Field>
-                      <Field label="Контакт на выгрузке" htmlFor="ship-unload-name">
-                        <OdooInput
-                          id="ship-unload-name"
-                          placeholder="Фамилия Имя"
-                          value={form.contact_unloading_name}
-                          onChange={(e) =>
-                            set("contact_unloading_name", e.target.value)
-                          }
-                        />
-                      </Field>
-                      <Field
-                        label="Телефон на выгрузке"
-                        htmlFor="ship-unload-phone"
-                      >
-                        <OdooInput
-                          id="ship-unload-phone"
-                          placeholder="+7 900 000-00-00"
-                          value={form.contact_unloading_phone}
-                          onChange={(e) =>
-                            set("contact_unloading_phone", e.target.value)
-                          }
-                        />
-                      </Field>
-                    </InnerGroup>
-                  </div>
-                </FormGroup>
+                      ),
+                    },
+                    {
+                      id: "lines",
+                      label: "Позиции заказа",
+                      content: (
+                        <p className="text-[13px] text-odoo-text-light">
+                          Таблица позиций заказа с суммами и НДС появится позже.
+                        </p>
+                      ),
+                    },
+                  ]}
+                />
               </>
             )}
           </FormSheet>

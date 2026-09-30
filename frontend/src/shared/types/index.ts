@@ -98,6 +98,43 @@ export interface Shipment {
   cargo_weight?: string | null;
   cargo_volume?: string | null;
   comment?: string;
+
+  // Заказчик (шапка).
+  customer_address?: string;
+  customer_contact?: string;
+  customer_signer?: string;
+
+  // Погрузка.
+  loading_cities?: string[];
+  loading_date_from?: string | null;
+  loading_date_to?: string | null;
+  loading_time_from?: string;
+  loading_time_to?: string;
+
+  // Выгрузка.
+  unloading_cities?: string[];
+  unloading_date_from?: string | null;
+  unloading_date_to?: string | null;
+  unloading_time_from?: string;
+  unloading_time_to?: string;
+
+  // Перевозчик.
+  carrier_contact?: string;
+  vehicle?: string;
+  vehicle_number?: string;
+  has_trailer?: boolean;
+  trailer_number?: string;
+  driver_name?: string;
+  driver_phone?: string;
+  driver_passport?: string;
+  carrier_signer?: string;
+
+  // Груз.
+  cargo_type?: string;
+  cargo_packaging?: string;
+  capacity?: string | null;
+  body_type?: string;
+  loading_method?: string[];
 }
 
 export interface Carrier {
