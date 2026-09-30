@@ -1,7 +1,7 @@
 import { format, formatDistanceToNow } from "date-fns";
 import { ru } from "date-fns/locale";
 import { Download, Paperclip, Search, Trash2, X } from "lucide-react";
-import { useMemo, useRef, useState } from "react";
+import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { downloadAttachment } from "@/shared/api/hooks";
 import type { Attachment, TimelineEntry } from "@/shared/types";
@@ -106,9 +106,19 @@ export function Chatter({
   const [pending, setPending] = useState<File[]>([]);
   const panelInput = useRef<HTMLInputElement | null>(null);
   const composerInput = useRef<HTMLInputElement | null>(null);
+  const composerText = useRef<HTMLTextAreaElement | null>(null);
   const files = attachments ?? [];
 
   const current = MODES.find((m) => m.id === mode) ?? MODES[0];
+
+  useLayoutEffect(() => {
+    const field = composerText.current;
+    if (!field) return;
+    // Сначала снимаем прежнюю высоту: иначе scrollHeight не уменьшается после
+    // сохранения или удаления части текста и редактор остаётся слишком высоким.
+    field.style.height = "auto";
+    field.style.height = `${Math.max(field.scrollHeight, 58)}px`;
+  }, [text]);
 
   const groups = useMemo(() => {
     const q = query.trim().toLowerCase();
@@ -297,12 +307,13 @@ export function Chatter({
           </span>
           <div className="min-w-0 flex-1 overflow-hidden rounded-[4px] border border-odoo-border bg-odoo-surface focus-within:border-odoo-primary">
             <textarea
+              ref={composerText}
               rows={2}
               aria-label="Текст внутреннего примечания"
               value={text}
               onChange={(e) => setText(e.target.value)}
               placeholder={current.placeholder}
-              className="min-h-[58px] w-full resize-y border-0 bg-transparent px-2 py-2 text-[13px] leading-[19px] text-odoo-text outline-none placeholder:text-odoo-text-light"
+              className="min-h-[58px] w-full resize-none overflow-hidden border-0 bg-transparent px-2 py-2 text-[13px] leading-[19px] text-odoo-text outline-none placeholder:text-odoo-text-light"
             />
 
             {pending.length > 0 && (

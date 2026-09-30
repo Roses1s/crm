@@ -1,4 +1,4 @@
-import { screen } from "@testing-library/react";
+import { fireEvent, screen } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
@@ -42,6 +42,17 @@ describe("Лента примечаний", () => {
     expect(screen.getByText(/\(Этапы лидов\)/)).toBeInTheDocument();
     expect(screen.getByText("Новый")).toBeInTheDocument();
     expect(screen.getByText("Перезвонить")).toBeInTheDocument();
+  });
+
+  it("автоматически увеличивает редактор и не показывает внутреннюю прокрутку", () => {
+    renderWithProviders(<Chatter timeline={[]} authorInitials="М" />);
+    const editor = screen.getByRole("textbox", { name: "Текст внутреннего примечания" });
+    Object.defineProperty(editor, "scrollHeight", { configurable: true, value: 138 });
+
+    fireEvent.change(editor, { target: { value: "Длинная внутренняя запись" } });
+
+    expect(editor).toHaveStyle({ height: "138px" });
+    expect(editor).toHaveClass("resize-none", "overflow-hidden");
   });
 
   it("передаёт новую внутреннюю запись в обработчик", async () => {
