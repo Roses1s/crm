@@ -18,7 +18,7 @@ export function AdminLayout() {
               key={l.to}
               to={l.to}
               className={({ isActive }) =>
-                `block rounded-[4px] px-2 py-1.5 text-sm hover:bg-odoo-bg ${isActive ? "font-semibold text-odoo-action" : "text-odoo-text"}`
+                `block rounded-[4px] px-2 py-1.5 text-sm transition-colors hover:bg-odoo-surface-hover ${isActive ? "bg-odoo-primary/10 font-semibold text-odoo-primary" : "text-odoo-text"}`
               }
             >
               {l.label}

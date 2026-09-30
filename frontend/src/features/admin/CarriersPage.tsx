@@ -39,13 +39,13 @@ export function CarriersPage() {
       <h2 className="mb-4">Перевозчики</h2>
       <div className="mb-4 flex gap-2">
         <input
-          className="rounded-[4px] border border-odoo-border px-2 py-1.5 text-sm"
+          className="rounded-[4px] border border-odoo-border bg-odoo-surface px-2 py-1.5 text-sm text-odoo-text placeholder:text-odoo-text-light transition-colors hover:border-odoo-border focus:border-odoo-focus focus:outline-none"
           placeholder="Название"
           value={name}
           onChange={(e) => setName(e.target.value)}
         />
         <input
-          className="rounded-[4px] border border-odoo-border px-2 py-1.5 text-sm"
+          className="rounded-[4px] border border-odoo-border bg-odoo-surface px-2 py-1.5 text-sm text-odoo-text placeholder:text-odoo-text-light transition-colors hover:border-odoo-border focus:border-odoo-focus focus:outline-none"
           placeholder="ИНН"
           inputMode="numeric"
           value={inn}
