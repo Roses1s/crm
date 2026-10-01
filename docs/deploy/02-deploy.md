@@ -53,7 +53,7 @@ sudo mkdir -p /opt/crm && sudo chown deploy:deploy /opt/crm
 ```
 
 ```bash
-git clone -b arena/01a0f1e0-crm https://github.com/Roses1s/crm.git /opt/crm
+git clone -b arena/01a0f5c2-crm https://github.com/Roses1s/crm.git /opt/crm
 ```
 
 > Если сервер уже настроен и `/opt/crm` клонировался со старой рабочей ветки
@@ -61,7 +61,7 @@ git clone -b arena/01a0f1e0-crm https://github.com/Roses1s/crm.git /opt/crm
 > переключить существующий клон на новую ветку:
 >
 > ```bash
-> ssh crm "cd /opt/crm && git fetch origin arena/01a0f1e0-crm && git checkout -B arena/01a0f1e0-crm --track origin/arena/01a0f1e0-crm && git log --oneline -1"
+> ssh crm "cd /opt/crm && git fetch origin arena/01a0f5c2-crm && git checkout -B arena/01a0f5c2-crm --track origin/arena/01a0f5c2-crm && git log --oneline -1"
 > ```
 >
 > После этого `ssh crm /opt/crm/deploy.sh` работает как раньше.
