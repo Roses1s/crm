@@ -25,6 +25,11 @@ const SecurityPage = lazy(() =>
 const UsersPage = lazy(() =>
   import("@/features/admin/UsersPage").then((m) => ({ default: m.UsersPage })),
 );
+const CustomersPage = lazy(() =>
+  import("@/features/customers/CustomersPage").then((m) => ({
+    default: m.CustomersPage,
+  })),
+);
 const LauncherPage = lazy(() =>
   import("@/features/launcher/LauncherPage").then((m) => ({
     default: m.LauncherPage,
@@ -77,6 +82,14 @@ export function AppRouter() {
           element={
             <RequireAuth>
               <LeadFormPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/customers"
+          element={
+            <RequireAuth>
+              <CustomersPage />
             </RequireAuth>
           }
         />

@@ -24,6 +24,7 @@
 | `attachments.py` | `/crm` | 6 |
 | `auth.py` | `/auth` | 4 |
 | `carriers.py` | `/carriers` | 3 |
+| `customers.py` | `/crm/customers` | 1 |
 | `health.py` | `—` | 2 |
 | `launcher.py` | `/launcher` | 1 |
 | `leads.py` | `/crm/leads` | 13 |
@@ -40,6 +41,7 @@
 | Файл | Что внутри |
 |---|---|
 | `attachments.py` | Бизнес-логика вложений лидов и заявок |
+| `customers.py` | Модуль «Клиенты»: все лиды компании одним списком, с маскировкой чужих |
 | `leads.py` | Бизнес-логика лидов: доступ, фильтры, карточка, лента, передача продавцу |
 | `shipments.py` | Бизнес-логика заявок на перевозку: доступ, список, статусы, лента |
 
@@ -77,13 +79,14 @@
 | `admin` | `CarriersPage`, `SecurityPage`, `UsersPage` |
 | `auth` | `LoginPage` |
 | `crm` | `KanbanPage`, `LeadFormPage` |
+| `customers` | `CustomersPage` |
 | `launcher` | `LauncherPage` |
 | `shipments` | `ShipmentFormPage`, `ShipmentsPage` |
 
 ## Тесты
 
-- бэкенд (pytest): **89** тест-функций
-- фронтенд (vitest): **36** тестов
+- бэкенд (pytest): **94** тест-функций
+- фронтенд (vitest): **39** тестов
 - сценарные (подменяется только сеть, остальное настоящее):
   - `frontend/src/features/auth/login-flow.test.tsx`
   - `frontend/src/features/crm/kanban-flow.test.tsx`

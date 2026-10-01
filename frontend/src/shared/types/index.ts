@@ -61,6 +61,29 @@ export interface Lead {
   updated_at?: string;
 }
 
+/**
+ * Строка модуля «Клиенты» — ВСЕ лиды компании. Чужой активный лид приходит
+ * с `can_open: false` и пустыми скрытыми полями (см. backend CustomerRead) —
+ * карточку такого лида открывать нельзя, видно только имя, ИНН и продавца.
+ */
+export interface Customer {
+  id: number;
+  name: string;
+  inn: string;
+  assigned_to_id: number | null;
+  assigned_to_name: string | null;
+  is_archived: boolean;
+  can_open: boolean;
+  loss_reason_name?: string | null;
+  logist_contact?: string | null;
+  logist_phone?: string | null;
+  logist_email?: string | null;
+  priority?: number | null;
+  stage_name?: string | null;
+  tags?: Tag[];
+  updated_at: string;
+}
+
 export interface Attachment {
   id: number;
   name: string;

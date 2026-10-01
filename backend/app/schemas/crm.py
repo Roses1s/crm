@@ -143,6 +143,32 @@ class LeadRead(ORMModel):
     updated_at: datetime
 
 
+# --- клиенты (все лиды компании, с маскировкой чужих активных) ----------------
+class CustomerRead(BaseModel):
+    """Строка модуля «Клиенты».
+
+    Свой лид и любой проигранный (``is_archived=True``) открыты полностью —
+    у них ``can_open=True``. Чужой активный лид виден только базово: название,
+    ИНН и кто ведёт, остальные поля приходят пустыми, карточку открыть нельзя.
+    """
+
+    id: int
+    name: str
+    inn: str
+    assigned_to_id: int | None
+    assigned_to_name: str | None
+    is_archived: bool
+    can_open: bool
+    loss_reason_name: str | None = None
+    logist_contact: str | None = None
+    logist_phone: str | None = None
+    logist_email: str | None = None
+    priority: int | None = None
+    stage_name: str | None = None
+    tags: list[TagRead] = Field(default_factory=list)
+    updated_at: datetime
+
+
 # --- лента -------------------------------------------------------------------
 class AttachmentRead(ORMModel):
     id: int

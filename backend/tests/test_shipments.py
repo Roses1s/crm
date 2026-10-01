@@ -109,7 +109,7 @@ async def test_carriers_list(auth_client: AsyncClient, seeded: dict) -> None:
 async def test_launcher_apps_depend_on_role(auth_client: AsyncClient) -> None:
     apps = await auth_client.get("/api/v1/launcher/apps")
     slugs = [a["slug"] for a in apps.json()]
-    assert slugs == ["crm", "shipments", "admin"]
+    assert slugs == ["crm", "shipments", "customers", "admin"]
 
 
 async def test_colleague_can_view_but_not_change_shipment_of_lost_lead(

@@ -31,6 +31,15 @@ APPS: list[dict[str, Any]] = [
         "min_role": Role.manager,
     },
     {
+        "id": 4,
+        "slug": "customers",
+        "name": "Клиенты",
+        "description": "Все клиенты компании: кто ведёт и кто уже проигран",
+        "icon": "Users",
+        "route": "/customers",
+        "min_role": Role.manager,
+    },
+    {
         "id": 3,
         "slug": "admin",
         "name": "Администрирование",

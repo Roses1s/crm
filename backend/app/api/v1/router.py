@@ -9,6 +9,7 @@ from app.api.v1 import (
     attachments,
     auth,
     carriers,
+    customers,
     launcher,
     leads,
     loss_reasons,
@@ -25,6 +26,7 @@ api_router.include_router(stages.router)
 api_router.include_router(tags.router)
 api_router.include_router(loss_reasons.router)
 api_router.include_router(leads.router)
+api_router.include_router(customers.router)
 api_router.include_router(attachments.router)
 api_router.include_router(shipments.router)
 api_router.include_router(attachments.shipment_router)

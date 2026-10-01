@@ -10,6 +10,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import type {
   Attachment,
   Carrier,
+  Customer,
   LauncherApp,
   Lead,
   LossReason,
@@ -49,6 +50,7 @@ export const keys = {
   stages: ["stages"] as const,
   tags: ["tags"] as const,
   lossReasons: ["loss-reasons"] as const,
+  customers: (search: string) => ["customers", search] as const,
   leads: (filters: LeadFilters) => ["leads", filters] as const,
   lead: (id: string | number) => ["lead", String(id)] as const,
   timeline: (id: string | number) => ["timeline", String(id)] as const,
@@ -221,6 +223,24 @@ export function useLeads(filters: LeadFilters = {}) {
   return useQuery({
     queryKey: keys.leads(filters),
     queryFn: () => api<Page<Lead>>(`/crm/leads?${leadsQueryString(filters)}`),
+    select: (page) => page.results,
+  });
+}
+
+/**
+ * Модуль «Клиенты»: ВСЕ лиды компании. Поиск — только по названию/ИНН (так же
+ * ограничен и на бэкенде — это единственные поля, видимые на чужом активном
+ * лиде). page_size на максимум: отдельной пагинации в интерфейсе пока нет,
+ * список подгружается целиком и режется на клиенте кнопкой «Показать ещё».
+ */
+export function useCustomers(search: string) {
+  return useQuery({
+    queryKey: keys.customers(search),
+    queryFn: () => {
+      const params = new URLSearchParams({ page_size: "500" });
+      if (search) params.set("search", search);
+      return api<Page<Customer>>(`/crm/customers?${params.toString()}`);
+    },
     select: (page) => page.results,
   });
 }
