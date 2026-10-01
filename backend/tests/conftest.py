@@ -129,7 +129,7 @@ async def seeded(session: AsyncSession) -> dict[str, object]:
     # Этапы принадлежат доске админа — как после перехода на личные воронки.
     new_stage = Stage(name="Новый", sequence=1, color="slate", owner_id=admin.id)
     talks_stage = Stage(name="Переговоры", sequence=2, color="blue", owner_id=admin.id)
-    tag = Tag(name="Крупный клиент", color="green")
+    tag = Tag(name="Крупный клиент", color="#1e8449")
     carrier = Carrier(name="ООО «АвтоТрансЛайн»", inn="7447112236")
     loss_reason = LossReason(name="Перестал возить")
     session.add_all([new_stage, talks_stage, tag, carrier, loss_reason])

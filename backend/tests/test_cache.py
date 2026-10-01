@@ -24,7 +24,7 @@ async def test_tags_list_is_cached_then_invalidated(auth_client: AsyncClient, se
 
     # Создание тега сбрасывает кеш: список сразу показывает новый тег.
     created = await auth_client.post(
-        "/api/v1/crm/tags", json={"name": "Экспресс", "color": "orange"}
+        "/api/v1/crm/tags", json={"name": "Экспресс", "color": "#935116"}
     )
     assert created.status_code == 201, created.text
 

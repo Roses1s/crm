@@ -6,6 +6,7 @@ from typing import Any
 
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy.orm import selectinload
 
 from app.core.errors import AppError, NotFoundError
 from app.core.logging import get_logger
@@ -17,6 +18,7 @@ from app.models.user import Role, User
 from app.schemas.crm import NoteCreate, NoteUpdate
 from app.schemas.shipment import ShipmentCreate, ShipmentStatusUpdate, ShipmentUpdate
 from app.services.leads import get_lead_or_404
+from app.services.tags import fetch_tags
 
 log = get_logger(__name__)
 
@@ -37,14 +39,30 @@ async def get_shipment_or_404(
 ) -> Shipment:
     """`allow_lost=True` — только для чтения: заявка проигранного лида тоже
     становится видна всем, как и сам лид (см. `get_lead_or_404`).
+
+    Теги подгружаем сразу (`selectinload`): без этого присваивание новой
+    коллекции `shipment.tags = ...` на уже существующей записи потребовало бы
+    синхронной ленивой подгрузки старого значения — на async-сессии это
+    падает с `MissingGreenlet`. `populate_existing` на тот же случай
+    перезаписывает то, что уже лежит в identity map этой сессии.
     """
-    shipment = await session.get(Shipment, shipment_id)
+    stmt = (
+        select(Shipment)
+        .where(Shipment.id == shipment_id)
+        .options(selectinload(Shipment.tags))
+        .execution_options(populate_existing=True)
+    )
+    shipment = (await session.execute(stmt)).unique().scalar_one_or_none()
     if shipment is None:
         raise NotFoundError(f"Заявка {shipment_id} не найдена")
     # Заявка наследует видимость своего лида: чужая для менеджера не существует.
     if user is not None and user.role != Role.admin:
         await get_lead_or_404(session, shipment.lead_id, user, allow_lost=allow_lost)
     return shipment
+
+
+async def _reload_shipment(session: AsyncSession, shipment_id: int) -> Shipment:
+    return await get_shipment_or_404(session, shipment_id)
 
 
 def visible_shipments(stmt: Any, user: User) -> Any:
@@ -74,23 +92,27 @@ async def list_shipments(
 async def create_shipment(session: AsyncSession, user: User, payload: ShipmentCreate) -> Shipment:
     # Заявку можно завести только по своему лиду.
     await get_lead_or_404(session, payload.lead_id, user)
-    shipment = Shipment(**payload.model_dump())
+    data = payload.model_dump(exclude={"tag_ids"})
+    shipment = Shipment(**data)
+    shipment.tags = await fetch_tags(session, payload.tag_ids)
     session.add(shipment)
     await session.commit()
-    await session.refresh(shipment)
     log.info("shipment.created", shipment_id=shipment.id, by=user.id)
-    return shipment
+    return await _reload_shipment(session, shipment.id)
 
 
 async def update_shipment(
     session: AsyncSession, user: User, shipment_id: int, payload: ShipmentUpdate
 ) -> Shipment:
     shipment = await get_shipment_or_404(session, shipment_id, user)
-    for key, value in payload.model_dump(exclude_unset=True).items():
+    data = payload.model_dump(exclude_unset=True)
+    tag_ids = data.pop("tag_ids", None)
+    for key, value in data.items():
         setattr(shipment, key, value)
+    if tag_ids is not None:
+        shipment.tags = await fetch_tags(session, tag_ids)
     await session.commit()
-    await session.refresh(shipment)
-    return shipment
+    return await _reload_shipment(session, shipment_id)
 
 
 async def set_status(
@@ -113,9 +135,8 @@ async def set_status(
             )
         )
     await session.commit()
-    await session.refresh(shipment)
     log.info("shipment.status", shipment_id=shipment_id, status=payload.status.value, by=user.id)
-    return shipment
+    return await _reload_shipment(session, shipment_id)
 
 
 async def lead_shipments(session: AsyncSession, user: User, lead_id: int) -> list[Shipment]:

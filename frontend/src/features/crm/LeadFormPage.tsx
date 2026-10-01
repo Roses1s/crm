@@ -353,10 +353,10 @@ function LeadForm({ id }: { id?: string }) {
                 type="button"
                 aria-label="Действия"
                 title="Действия"
-                className="inline-flex h-5 w-5 items-center justify-center rounded-sm text-odoo-text-muted transition-colors hover:bg-odoo-bg hover:text-odoo-text"
+                className="inline-flex h-6 w-6 items-center justify-center rounded-sm text-odoo-text-muted transition-colors hover:bg-odoo-bg hover:text-odoo-text"
                 onClick={() => setActionsOpen((v) => !v)}
               >
-                <Settings className="h-3.5 w-3.5" />
+                <Settings className="h-4 w-4" />
               </button>
               {actionsOpen && (
                 <>

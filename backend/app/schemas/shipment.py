@@ -7,6 +7,7 @@ from pydantic import BaseModel, Field
 
 from app.models.shipment import ShipmentStatus, TaxRate, TransportType
 from app.schemas.common import ORMModel
+from app.schemas.crm import TagRead
 
 
 class ShipmentBase(BaseModel):
@@ -65,6 +66,8 @@ class ShipmentBase(BaseModel):
     body_type: list[str] = Field(default_factory=list)
     loading_method: list[str] = Field(default_factory=list)
 
+    tag_ids: list[int] = Field(default_factory=list)
+
 
 class ShipmentCreate(ShipmentBase):
     lead_id: int
@@ -122,6 +125,8 @@ class ShipmentUpdate(BaseModel):
     capacity: Decimal | None = None
     body_type: list[str] | None = None
     loading_method: list[str] | None = None
+
+    tag_ids: list[int] | None = None
 
 
 class ShipmentStatusUpdate(BaseModel):
@@ -186,6 +191,8 @@ class ShipmentRead(ORMModel):
     body_type: list[str]
     loading_method: list[str]
 
+    tags: list[TagRead] = Field(default_factory=list)
+
     created_at: datetime
 
 
@@ -195,6 +202,7 @@ class ShipmentListItem(ORMModel):
     id: int
     lead_id: int
     lead_name: str
+    tags: list[TagRead] = Field(default_factory=list)
     seller_name: str | None
     status: ShipmentStatus
     route: str

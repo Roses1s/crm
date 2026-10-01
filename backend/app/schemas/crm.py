@@ -1,5 +1,6 @@
 from __future__ import annotations
 
+import re
 from datetime import datetime
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
@@ -46,6 +47,17 @@ class StageReorder(BaseModel):
 
 
 # --- теги --------------------------------------------------------------------
+# Цвет — HEX (#rrggbb): тег можно покрасить в любой цвет, а не только в одну
+# из заранее заготовленных палитр.
+_HEX_COLOR_RE = r"^#[0-9a-fA-F]{6}$"
+
+
+def _validate_hex_color(value: str) -> str:
+    if not re.fullmatch(_HEX_COLOR_RE, value):
+        raise ValueError("Цвет должен быть в формате HEX, например #3B82F6")
+    return value.lower()
+
+
 class TagRead(ORMModel):
     id: int
     name: str
@@ -54,7 +66,22 @@ class TagRead(ORMModel):
 
 class TagCreate(BaseModel):
     name: str = Field(min_length=1, max_length=64)
-    color: str = "blue"
+    color: str = "#3B82F6"
+
+    @field_validator("color")
+    @classmethod
+    def _color_is_hex(cls, value: str) -> str:
+        return _validate_hex_color(value)
+
+
+class TagUpdate(BaseModel):
+    name: str | None = Field(default=None, min_length=1, max_length=64)
+    color: str | None = None
+
+    @field_validator("color")
+    @classmethod
+    def _color_is_hex(cls, value: str | None) -> str | None:
+        return _validate_hex_color(value) if value is not None else None
 
 
 # --- причины проигрыша --------------------------------------------------------

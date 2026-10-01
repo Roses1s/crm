@@ -114,13 +114,17 @@ export function ControlPanel({
               <span className="truncate text-[14px] font-medium leading-[18px] text-odoo-text">
                 {crumbs[crumbs.length - 1].label}
               </span>
-              {cog}
             </span>
           </nav>
         ) : (
           <span className="text-[14px] font-medium leading-none text-odoo-text">{title}</span>
         )}
-        {status}
+        {(cog || status) && (
+          <span className="flex items-center gap-0.5">
+            {cog}
+            {status}
+          </span>
+        )}
         {stats && (
           <div className="pointer-events-none absolute inset-x-0 hidden justify-center lg:flex">
             <div className="pointer-events-auto flex items-center gap-2">{stats}</div>

@@ -5,14 +5,23 @@ from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import JSON, Boolean, Date, Enum, ForeignKey, Numeric, String, Text
+from sqlalchemy import JSON, Boolean, Column, Date, Enum, ForeignKey, Numeric, String, Table, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
+from app.models.crm import Tag
 
 if TYPE_CHECKING:
     from app.models.carrier import Carrier
     from app.models.crm import Lead
+
+
+shipment_tags = Table(
+    "shipment_tags",
+    Base.metadata,
+    Column("shipment_id", ForeignKey("shipments.id", ondelete="CASCADE"), primary_key=True),
+    Column("tag_id", ForeignKey("tags.id", ondelete="CASCADE"), primary_key=True),
+)
 
 
 class ShipmentStatus(enum.StrEnum):
@@ -125,6 +134,7 @@ class Shipment(Base, TimestampMixin):
 
     lead: Mapped[Lead] = relationship(back_populates="shipments", lazy="joined")
     carrier: Mapped[Carrier | None] = relationship(back_populates="shipments", lazy="joined")
+    tags: Mapped[list[Tag]] = relationship(secondary=shipment_tags, lazy="selectin")
 
     @property
     def lead_name(self) -> str:

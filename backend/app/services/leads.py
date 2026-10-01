@@ -18,10 +18,11 @@ from app.api.v1.stages import board_stage_for
 from app.core.errors import AppError, NotFoundError, PermissionDeniedError
 from app.core.logging import get_logger
 from app.core.pagination import PageParams, build_page, paginate
-from app.models.crm import Lead, LossReason, Tag, lead_tags
+from app.models.crm import Lead, LossReason, lead_tags
 from app.models.timeline import Attachment, EntryType, TimelineEntry
 from app.models.user import Role, User
 from app.schemas.crm import LeadCreate, LeadLose, LeadTransfer, LeadUpdate, NoteCreate, NoteUpdate
+from app.services.tags import fetch_tags
 
 log = get_logger(__name__)
 
@@ -98,13 +99,6 @@ def apply_filters(
     return stmt
 
 
-async def _fetch_tags(session: AsyncSession, tag_ids: list[int]) -> list[Tag]:
-    if not tag_ids:
-        return []
-    rows = (await session.execute(select(Tag).where(Tag.id.in_(tag_ids)))).scalars().all()
-    return list(rows)
-
-
 # --- операции над лидами ----------------------------------------------------
 
 
@@ -140,7 +134,7 @@ async def create_lead(session: AsyncSession, user: User, payload: LeadCreate) ->
     lead = Lead(**data)
     # Теги проставляем ДО add/flush: у ещё не сохранённого объекта присваивание
     # коллекции не требует подгрузки старого значения из базы.
-    lead.tags = await _fetch_tags(session, payload.tag_ids)
+    lead.tags = await fetch_tags(session, payload.tag_ids)
     # Менеджер не может создать лид «на коллегу»: карточка появляется на его доске.
     if lead.assigned_to_id is None or user.role != Role.admin:
         lead.assigned_to_id = user.id
@@ -175,7 +169,7 @@ async def update_lead(session: AsyncSession, user: User, lead_id: int, payload: 
         setattr(lead, key, value)
     if tag_ids is not None:
         # lead загружен с selectinload(tags) -> коллекция уже в памяти.
-        lead.tags = await _fetch_tags(session, tag_ids)
+        lead.tags = await fetch_tags(session, tag_ids)
 
     await session.commit()
     log.info("lead.updated", lead_id=lead.id, fields=sorted(data), by=user.id)
