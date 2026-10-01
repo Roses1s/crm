@@ -15,7 +15,6 @@ import {
 import { ApiError } from "@/shared/api/client";
 import {
   useAddNote,
-  useArchiveLead,
   useCreateLead,
   useDeleteAttachment,
   useDeleteLead,
@@ -26,7 +25,9 @@ import {
   useLeadPager,
   useLeadShipments,
   useLeadTimeline,
+  useLoseLead,
   useMe,
+  useRestoreLead,
   useStages,
   useTags,
   useUpdateLead,
@@ -36,6 +37,8 @@ import {
 import { ownerInitials, ownerLabel } from "@/shared/lib/owner";
 import type { Attachment } from "@/shared/types";
 import { DeleteLeadDialog } from "@/features/crm/lead-form/DeleteLeadDialog";
+import { LoseLeadDialog } from "@/features/crm/lead-form/LoseLeadDialog";
+import { LostRibbon } from "@/features/crm/lead-form/LostRibbon";
 import { TransferDialog } from "@/features/crm/lead-form/TransferDialog";
 import { Chatter } from "@/shared/ui/chatter";
 import { FilePreview } from "@/shared/ui/file-preview";
@@ -76,7 +79,8 @@ function LeadForm({ id }: { id?: string }) {
 
   const createLead = useCreateLead();
   const updateLead = useUpdateLead(id);
-  const archiveLead = useArchiveLead();
+  const loseLead = useLoseLead();
+  const restoreLead = useRestoreLead();
   const deleteLead = useDeleteLead();
   const addNote = useAddNote(id);
   const editNote = useEditNote(id);
@@ -96,6 +100,10 @@ function LeadForm({ id }: { id?: string }) {
   const [transferError, setTransferError] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteError, setDeleteError] = useState("");
+  // Отметить проигрышем: диалог с выбором причины.
+  const [loseOpen, setLoseOpen] = useState(false);
+  const [loseError, setLoseError] = useState("");
+  const [restoreError, setRestoreError] = useState("");
   const loadedId = useRef<number | null>(null);
 
   // Загруженную карточку кладём в форму один раз: фоновое обновление
@@ -175,12 +183,26 @@ function LeadForm({ id }: { id?: string }) {
     setForm(pristine);
   }
 
-  function archive() {
+  function confirmLose(reasonId: number) {
     if (!lead) return;
-    if (!window.confirm(`Пометить лид «${lead.name}» проигранным? Он уйдёт в архив.`)) return;
-    archiveLead.mutate(lead.id, {
-      onSuccess: () => navigate("/crm"),
-      onError: (err) => setError(describe(err, "Не удалось архивировать лид")),
+    setLoseError("");
+    loseLead.mutate(
+      { id: lead.id, reasonId },
+      {
+        onSuccess: () => {
+          setLoseOpen(false);
+          navigate("/crm");
+        },
+        onError: (err) => setLoseError(describe(err, "Не удалось отметить лид проигранным")),
+      },
+    );
+  }
+
+  function restore() {
+    if (!lead) return;
+    setRestoreError("");
+    restoreLead.mutate(lead.id, {
+      onError: (err) => setRestoreError(describe(err, "Не удалось восстановить лид")),
     });
   }
 
@@ -212,6 +234,10 @@ function LeadForm({ id }: { id?: string }) {
 
   const owner = lead ? ownerLabel(lead) : "";
   const ownerAvatar = lead ? ownerInitials(lead) : "—";
+  const isOwner = !!lead && !!currentUser && lead.assigned_to_id === currentUser.id;
+  // Проигранный чужой лид можно посмотреть целиком, но не менять — пока не
+  // забрали его себе кнопкой «Взять себе» (админ может редактировать всегда).
+  const readOnly = !!lead && lead.is_archived && !isOwner && currentUser?.role !== "admin";
   const composerInitial = (currentUser?.first_name || currentUser?.email || "Я")
     .slice(0, 1)
     .toUpperCase();
@@ -334,17 +360,19 @@ function LeadForm({ id }: { id?: string }) {
                     onClick={() => setActionsOpen(false)}
                   />
                   <div className="absolute left-0 top-6 z-50 min-w-[180px] rounded-[3px] border border-odoo-border bg-odoo-surface py-1 shadow-lg">
-                    <button
-                      type="button"
-                      disabled={archiveLead.isPending}
-                      className="block w-full px-3 py-1.5 text-left text-[13px] text-odoo-text hover:bg-odoo-bg disabled:opacity-60"
-                      onClick={() => {
-                        setActionsOpen(false);
-                        archive();
-                      }}
-                    >
-                      Архивировать
-                    </button>
+                    {!lead?.is_archived && (
+                      <button
+                        type="button"
+                        className="block w-full px-3 py-1.5 text-left text-[13px] text-odoo-text hover:bg-odoo-bg disabled:opacity-60"
+                        onClick={() => {
+                          setActionsOpen(false);
+                          setLoseError("");
+                          setLoseOpen(true);
+                        }}
+                      >
+                        Отметить проигрышем
+                      </button>
+                    )}
                     {currentUser?.role === "admin" && (
                       <button
                         type="button"
@@ -423,167 +451,225 @@ function LeadForm({ id }: { id?: string }) {
           <FormStatusbar
             items={stages}
             current={form.stage_id}
-            disabled={saving}
+            disabled={saving || readOnly}
             onSelect={selectStage}
             left={
               !isNew ? (
                 <>
-                  <Link
-                    to={`/shipments/new?lead=${lead?.id ?? ""}`}
-                    className="inline-flex h-[30px] items-center rounded-[4px] bg-odoo-primary px-3 text-[13px] font-medium text-white transition-colors hover:bg-odoo-primary-hover"
-                  >
-                    Создать заявку
-                  </Link>
-                  <button
-                    type="button"
-                    disabled={archiveLead.isPending}
-                    onClick={archive}
-                    className="h-[30px] rounded-[4px] border border-odoo-border bg-odoo-surface px-3 text-[13px] text-odoo-text transition-colors hover:bg-odoo-bg disabled:opacity-60"
-                  >
-                    Проигрыш
-                  </button>
+                  {(!lead?.is_archived || isOwner) && (
+                    <Link
+                      to={`/shipments/new?lead=${lead?.id ?? ""}`}
+                      className="inline-flex h-[30px] items-center rounded-[4px] bg-odoo-primary px-3 text-[13px] font-medium text-white transition-colors hover:bg-odoo-primary-hover"
+                    >
+                      Создать заявку
+                    </Link>
+                  )}
+                  {lead?.is_archived ? (
+                    <button
+                      type="button"
+                      disabled={restoreLead.isPending}
+                      onClick={restore}
+                      title={
+                        isOwner
+                          ? "Вернуть лид на доску"
+                          : "Забрать лид себе: он перейдёт на вашу доску"
+                      }
+                      className="h-[30px] rounded-[4px] border border-odoo-border bg-odoo-surface px-3 text-[13px] text-odoo-text transition-colors hover:bg-odoo-bg disabled:opacity-60"
+                    >
+                      {restoreLead.isPending
+                        ? "Восстанавливаем…"
+                        : isOwner
+                          ? "Восстановить"
+                          : "Взять себе"}
+                    </button>
+                  ) : (
+                    <button
+                      type="button"
+                      onClick={() => {
+                        setLoseError("");
+                        setLoseOpen(true);
+                      }}
+                      className="h-[30px] rounded-[4px] border border-odoo-border bg-odoo-surface px-3 text-[13px] text-odoo-text transition-colors hover:bg-odoo-bg disabled:opacity-60"
+                    >
+                      Проигрыш
+                    </button>
+                  )}
                 </>
               ) : null
             }
           />
+          {restoreError && (
+            <div
+              role="alert"
+              className="mx-4 mt-2 rounded-[4px] border border-odoo-danger/30 bg-odoo-danger/10 px-3 py-2 text-sm text-odoo-danger lg:mx-6"
+            >
+              {restoreError}
+            </div>
+          )}
 
           <FormSheetBg>
             {error && <FormAlert>{error}</FormAlert>}
+            {readOnly && (
+              <FormAlert tone="warning">
+                Этот лид в проигрыше у другого сотрудника — можно только посмотреть. Нажмите «Взять
+                себе» выше, чтобы редактировать.
+              </FormAlert>
+            )}
 
-            <FormSheet>
-              {isLoading ? (
-                <FormSkeleton />
-              ) : (
-                <>
-                  <FormTitle>
-                    <OdooInput
-                      aria-label="Название лида"
-                      placeholder="например, ООО «Ромашка»"
-                      className="!px-0 !text-[24px] !leading-[34px]"
-                      value={form.name}
-                      onChange={(e) => set("name", e.target.value)}
-                    />
-                  </FormTitle>
+            <div className={lead?.is_archived ? "relative overflow-hidden" : undefined}>
+              {lead?.is_archived && <LostRibbon />}
+              <FormSheet>
+                {isLoading ? (
+                  <FormSkeleton />
+                ) : (
+                  <>
+                    <FormTitle>
+                      <OdooInput
+                        aria-label="Название лида"
+                        placeholder="например, ООО «Ромашка»"
+                        className="!px-0 !text-[24px] !leading-[34px]"
+                        value={form.name}
+                        disabled={readOnly}
+                        onChange={(e) => set("name", e.target.value)}
+                      />
+                    </FormTitle>
 
-                  <FormGroup>
-                    <div>
-                      <InnerGroup title="Информация о компании">
-                        <Field label="Компания" htmlFor="lead-company">
-                          {/*
+                    <FormGroup>
+                      <div>
+                        <InnerGroup title="Информация о компании">
+                          <Field label="Компания" htmlFor="lead-company">
+                            {/*
                             «Компания» показывает и редактирует то же название,
                             что и крупный заголовок сверху (одно поле form.name),
                             без отдельного поля в базе.
                           */}
-                          <OdooInput
-                            id="lead-company"
-                            placeholder="например, ООО «Ромашка»"
-                            value={form.name}
-                            onChange={(e) => set("name", e.target.value)}
-                          />
-                        </Field>
-                        <Field
-                          label="ИНН"
-                          htmlFor="lead-inn"
-                          help="10 или 12 цифр, проверяется контрольная сумма ФНС"
-                        >
-                          <OdooInput
-                            id="lead-inn"
-                            inputMode="numeric"
-                            placeholder="10 или 12 цифр"
-                            value={form.inn}
-                            onChange={(e) => set("inn", e.target.value)}
-                          />
-                        </Field>
-                        <Field label="Продавец">
-                          {/* Щелчок по имени открывает передачу лида коллеге. */}
-                          <button
-                            type="button"
-                            disabled={isNew}
-                            onClick={() => {
-                              setTransferError("");
-                              setTransferOpen(true);
-                            }}
-                            title={
-                              isNew ? "Сначала сохраните лид" : "Передать лид другому сотруднику"
-                            }
-                            className="flex w-full items-center gap-1.5 rounded-[4px] pt-[2px] text-left transition-colors hover:bg-odoo-bg disabled:cursor-default disabled:hover:bg-transparent"
+                            <OdooInput
+                              id="lead-company"
+                              placeholder="например, ООО «Ромашка»"
+                              value={form.name}
+                              disabled={readOnly}
+                              onChange={(e) => set("name", e.target.value)}
+                            />
+                          </Field>
+                          <Field
+                            label="ИНН"
+                            htmlFor="lead-inn"
+                            help="10 или 12 цифр, проверяется контрольная сумма ФНС"
                           >
-                            {owner ? (
-                              <>
-                                <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-odoo-primary text-[9px] font-semibold text-white">
-                                  {ownerAvatar}
-                                </span>
-                                <span className="truncate">{owner}</span>
-                              </>
-                            ) : (
-                              <span className="text-odoo-text-light">Не назначен</span>
-                            )}
-                          </button>
-                        </Field>
-                      </InnerGroup>
+                            <OdooInput
+                              id="lead-inn"
+                              inputMode="numeric"
+                              placeholder="10 или 12 цифр"
+                              value={form.inn}
+                              disabled={readOnly}
+                              onChange={(e) => set("inn", e.target.value)}
+                            />
+                          </Field>
+                          <Field label="Продавец">
+                            {/* Щелчок по имени открывает передачу лида коллеге. */}
+                            <button
+                              type="button"
+                              disabled={isNew || readOnly}
+                              onClick={() => {
+                                setTransferError("");
+                                setTransferOpen(true);
+                              }}
+                              title={
+                                isNew
+                                  ? "Сначала сохраните лид"
+                                  : readOnly
+                                    ? "Заберите лид себе, чтобы передать его кому-то ещё"
+                                    : "Передать лид другому сотруднику"
+                              }
+                              className="flex w-full items-center gap-1.5 rounded-[4px] pt-[2px] text-left transition-colors hover:bg-odoo-bg disabled:cursor-default disabled:hover:bg-transparent"
+                            >
+                              {owner ? (
+                                <>
+                                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-odoo-primary text-[9px] font-semibold text-white">
+                                    {ownerAvatar}
+                                  </span>
+                                  <span className="truncate">{owner}</span>
+                                </>
+                              ) : (
+                                <span className="text-odoo-text-light">Не назначен</span>
+                              )}
+                            </button>
+                          </Field>
+                          {lead?.is_archived && (
+                            <Field label="Причина проигрыша">
+                              <span className="pt-[2px] text-odoo-text">
+                                {lead.loss_reason_name || "—"}
+                              </span>
+                            </Field>
+                          )}
+                        </InnerGroup>
 
-                      <InnerGroup>
-                        <Field label="Приоритет">
-                          {/*
+                        <InnerGroup>
+                          <Field label="Приоритет">
+                            {/*
                             Тот же виджет звёзд, что на канбане: при наведении
                             подсвечивает звёзды до курсора, при уходе возвращает
                             сохранённый приоритет, по клику сохраняет значение.
                           */}
-                          <span className="inline-flex items-center pt-[2px]">
-                            <StarRating
-                              value={form.priority}
-                              onChange={(n) => set("priority", n)}
+                            <span className="inline-flex items-center pt-[2px]">
+                              <StarRating
+                                value={form.priority}
+                                onChange={readOnly ? undefined : (n) => set("priority", n)}
+                              />
+                            </span>
+                          </Field>
+                          <Field
+                            label="Теги"
+                            help="Метки клиента — видны на карточке в списке и на канбане"
+                          >
+                            <TagsField
+                              all={allTags}
+                              value={form.tag_ids}
+                              onChange={(ids) => set("tag_ids", ids)}
                             />
-                          </span>
-                        </Field>
-                        <Field
-                          label="Теги"
-                          help="Метки клиента — видны на карточке в списке и на канбане"
-                        >
-                          <TagsField
-                            all={allTags}
-                            value={form.tag_ids}
-                            onChange={(ids) => set("tag_ids", ids)}
-                          />
-                        </Field>
-                      </InnerGroup>
-                    </div>
+                          </Field>
+                        </InnerGroup>
+                      </div>
 
-                    <div>
-                      <InnerGroup title="Информация о клиенте">
-                        <Field label="Контакт логиста/ЛПР" htmlFor="lead-contact">
-                          <OdooInput
-                            id="lead-contact"
-                            placeholder="Фамилия Имя"
-                            value={form.logist_contact}
-                            onChange={(e) => set("logist_contact", e.target.value)}
-                          />
-                        </Field>
-                        <Field label="Телефон логиста" htmlFor="lead-logist-phone">
-                          <OdooInput
-                            id="lead-logist-phone"
-                            placeholder="+7 900 000-00-00"
-                            value={form.logist_phone}
-                            onChange={(e) => set("logist_phone", e.target.value)}
-                          />
-                        </Field>
-                        <Field label="Email логиста" htmlFor="lead-email">
-                          <OdooInput
-                            id="lead-email"
-                            type="email"
-                            placeholder="name@example.ru"
-                            value={form.logist_email}
-                            onChange={(e) => set("logist_email", e.target.value)}
-                          />
-                        </Field>
-                      </InnerGroup>
-                    </div>
-                  </FormGroup>
+                      <div>
+                        <InnerGroup title="Информация о клиенте">
+                          <Field label="Контакт логиста/ЛПР" htmlFor="lead-contact">
+                            <OdooInput
+                              id="lead-contact"
+                              placeholder="Фамилия Имя"
+                              value={form.logist_contact}
+                              disabled={readOnly}
+                              onChange={(e) => set("logist_contact", e.target.value)}
+                            />
+                          </Field>
+                          <Field label="Телефон логиста" htmlFor="lead-logist-phone">
+                            <OdooInput
+                              id="lead-logist-phone"
+                              placeholder="+7 900 000-00-00"
+                              value={form.logist_phone}
+                              disabled={readOnly}
+                              onChange={(e) => set("logist_phone", e.target.value)}
+                            />
+                          </Field>
+                          <Field label="Email логиста" htmlFor="lead-email">
+                            <OdooInput
+                              id="lead-email"
+                              type="email"
+                              placeholder="name@example.ru"
+                              value={form.logist_email}
+                              disabled={readOnly}
+                              onChange={(e) => set("logist_email", e.target.value)}
+                            />
+                          </Field>
+                        </InnerGroup>
+                      </div>
+                    </FormGroup>
 
-                  {!isNew && <Notebook tabs={notebookTabs} active={tab} onSelect={setTab} />}
-                </>
-              )}
-            </FormSheet>
+                    {!isNew && <Notebook tabs={notebookTabs} active={tab} onSelect={setTab} />}
+                  </>
+                )}
+              </FormSheet>
+            </div>
           </FormSheetBg>
         </main>
       </FormWorkspace>
@@ -591,6 +677,7 @@ function LeadForm({ id }: { id?: string }) {
       {transferOpen && lead && (
         <TransferDialog
           leadName={lead.name}
+          leadIsLost={lead.is_archived}
           pending={transferLead.isPending}
           error={transferError}
           onCancel={() => setTransferOpen(false)}
@@ -614,6 +701,16 @@ function LeadForm({ id }: { id?: string }) {
           error={deleteError}
           onCancel={() => setDeleteOpen(false)}
           onConfirm={deleteForever}
+        />
+      )}
+
+      {loseOpen && lead && (
+        <LoseLeadDialog
+          leadName={lead.name}
+          pending={loseLead.isPending}
+          error={loseError}
+          onCancel={() => setLoseOpen(false)}
+          onConfirm={confirmLose}
         />
       )}
 

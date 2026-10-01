@@ -16,6 +16,7 @@ from app.models.timeline import TimelineEntry
 from app.models.user import User
 from app.schemas.crm import (
     LeadCreate,
+    LeadLose,
     LeadRead,
     LeadTransfer,
     LeadUpdate,
@@ -65,7 +66,8 @@ async def create_lead(payload: LeadCreate, session: SessionDep, user: CurrentUse
 
 @router.get("/{lead_id}", response_model=LeadRead, summary="Карточка лида")
 async def get_lead(lead_id: int, session: SessionDep, user: CurrentUser) -> Any:
-    return await service.get_lead_or_404(session, lead_id, user)
+    # Чтение — проигранный лид открыт всем, его можно посмотреть и забрать.
+    return await service.get_lead_or_404(session, lead_id, user, allow_lost=True)
 
 
 @router.patch("/{lead_id}", response_model=LeadRead, summary="Изменить лид")
@@ -75,9 +77,24 @@ async def update_lead(
     return await service.update_lead(session, user, lead_id, payload)
 
 
-@router.delete("/{lead_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Архивировать лид")
-async def archive_lead(lead_id: int, session: SessionDep, user: CurrentUser) -> None:
-    await service.archive_lead(session, user, lead_id)
+@router.post(
+    "/{lead_id}/lose",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Отметить лид проигранным",
+)
+async def lose_lead(
+    lead_id: int, payload: LeadLose, session: SessionDep, user: CurrentUser
+) -> None:
+    await service.lose_lead(session, user, lead_id, payload)
+
+
+@router.post(
+    "/{lead_id}/restore",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Забрать проигранный лид себе",
+)
+async def restore_lead(lead_id: int, session: SessionDep, user: CurrentUser) -> None:
+    await service.restore_lead(session, user, lead_id)
 
 
 @router.delete(

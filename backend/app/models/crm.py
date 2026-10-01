@@ -59,6 +59,19 @@ class Tag(Base, TimestampMixin):
     leads: Mapped[list[Lead]] = relationship(secondary=lead_tags, back_populates="tags")
 
 
+class LossReason(Base, TimestampMixin):
+    """Причина проигрыша лида — короткий справочник, как теги.
+
+    Список редактируемый (не зашит в код намертво): новую причину можно
+    добавить через API, не трогая код и не выпуская релиз.
+    """
+
+    __tablename__ = "loss_reasons"
+
+    id: Mapped[int] = mapped_column(primary_key=True)
+    name: Mapped[str] = mapped_column(String(100), unique=True, nullable=False)
+
+
 class Lead(Base, TimestampMixin):
     """Лид — карточка потенциального клиента."""
 
@@ -76,7 +89,16 @@ class Lead(Base, TimestampMixin):
     logist_email: Mapped[str | None] = mapped_column(String(255))
 
     priority: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
+    # Переосмыслено 01.10.2026: это поле означает «лид проигран» — название
+    # оставили прежним (is_archived), чтобы не переписывать всё, что на него
+    # завязано, но по смыслу теперь это «Проигрыш», а не мягкое удаление.
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
+    # Причина проигрыша — заполняется только когда is_archived=True. При
+    # восстановлении лида (см. restore_lead/transfer_lead) обнуляется, но сама
+    # причина навсегда остаётся в чаттере отдельной записью.
+    loss_reason_id: Mapped[int | None] = mapped_column(
+        ForeignKey("loss_reasons.id", ondelete="SET NULL"), index=True
+    )
 
     stage_id: Mapped[int] = mapped_column(
         ForeignKey("stages.id", ondelete="RESTRICT"), nullable=False, index=True
@@ -87,6 +109,7 @@ class Lead(Base, TimestampMixin):
 
     stage: Mapped[Stage] = relationship(back_populates="leads", lazy="joined")
     assigned_to: Mapped[User | None] = relationship(back_populates="leads", lazy="joined")
+    loss_reason: Mapped[LossReason | None] = relationship(lazy="joined")
     tags: Mapped[list[Tag]] = relationship(
         secondary=lead_tags, back_populates="leads", lazy="selectin"
     )
@@ -112,6 +135,10 @@ class Lead(Base, TimestampMixin):
     @property
     def assigned_to_name(self) -> str | None:
         return self.assigned_to.full_name if self.assigned_to else None
+
+    @property
+    def loss_reason_name(self) -> str | None:
+        return self.loss_reason.name if self.loss_reason else None
 
     def __repr__(self) -> str:  # pragma: no cover
         return f"<Lead {self.id} {self.name}>"

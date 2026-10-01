@@ -135,13 +135,121 @@ async def test_delete_missing_entry_is_404(auth_client: AsyncClient, seeded: dic
     assert response.status_code == 404
 
 
-async def test_archive_hides_lead_from_default_list(auth_client: AsyncClient, seeded: dict) -> None:
+async def test_lose_hides_lead_from_default_list(auth_client: AsyncClient, seeded: dict) -> None:
     lead_id = seeded["lead"].id  # type: ignore[attr-defined]
-    assert (await auth_client.delete(f"/api/v1/crm/leads/{lead_id}")).status_code == 204
+    reason_id = seeded["loss_reason"].id  # type: ignore[attr-defined]
+    response = await auth_client.post(
+        f"/api/v1/crm/leads/{lead_id}/lose", json={"reason_id": reason_id}
+    )
+    assert response.status_code == 204
 
     assert (await auth_client.get("/api/v1/crm/leads")).json()["count"] == 0
     archived = await auth_client.get("/api/v1/crm/leads", params={"is_archived": True})
     assert archived.json()["count"] == 1
+
+    lead = (await auth_client.get(f"/api/v1/crm/leads/{lead_id}")).json()
+    assert lead["is_archived"] is True
+    assert lead["loss_reason_name"] == "Перестал возить"
+
+    timeline = (await auth_client.get(f"/api/v1/crm/leads/{lead_id}/timeline")).json()
+    labels = {e["field_label"]: (e["old_value"], e["new_value"]) for e in timeline}
+    assert labels["Активный"] == ("Да", "Нет")
+    assert labels["Причина проигрыша"] == ("—", "Перестал возить")
+
+
+async def test_lose_requires_existing_reason(auth_client: AsyncClient, seeded: dict) -> None:
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    response = await auth_client.post(f"/api/v1/crm/leads/{lead_id}/lose", json={"reason_id": 999})
+    assert response.status_code == 404
+
+
+async def test_manager_cannot_lose_colleagues_lead(auth_client: AsyncClient, seeded: dict) -> None:
+    """Отметить проигрышем можно только свою карточку — чужая для менеджера не видна."""
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    reason_id = seeded["loss_reason"].id  # type: ignore[attr-defined]
+    headers = await manager_headers(auth_client)
+    response = await auth_client.post(
+        f"/api/v1/crm/leads/{lead_id}/lose", json={"reason_id": reason_id}, headers=headers
+    )
+    assert response.status_code == 404
+
+
+async def test_restore_lets_colleague_claim_a_lost_lead(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    """Проигранный лид — общий: менеджер может открыть его и забрать себе."""
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    reason_id = seeded["loss_reason"].id  # type: ignore[attr-defined]
+    await auth_client.post(f"/api/v1/crm/leads/{lead_id}/lose", json={"reason_id": reason_id})
+
+    headers = await manager_headers(auth_client)
+
+    # До восстановления менеджер видит карточку (она проиграна — общая), но
+    # изменить/забрать себе может только явным действием restore.
+    seen = await auth_client.get(f"/api/v1/crm/leads/{lead_id}", headers=headers)
+    assert seen.status_code == 200
+    assert seen.json()["loss_reason_name"] == "Перестал возить"
+
+    restored = await auth_client.post(f"/api/v1/crm/leads/{lead_id}/restore", headers=headers)
+    assert restored.status_code == 204
+
+    lead = (await auth_client.get(f"/api/v1/crm/leads/{lead_id}", headers=headers)).json()
+    assert lead["is_archived"] is False
+    assert lead["loss_reason_name"] is None
+    assert lead["assigned_to_email"] == "manager@crmdetroid.ru"
+
+    timeline = (
+        await auth_client.get(f"/api/v1/crm/leads/{lead_id}/timeline", headers=headers)
+    ).json()
+    labels = [e["field_label"] for e in timeline]
+    assert "Активный" in labels
+    assert "Продавец" in labels
+
+
+async def test_restore_fails_for_active_lead(auth_client: AsyncClient, seeded: dict) -> None:
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    response = await auth_client.post(f"/api/v1/crm/leads/{lead_id}/restore")
+    assert response.status_code == 400
+    assert response.json()["code"] == "not_lost"
+
+
+async def test_manager_cannot_edit_or_note_foreign_lost_lead(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    """Смотреть проигранный чужой лид можно, а менять/писать в него — нет, пока не забрал себе."""
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    reason_id = seeded["loss_reason"].id  # type: ignore[attr-defined]
+    await auth_client.post(f"/api/v1/crm/leads/{lead_id}/lose", json={"reason_id": reason_id})
+
+    headers = await manager_headers(auth_client)
+    patched = await auth_client.patch(
+        f"/api/v1/crm/leads/{lead_id}", json={"name": "Новое имя"}, headers=headers
+    )
+    assert patched.status_code == 404
+
+    noted = await auth_client.post(
+        f"/api/v1/crm/leads/{lead_id}/notes", json={"body": "привет"}, headers=headers
+    )
+    assert noted.status_code == 404
+
+
+async def test_admin_transfer_restores_lost_lead_to_any_employee(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    """Админ может назначить проигранный лид любому сотруднику — он восстанавливается."""
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    reason_id = seeded["loss_reason"].id  # type: ignore[attr-defined]
+    manager_id = seeded["manager"].id  # type: ignore[attr-defined]
+    await auth_client.post(f"/api/v1/crm/leads/{lead_id}/lose", json={"reason_id": reason_id})
+
+    transferred = await auth_client.post(
+        f"/api/v1/crm/leads/{lead_id}/transfer", json={"user_id": manager_id}
+    )
+    assert transferred.status_code == 204
+
+    lead = (await auth_client.get(f"/api/v1/crm/leads/{lead_id}")).json()
+    assert lead["is_archived"] is False
+    assert lead["assigned_to_id"] == manager_id
 
 
 async def test_pager_reports_position(auth_client: AsyncClient, seeded: dict) -> None:

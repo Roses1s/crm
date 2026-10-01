@@ -53,7 +53,7 @@ async def create_shipment(
 
 @router.get("/shipments/{shipment_id}", response_model=ShipmentRead, summary="Карточка заявки")
 async def get_shipment(shipment_id: int, session: SessionDep, user: CurrentUser) -> Shipment:
-    return await service.get_shipment_or_404(session, shipment_id, user)
+    return await service.get_shipment_or_404(session, shipment_id, user, allow_lost=True)
 
 
 @router.patch("/shipments/{shipment_id}", response_model=ShipmentRead, summary="Изменить заявку")

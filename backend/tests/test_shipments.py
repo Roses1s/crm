@@ -4,6 +4,16 @@ from __future__ import annotations
 
 from httpx import AsyncClient
 
+from tests.conftest import TEST_PASSWORD
+
+
+async def manager_headers(client: AsyncClient) -> dict[str, str]:
+    login = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "manager@crmdetroid.ru", "password": TEST_PASSWORD},
+    )
+    return {"Authorization": f"Bearer {login.json()['access_token']}"}
+
 
 async def test_create_and_read_shipment(auth_client: AsyncClient, seeded: dict) -> None:
     lead_id = seeded["lead"].id  # type: ignore[attr-defined]
@@ -100,3 +110,23 @@ async def test_launcher_apps_depend_on_role(auth_client: AsyncClient) -> None:
     apps = await auth_client.get("/api/v1/launcher/apps")
     slugs = [a["slug"] for a in apps.json()]
     assert slugs == ["crm", "shipments", "admin"]
+
+
+async def test_colleague_can_view_but_not_change_shipment_of_lost_lead(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    """Заявка проигранного лида видна любому, менять её может только владелец лида."""
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    reason_id = seeded["loss_reason"].id  # type: ignore[attr-defined]
+
+    shipment = (await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})).json()
+    await auth_client.post(f"/api/v1/crm/leads/{lead_id}/lose", json={"reason_id": reason_id})
+
+    headers = await manager_headers(auth_client)
+    seen = await auth_client.get(f"/api/v1/shipments/{shipment['id']}", headers=headers)
+    assert seen.status_code == 200
+
+    changed = await auth_client.patch(
+        f"/api/v1/shipments/{shipment['id']}/status", json={"status": "checked"}, headers=headers
+    )
+    assert changed.status_code == 404

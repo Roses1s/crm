@@ -123,7 +123,8 @@ async def _store_upload(file: UploadFile, relative_dir: Path) -> tuple[str, str,
 async def list_lead_attachments(
     session: AsyncSession, user: User, lead_id: int
 ) -> list[Attachment]:
-    await get_lead_or_404(session, lead_id, user)
+    # Чтение — вложения проигранного лида видны всем, как и сам лид.
+    await get_lead_or_404(session, lead_id, user, allow_lost=True)
     stmt = (
         select(Attachment)
         # Файлы заявок показываются только на самой заявке — решение владельца.
@@ -169,19 +170,21 @@ async def upload_lead_attachment(
 # --- вложения заявки --------------------------------------------------------
 
 
-async def _shipment_or_404(session: AsyncSession, user: User, shipment_id: int) -> Shipment:
+async def _shipment_or_404(
+    session: AsyncSession, user: User, shipment_id: int, *, allow_lost: bool = False
+) -> Shipment:
     shipment = await session.get(Shipment, shipment_id)
     if shipment is None:
         raise NotFoundError(f"Заявка {shipment_id} не найдена")
     # Документы заявки доступны тому же кругу, что и сама заявка.
-    await get_lead_or_404(session, shipment.lead_id, user)
+    await get_lead_or_404(session, shipment.lead_id, user, allow_lost=allow_lost)
     return shipment
 
 
 async def list_shipment_attachments(
     session: AsyncSession, user: User, shipment_id: int
 ) -> list[Attachment]:
-    await _shipment_or_404(session, user, shipment_id)
+    await _shipment_or_404(session, user, shipment_id, allow_lost=True)
     stmt = (
         select(Attachment)
         .where(Attachment.shipment_id == shipment_id)
@@ -239,7 +242,8 @@ async def get_for_download(
     attachment = await session.get(Attachment, attachment_id)
     if attachment is None:
         raise NotFoundError(f"Вложение {attachment_id} не найдено")
-    await get_lead_or_404(session, attachment.lead_id, user)
+    # Чтение — файл проигранного лида можно открыть, как и саму карточку.
+    await get_lead_or_404(session, attachment.lead_id, user, allow_lost=True)
 
     path = Path(attachment.storage_path)
     if not path.is_file():

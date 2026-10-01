@@ -11,6 +11,14 @@ from app.core.config import settings
 from tests.conftest import TEST_PASSWORD
 
 
+async def manager_headers(client: AsyncClient) -> dict[str, str]:
+    login = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "manager@crmdetroid.ru", "password": TEST_PASSWORD},
+    )
+    return {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+
 async def test_upload_and_download(auth_client: AsyncClient, seeded: dict) -> None:
     lead_id = seeded["lead"].id  # type: ignore[attr-defined]
 
@@ -221,3 +229,29 @@ async def test_shipment_attachment_can_be_deleted(auth_client: AsyncClient, seed
     remaining = await auth_client.get(f"/api/v1/shipments/{shipment_id}/attachments")
     assert remaining.json() == []
     assert not list(stored.iterdir()), "файл должен исчезнуть и с диска"
+
+
+async def test_colleague_can_view_but_not_upload_lost_lead_attachments(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    """Проигранный лид общий на чтение: вложения видны всем, загрузка — только после claim."""
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    reason_id = seeded["loss_reason"].id  # type: ignore[attr-defined]
+
+    await auth_client.post(
+        f"/api/v1/crm/leads/{lead_id}/attachments",
+        files={"file": ("Договор.pdf", b"%PDF-1.4 fake", "application/pdf")},
+    )
+    await auth_client.post(f"/api/v1/crm/leads/{lead_id}/lose", json={"reason_id": reason_id})
+
+    headers = await manager_headers(auth_client)
+    listed = await auth_client.get(f"/api/v1/crm/leads/{lead_id}/attachments", headers=headers)
+    assert listed.status_code == 200
+    assert [a["name"] for a in listed.json()] == ["Договор.pdf"]
+
+    uploaded = await auth_client.post(
+        f"/api/v1/crm/leads/{lead_id}/attachments",
+        files={"file": ("Чужое.pdf", b"%PDF-1.4 other", "application/pdf")},
+        headers=headers,
+    )
+    assert uploaded.status_code == 404

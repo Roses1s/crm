@@ -236,7 +236,7 @@ export function LeadListView({
           {lead.name}
           {lead.is_archived && (
             <span className="ml-1.5 rounded-sm bg-odoo-danger/10 px-1 text-[10px] font-normal text-odoo-danger">
-              Архив
+              Проигрыш
             </span>
           )}
         </td>

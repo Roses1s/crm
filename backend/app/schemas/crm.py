@@ -57,6 +57,16 @@ class TagCreate(BaseModel):
     color: str = "blue"
 
 
+# --- причины проигрыша --------------------------------------------------------
+class LossReasonRead(ORMModel):
+    id: int
+    name: str
+
+
+class LossReasonCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=100)
+
+
 # --- лиды --------------------------------------------------------------------
 class LeadBase(BaseModel):
     name: str = Field(min_length=1, max_length=255)
@@ -99,9 +109,17 @@ class LeadUpdate(BaseModel):
     priority: int | None = Field(default=None, ge=0, le=3)
     stage_id: int | None = None
     tag_ids: list[int] | None = None
-    is_archived: bool | None = None
+    # is_archived сюда намеренно не входит: отметить лид проигравшим можно
+    # только через POST /lose (там же обязательна причина и запись в ленту),
+    # обычным сохранением формы это не делается — как и передача продавцу.
 
     _validate_inn = field_validator("inn")(LeadBase.validate_inn.__func__)  # type: ignore[attr-defined]
+
+
+class LeadLose(BaseModel):
+    """Тело запроса «отметить проигрышем» — причина обязательна."""
+
+    reason_id: int
 
 
 class LeadRead(ORMModel):
@@ -113,6 +131,8 @@ class LeadRead(ORMModel):
     logist_email: str | None
     priority: int
     is_archived: bool
+    loss_reason_id: int | None
+    loss_reason_name: str | None
     stage_id: int
     stage_name: str
     assigned_to_id: int | None

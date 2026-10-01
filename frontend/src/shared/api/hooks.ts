@@ -12,6 +12,7 @@ import type {
   Carrier,
   LauncherApp,
   Lead,
+  LossReason,
   Pager,
   Shipment,
   Stage,
@@ -47,6 +48,7 @@ export const keys = {
   apps: ["launcher"] as const,
   stages: ["stages"] as const,
   tags: ["tags"] as const,
+  lossReasons: ["loss-reasons"] as const,
   leads: (filters: LeadFilters) => ["leads", filters] as const,
   lead: (id: string | number) => ["lead", String(id)] as const,
   timeline: (id: string | number) => ["timeline", String(id)] as const,
@@ -112,6 +114,13 @@ export function useTags() {
   return useQuery({
     queryKey: keys.tags,
     queryFn: () => api<Tag[]>("/crm/tags"),
+  });
+}
+
+export function useLossReasons() {
+  return useQuery({
+    queryKey: keys.lossReasons,
+    queryFn: () => api<LossReason[]>("/crm/loss-reasons"),
   });
 }
 
@@ -342,11 +351,30 @@ export function useUpdateLeadPriority() {
   });
 }
 
-export function useArchiveLead() {
+/** Отметить лид проигранным — причина обязательна (см. LoseLeadDialog). */
+export function useLoseLead() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number | string) => api<void>(`/crm/leads/${id}`, { method: "DELETE" }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ["leads"] }),
+    mutationFn: ({ id, reasonId }: { id: number | string; reasonId: number }) =>
+      api<void>(`/crm/leads/${id}/lose`, { method: "POST", body: { reason_id: reasonId } }),
+    onSuccess: (_data, { id }) => {
+      void qc.invalidateQueries({ queryKey: ["leads"] });
+      void qc.invalidateQueries({ queryKey: keys.lead(id) });
+      void qc.invalidateQueries({ queryKey: keys.timeline(id) });
+    },
+  });
+}
+
+/** Забрать проигранный лид себе — доступно любому сотруднику, не только владельцу. */
+export function useRestoreLead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number | string) => api<void>(`/crm/leads/${id}/restore`, { method: "POST" }),
+    onSuccess: (_data, id) => {
+      void qc.invalidateQueries({ queryKey: ["leads"] });
+      void qc.invalidateQueries({ queryKey: keys.lead(id) });
+      void qc.invalidateQueries({ queryKey: keys.timeline(id) });
+    },
   });
 }
 

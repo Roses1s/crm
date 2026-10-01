@@ -12,12 +12,15 @@ import { useColleagues, type Colleague } from "@/shared/api/hooks";
  */
 export function TransferDialog({
   leadName,
+  leadIsLost = false,
   pending,
   error,
   onCancel,
   onConfirm,
 }: {
   leadName: string;
+  /** Лид сейчас в проигрыше — передача заодно вернёт его на доску получателя. */
+  leadIsLost?: boolean;
   pending: boolean;
   error: string;
   onCancel: () => void;
@@ -43,6 +46,7 @@ export function TransferDialog({
               Карточка «{leadName}» перейдёт к сотруднику{" "}
               <span className="font-medium text-odoo-text">{chosen.full_name}</span> вместе с
               заявками, документами и перепиской. С вашей доски она исчезнет.
+              {leadIsLost && " Лид также выйдет из проигрыша и вернётся на доску."}
             </p>
             {error && <p className="mt-3 text-[13px] text-odoo-danger">{error}</p>}
             <div className="mt-4 flex justify-end gap-2">

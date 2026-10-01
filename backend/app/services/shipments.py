@@ -33,14 +33,17 @@ STAGE_LABELS: dict[ShipmentStatus, str] = {
 
 
 async def get_shipment_or_404(
-    session: AsyncSession, shipment_id: int, user: User | None = None
+    session: AsyncSession, shipment_id: int, user: User | None = None, *, allow_lost: bool = False
 ) -> Shipment:
+    """`allow_lost=True` — только для чтения: заявка проигранного лида тоже
+    становится видна всем, как и сам лид (см. `get_lead_or_404`).
+    """
     shipment = await session.get(Shipment, shipment_id)
     if shipment is None:
         raise NotFoundError(f"Заявка {shipment_id} не найдена")
     # Заявка наследует видимость своего лида: чужая для менеджера не существует.
     if user is not None and user.role != Role.admin:
-        await get_lead_or_404(session, shipment.lead_id, user)
+        await get_lead_or_404(session, shipment.lead_id, user, allow_lost=allow_lost)
     return shipment
 
 
@@ -116,7 +119,8 @@ async def set_status(
 
 
 async def lead_shipments(session: AsyncSession, user: User, lead_id: int) -> list[Shipment]:
-    await get_lead_or_404(session, lead_id, user)
+    # Чтение — заявки проигранного лида видны всем, как и сам лид.
+    await get_lead_or_404(session, lead_id, user, allow_lost=True)
     stmt = select(Shipment).where(Shipment.lead_id == lead_id).order_by(Shipment.created_at.desc())
     return list((await session.execute(stmt)).unique().scalars().all())
 
@@ -136,7 +140,7 @@ async def _get_entry_or_404(
 async def shipment_timeline(
     session: AsyncSession, user: User, shipment_id: int
 ) -> list[TimelineEntry]:
-    await get_shipment_or_404(session, shipment_id, user)
+    await get_shipment_or_404(session, shipment_id, user, allow_lost=True)
     stmt = (
         select(TimelineEntry)
         .where(TimelineEntry.shipment_id == shipment_id)

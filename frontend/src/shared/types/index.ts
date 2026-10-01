@@ -35,6 +35,11 @@ export interface Tag {
   color: string;
 }
 
+export interface LossReason {
+  id: number;
+  name: string;
+}
+
 export interface Lead {
   id: number;
   name: string;
@@ -44,6 +49,8 @@ export interface Lead {
   logist_email: string | null;
   priority: number;
   is_archived: boolean;
+  loss_reason_id?: number | null;
+  loss_reason_name?: string | null;
   stage_id: number;
   stage_name: string;
   assigned_to_id: number | null;

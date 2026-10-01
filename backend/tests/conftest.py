@@ -51,7 +51,7 @@ from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
 from app.models.carrier import Carrier
-from app.models.crm import Lead, Stage, Tag
+from app.models.crm import Lead, LossReason, Stage, Tag
 from app.models.user import Role, User
 
 TEST_PASSWORD = "SuperSecret123"
@@ -131,7 +131,8 @@ async def seeded(session: AsyncSession) -> dict[str, object]:
     talks_stage = Stage(name="Переговоры", sequence=2, color="blue", owner_id=admin.id)
     tag = Tag(name="Крупный клиент", color="green")
     carrier = Carrier(name="ООО «АвтоТрансЛайн»", inn="7447112236")
-    session.add_all([new_stage, talks_stage, tag, carrier])
+    loss_reason = LossReason(name="Перестал возить")
+    session.add_all([new_stage, talks_stage, tag, carrier, loss_reason])
     await session.flush()
 
     lead = Lead(
@@ -154,6 +155,7 @@ async def seeded(session: AsyncSession) -> dict[str, object]:
         "tag": tag,
         "lead": lead,
         "carrier": carrier,
+        "loss_reason": loss_reason,
     }
 
 
