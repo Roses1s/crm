@@ -350,6 +350,17 @@ export function useArchiveLead() {
   });
 }
 
+// Безвозвратное удаление — отдельная ручка от архивации (DELETE .../{id}
+// выше её не трогает) и доступна только администратору.
+export function useDeleteLead() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number | string) =>
+      api<void>(`/crm/leads/${id}/permanent`, { method: "DELETE" }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: ["leads"] }),
+  });
+}
+
 export function useAddNote(id: string | undefined) {
   const qc = useQueryClient();
   return useMutation({

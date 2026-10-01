@@ -18,6 +18,7 @@ import {
   useArchiveLead,
   useCreateLead,
   useDeleteAttachment,
+  useDeleteLead,
   useDeleteTimelineEntry,
   useEditNote,
   useLead,
@@ -34,6 +35,7 @@ import {
 } from "@/shared/api/hooks";
 import { ownerInitials, ownerLabel } from "@/shared/lib/owner";
 import type { Attachment } from "@/shared/types";
+import { DeleteLeadDialog } from "@/features/crm/lead-form/DeleteLeadDialog";
 import { TransferDialog } from "@/features/crm/lead-form/TransferDialog";
 import { Chatter } from "@/shared/ui/chatter";
 import { FilePreview } from "@/shared/ui/file-preview";
@@ -75,6 +77,7 @@ function LeadForm({ id }: { id?: string }) {
   const createLead = useCreateLead();
   const updateLead = useUpdateLead(id);
   const archiveLead = useArchiveLead();
+  const deleteLead = useDeleteLead();
   const addNote = useAddNote(id);
   const editNote = useEditNote(id);
   const deleteTimelineEntry = useDeleteTimelineEntry(id);
@@ -91,6 +94,8 @@ function LeadForm({ id }: { id?: string }) {
   // Передача лида коллеге: диалог выбора и подтверждения.
   const [transferOpen, setTransferOpen] = useState(false);
   const [transferError, setTransferError] = useState("");
+  const [deleteOpen, setDeleteOpen] = useState(false);
+  const [deleteError, setDeleteError] = useState("");
   const loadedId = useRef<number | null>(null);
 
   // Загруженную карточку кладём в форму один раз: фоновое обновление
@@ -176,6 +181,15 @@ function LeadForm({ id }: { id?: string }) {
     archiveLead.mutate(lead.id, {
       onSuccess: () => navigate("/crm"),
       onError: (err) => setError(describe(err, "Не удалось архивировать лид")),
+    });
+  }
+
+  function deleteForever() {
+    if (!lead) return;
+    setDeleteError("");
+    deleteLead.mutate(lead.id, {
+      onSuccess: () => navigate("/crm"),
+      onError: (err) => setDeleteError(describe(err, "Не удалось удалить лид")),
     });
   }
 
@@ -331,6 +345,20 @@ function LeadForm({ id }: { id?: string }) {
                     >
                       Архивировать
                     </button>
+                    {currentUser?.role === "admin" && (
+                      <button
+                        type="button"
+                        disabled={deleteLead.isPending}
+                        className="block w-full px-3 py-1.5 text-left text-[13px] text-odoo-danger hover:bg-odoo-bg disabled:opacity-60"
+                        onClick={() => {
+                          setActionsOpen(false);
+                          setDeleteError("");
+                          setDeleteOpen(true);
+                        }}
+                      >
+                        Удалить лид
+                      </button>
+                    )}
                   </div>
                 </>
               )}
@@ -576,6 +604,16 @@ function LeadForm({ id }: { id?: string }) {
               onError: (err: Error) => setTransferError(err.message || "Не удалось передать лид"),
             })
           }
+        />
+      )}
+
+      {deleteOpen && lead && (
+        <DeleteLeadDialog
+          leadName={lead.name}
+          pending={deleteLead.isPending}
+          error={deleteError}
+          onCancel={() => setDeleteOpen(false)}
+          onConfirm={deleteForever}
         />
       )}
 

@@ -26,7 +26,7 @@
 | `carriers.py` | `/carriers` | 3 |
 | `health.py` | `—` | 2 |
 | `launcher.py` | `/launcher` | 1 |
-| `leads.py` | `/crm/leads` | 11 |
+| `leads.py` | `/crm/leads` | 12 |
 | `shipments.py` | `—` | 10 |
 | `stages.py` | `/crm/stages` | 5 |
 | `tags.py` | `/crm/tags` | 3 |
@@ -80,7 +80,7 @@
 
 ## Тесты
 
-- бэкенд (pytest): **74** тест-функций
+- бэкенд (pytest): **77** тест-функций
 - фронтенд (vitest): **36** тестов
 - сценарные (подменяется только сеть, остальное настоящее):
   - `frontend/src/features/auth/login-flow.test.tsx`
