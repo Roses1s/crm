@@ -29,7 +29,11 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
-        compare_server_default=True,
+        # Значения по умолчанию на стороне базы НЕ сравниваем: при добавлении
+        # обязательных колонок миграция ставит server_default='' только чтобы
+        # заполнить уже существующие строки, а в модели его намеренно нет.
+        # Иначе `alembic check` каждый раз «находит» несуществующие расхождения.
+        compare_server_default=False,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -40,7 +44,7 @@ def do_run_migrations(connection: Connection) -> None:
         connection=connection,
         target_metadata=target_metadata,
         compare_type=True,
-        compare_server_default=True,
+        compare_server_default=False,  # см. комментарий выше
         render_as_batch=connection.dialect.name == "sqlite",
     )
     with context.begin_transaction():

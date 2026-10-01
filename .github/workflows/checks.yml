@@ -54,6 +54,14 @@ jobs:
           DATABASE_URL: sqlite+aiosqlite:////tmp/checks.db
         run: alembic upgrade head
 
+      - name: Модели и миграции совпадают
+        # `alembic check` сравнивает модели в коде со схемой базы после всех
+        # миграций. Падает, если кто-то изменил модель и забыл создать
+        # миграцию — иначе такая ошибка всплыла бы только на проде.
+        env:
+          DATABASE_URL: sqlite+aiosqlite:////tmp/checks.db
+        run: alembic check
+
       - name: Аудит зависимостей на уязвимости
         # Информационный шаг: показывает известные уязвимости в логе, но НЕ роняет
         # сборку. Так разовый сбой сети (запрос к базе advisory) или свежий
@@ -102,6 +110,11 @@ jobs:
         env:
           DATABASE_URL: postgresql+asyncpg://crm:crm@localhost:5432/crm_test
         run: alembic upgrade head
+
+      - name: Модели и миграции совпадают (PostgreSQL)
+        env:
+          DATABASE_URL: postgresql+asyncpg://crm:crm@localhost:5432/crm_test
+        run: alembic check
 
       - name: Тесты на PostgreSQL
         env:
