@@ -102,16 +102,18 @@ export function Navbar() {
               className="absolute right-0 mt-2 min-w-[200px] rounded-md border border-odoo-border bg-odoo-surface py-1 text-odoo-text shadow-lg"
             >
               <div className="px-3 py-1.5 text-xs text-odoo-text-muted">{user?.email}</div>
-              <button
-                type="button"
-                className="block w-full px-3 py-1.5 text-left text-sm hover:bg-odoo-bg"
-                onClick={() => {
-                  setMenu(false);
-                  navigate("/admin");
-                }}
-              >
-                Отчёты
-              </button>
+              {user?.role === "admin" && (
+                <button
+                  type="button"
+                  className="block w-full px-3 py-1.5 text-left text-sm hover:bg-odoo-bg"
+                  onClick={() => {
+                    setMenu(false);
+                    navigate("/admin");
+                  }}
+                >
+                  Отчёты
+                </button>
+              )}
               <button
                 type="button"
                 role="switch"

@@ -45,6 +45,11 @@ const ShipmentsPage = lazy(() =>
     default: m.ShipmentsPage,
   })),
 );
+const AccountingPage = lazy(() =>
+  import("@/features/accounting/AccountingPage").then((m) => ({
+    default: m.AccountingPage,
+  })),
+);
 
 function RouteFallback() {
   return (
@@ -106,6 +111,14 @@ export function AppRouter() {
           element={
             <RequireAuth>
               <ShipmentFormPage />
+            </RequireAuth>
+          }
+        />
+        <Route
+          path="/accounting"
+          element={
+            <RequireAuth>
+              <AccountingPage />
             </RequireAuth>
           }
         />

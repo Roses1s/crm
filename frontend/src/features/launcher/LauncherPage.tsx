@@ -1,4 +1,4 @@
-import { Kanban, LayoutGrid, Package, Settings, Users } from "lucide-react";
+import { Kanban, Landmark, LayoutGrid, Package, Settings, Users } from "lucide-react";
 import { Link } from "react-router-dom";
 import { useLauncherApps } from "@/shared/api/hooks";
 
@@ -7,6 +7,7 @@ const ICONS: Record<string, typeof LayoutGrid> = {
   Package,
   Settings,
   Users,
+  Landmark,
   LayoutGrid,
 };
 

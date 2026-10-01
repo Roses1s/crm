@@ -48,6 +48,15 @@ APPS: list[dict[str, Any]] = [
         "route": "/admin",
         "min_role": Role.admin,
     },
+    {
+        "id": 5,
+        "slug": "accounting",
+        "name": "Бухгалтерия",
+        "description": "Счета, банк и кассовые операции — раздел в разработке",
+        "icon": "Landmark",
+        "route": "/accounting",
+        "min_role": Role.manager,
+    },
 ]
 
 RANK = {Role.manager: 0, Role.admin: 1}
