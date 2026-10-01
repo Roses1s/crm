@@ -108,6 +108,7 @@ export interface TimelineEntry {
 
 export interface Shipment {
   id: number;
+  number: string;
   lead_id: number;
   lead_name: string;
   seller_name?: string | null;

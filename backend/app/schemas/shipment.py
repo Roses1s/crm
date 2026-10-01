@@ -11,6 +11,9 @@ from app.schemas.crm import TagRead
 
 
 class ShipmentBase(BaseModel):
+    # Номер заявки — редактируемый пользователем текст (по умолчанию = id).
+    number: str = ""
+
     # Маршрут (адреса и контакты; города — списком тегов ниже).
     address_loading: str = ""
     address_unloading: str = ""
@@ -75,6 +78,7 @@ class ShipmentCreate(ShipmentBase):
 
 
 class ShipmentUpdate(BaseModel):
+    number: str | None = None
     lead_id: int | None = None
     carrier_id: int | None = None
     status: ShipmentStatus | None = None
@@ -135,6 +139,7 @@ class ShipmentStatusUpdate(BaseModel):
 
 class ShipmentRead(ORMModel):
     id: int
+    number: str
     lead_id: int
     lead_name: str
     seller_name: str | None
@@ -200,6 +205,7 @@ class ShipmentListItem(ORMModel):
     """Укороченная схема для таблицы заявок."""
 
     id: int
+    number: str
     lead_id: int
     lead_name: str
     tags: list[TagRead] = Field(default_factory=list)

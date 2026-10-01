@@ -35,8 +35,11 @@ async def list_shipments(
     user: CurrentUser,
     params: PageParamsDep,
     status_filter: Annotated[ShipmentStatus | None, Query(alias="status")] = None,
+    search: Annotated[str | None, Query(alias="search")] = None,
 ) -> dict[str, Any]:
-    return await service.list_shipments(session, user, params, status_filter=status_filter)
+    return await service.list_shipments(
+        session, user, params, status_filter=status_filter, search=search
+    )
 
 
 @router.post(

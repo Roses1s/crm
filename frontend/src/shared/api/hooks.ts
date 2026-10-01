@@ -55,7 +55,7 @@ export const keys = {
   lead: (id: string | number) => ["lead", String(id)] as const,
   timeline: (id: string | number) => ["timeline", String(id)] as const,
   pager: (id: string | number) => ["pager", String(id)] as const,
-  shipments: (status: string) => ["shipments", status] as const,
+  shipments: (status: string, search = "") => ["shipments", status, search] as const,
   shipment: (id: string | number) => ["shipment", String(id)] as const,
   leadShipments: (id: string | number) => ["lead-shipments", String(id)] as const,
   attachments: (id: string | number) => ["attachments", String(id)] as const,
@@ -670,11 +670,15 @@ export async function downloadAttachment(attachment: Attachment): Promise<void> 
 }
 
 // --- заявки ------------------------------------------------------------------
-export function useShipments(status = "") {
+export function useShipments(status = "", search = "") {
   return useQuery({
-    queryKey: keys.shipments(status),
-    queryFn: () =>
-      api<Page<Shipment>>(`/shipments?page_size=200${status ? `&status=${status}` : ""}`),
+    queryKey: keys.shipments(status, search),
+    queryFn: () => {
+      const params = new URLSearchParams({ page_size: "200" });
+      if (status) params.set("status", status);
+      if (search) params.set("search", search);
+      return api<Page<Shipment>>(`/shipments?${params.toString()}`);
+    },
     select: (page) => page.results,
   });
 }
@@ -696,6 +700,7 @@ export function useLeadShipments(id: number | string | undefined) {
 }
 
 export interface ShipmentPayload {
+  number?: string;
   lead_id: number;
   carrier_id?: number | null;
   address_loading?: string;

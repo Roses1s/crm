@@ -4,13 +4,14 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import select
+from sqlalchemy import or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
 from app.core.errors import AppError, NotFoundError
 from app.core.logging import get_logger
 from app.core.pagination import PageParams, build_page, paginate
+from app.models.carrier import Carrier
 from app.models.crm import Lead
 from app.models.shipment import Shipment, ShipmentStatus
 from app.models.timeline import EntryType, TimelineEntry
@@ -81,10 +82,23 @@ async def list_shipments(
     params: PageParams,
     *,
     status_filter: ShipmentStatus | None = None,
+    search: str | None = None,
 ) -> dict[str, Any]:
     stmt = visible_shipments(select(Shipment).order_by(Shipment.created_at.desc()), user)
     if status_filter is not None:
         stmt = stmt.where(Shipment.status == status_filter)
+    if search:
+        pattern = f"%{search.strip()}%"
+        stmt = stmt.join(Lead, Shipment.lead_id == Lead.id).outerjoin(
+            Carrier, Shipment.carrier_id == Carrier.id
+        )
+        stmt = stmt.where(
+            or_(
+                Shipment.number.ilike(pattern),
+                Lead.name.ilike(pattern),
+                Carrier.name.ilike(pattern),
+            )
+        )
     items, total = await paginate(session, stmt, params)
     return build_page(items, total, params)
 
@@ -96,6 +110,11 @@ async def create_shipment(session: AsyncSession, user: User, payload: ShipmentCr
     shipment = Shipment(**data)
     shipment.tags = await fetch_tags(session, payload.tag_ids)
     session.add(shipment)
+    await session.flush()
+    # Номер по умолчанию = id — но это только стартовое значение, дальше
+    # пользователь волен переименовать его во что угодно.
+    if not shipment.number:
+        shipment.number = str(shipment.id)
     await session.commit()
     log.info("shipment.created", shipment_id=shipment.id, by=user.id)
     return await _reload_shipment(session, shipment.id)

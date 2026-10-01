@@ -7,6 +7,7 @@
 
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
+import { Route, Routes } from "react-router-dom";
 import { afterEach, describe, expect, it } from "vitest";
 
 import { ShipmentsPage } from "@/features/shipments/ShipmentsPage";
@@ -26,6 +27,7 @@ const ME = {
 const SHIPMENTS = [
   {
     id: 101,
+    number: "101",
     lead_id: 10,
     lead_name: "ООО Ромашка",
     seller_name: "Мария Петрова",
@@ -53,13 +55,23 @@ describe("Сценарий: список заявок", () => {
       { path: "/shipments", response: page(SHIPMENTS) },
     ]);
 
-    renderWithProviders(<ShipmentsPage />, { route: "/shipments" });
+    renderWithProviders(
+      <Routes>
+        <Route path="/shipments" element={<ShipmentsPage />} />
+        <Route path="/shipments/:id" element={<div>Карточка заявки открыта</div>} />
+      </Routes>,
+      { route: "/shipments" },
+    );
 
     expect(await screen.findByText("Москва — Казань", undefined, { timeout: 5000 })).toBeVisible();
     expect(screen.getByText("ООО Ромашка")).toBeVisible();
     expect(screen.getByText("ИП Сидоров")).toBeVisible();
-    // Номер заявки — ссылка на карточку.
-    expect(screen.getByRole("link", { name: "101" })).toHaveAttribute("href", "/shipments/101");
+    expect(screen.getByText("101")).toBeVisible();
+
+    // Вся строка кликабельна — ведёт на карточку заявки, а не только номер.
+    const user = userEvent.setup();
+    await user.click(screen.getByRole("link", { name: "Открыть заявку 101" }));
+    expect(await screen.findByText("Карточка заявки открыта")).toBeVisible();
   });
 
   it("пустой ответ сервера -> понятная надпись вместо пустой таблицы", async () => {

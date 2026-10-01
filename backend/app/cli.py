@@ -184,14 +184,15 @@ async def seed() -> None:
             == 0
         ):
             leads = list((await session.execute(select(Lead))).unique().scalars())
-            session.add(
-                Shipment(
-                    lead_id=leads[0].id,
-                    loading_cities=["Челябинск"],
-                    unloading_cities=["Новосибирск"],
-                    status=ShipmentStatus.loaded,
-                )
+            demo_shipment = Shipment(
+                lead_id=leads[0].id,
+                loading_cities=["Челябинск"],
+                unloading_cities=["Новосибирск"],
+                status=ShipmentStatus.loaded,
             )
+            session.add(demo_shipment)
+            await session.flush()
+            demo_shipment.number = str(demo_shipment.id)
             await session.commit()
 
         print("Демо-данные загружены")

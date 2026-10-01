@@ -34,12 +34,50 @@ async def test_create_and_read_shipment(auth_client: AsyncClient, seeded: dict) 
     assert body["status"] == "new"
     assert body["lead_name"] == "ООО «Уралпромснаб»"
     assert body["carrier_name"] == "ООО «АвтоТрансЛайн»"
+    # Номер заявки по умолчанию = её id, но его можно свободно переименовать.
+    assert body["number"] == str(body["id"])
 
     listed = await auth_client.get("/api/v1/shipments")
     assert listed.json()["count"] == 1
 
     by_lead = await auth_client.get(f"/api/v1/leads/{lead_id}/shipments")
     assert len(by_lead.json()) == 1
+
+
+async def test_shipment_number_is_editable(auth_client: AsyncClient, seeded: dict) -> None:
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    shipment = (await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})).json()
+
+    updated = await auth_client.patch(
+        f"/api/v1/shipments/{shipment['id']}", json={"number": "ЗНТ-042"}
+    )
+    assert updated.status_code == 200, updated.text
+    assert updated.json()["number"] == "ЗНТ-042"
+
+    again = await auth_client.get(f"/api/v1/shipments/{shipment['id']}")
+    assert again.json()["number"] == "ЗНТ-042"
+
+
+async def test_shipments_search(auth_client: AsyncClient, seeded: dict) -> None:
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    carrier_id = seeded["carrier"].id  # type: ignore[attr-defined]
+    created = await auth_client.post(
+        "/api/v1/shipments", json={"lead_id": lead_id, "carrier_id": carrier_id}
+    )
+    shipment = created.json()
+    await auth_client.patch(f"/api/v1/shipments/{shipment['id']}", json={"number": "ЗНТ-777"})
+
+    by_number = await auth_client.get("/api/v1/shipments?search=ЗНТ-777")
+    assert by_number.json()["count"] == 1
+
+    by_lead_name = await auth_client.get("/api/v1/shipments?search=Уралпромснаб")
+    assert by_lead_name.json()["count"] == 1
+
+    by_carrier_name = await auth_client.get("/api/v1/shipments?search=АвтоТрансЛайн")
+    assert by_carrier_name.json()["count"] == 1
+
+    no_match = await auth_client.get("/api/v1/shipments?search=несуществующий-текст")
+    assert no_match.json()["count"] == 0
 
 
 async def test_status_transition(auth_client: AsyncClient, seeded: dict) -> None:

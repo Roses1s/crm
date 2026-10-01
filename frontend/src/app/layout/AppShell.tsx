@@ -160,7 +160,7 @@ export function ControlPanel({
                   value={search ?? ""}
                   onChange={(e) => onSearch(e.target.value)}
                   placeholder="Поиск..."
-                  aria-label="Поиск лидов"
+                  aria-label="Поиск"
                   className="min-w-0 flex-1 bg-transparent pr-2 text-[13px] outline-none placeholder:text-odoo-search-placeholder"
                 />
                 {onSettings && (

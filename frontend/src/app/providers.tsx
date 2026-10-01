@@ -2,6 +2,8 @@ import { QueryCache, QueryClient, QueryClientProvider } from "@tanstack/react-qu
 import type { ReactNode } from "react";
 import { BrowserRouter } from "react-router-dom";
 
+import { ToastProvider } from "@/shared/ui/toast";
+
 const queryClient = new QueryClient({
   // Единая точка логирования ошибок запросов: любую неуспешную загрузку данных
   // видно в консоли браузера, а не только в том месте, где она случилась.
@@ -22,7 +24,9 @@ const queryClient = new QueryClient({
 export function Providers({ children }: { children: ReactNode }) {
   return (
     <QueryClientProvider client={queryClient}>
-      <BrowserRouter>{children}</BrowserRouter>
+      <BrowserRouter>
+        <ToastProvider>{children}</ToastProvider>
+      </BrowserRouter>
     </QueryClientProvider>
   );
 }

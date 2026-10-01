@@ -1,18 +1,9 @@
-import { format } from "date-fns";
-import { Link, useSearchParams } from "react-router-dom";
+import { useState } from "react";
+import { useNavigate, useSearchParams } from "react-router-dom";
 
 import { AppShell, ControlPanel } from "@/app/layout/AppShell";
 import { useShipments } from "@/shared/api/hooks";
-
-const STATUS: Record<string, { label: string; cls: string }> = {
-  new: { label: "Новая", cls: "bg-odoo-tag-yellow-bg text-odoo-tag-yellow-text" },
-  checked: {
-    label: "Проверена и подписана заявка",
-    cls: "bg-odoo-tag-blue-bg text-odoo-tag-blue-text",
-  },
-  loaded: { label: "Машина загрузилась", cls: "bg-odoo-tag-green-bg text-odoo-tag-green-text" },
-  unloaded: { label: "Машина выгрузилась", cls: "bg-odoo-tag-green-bg text-odoo-tag-green-text" },
-};
+import { formatShipmentDate, SHIPMENT_STATUS } from "./shipment-status";
 
 /** Инициалы продавца для аватарки (до двух букв). */
 function initials(name: string | null | undefined): string {
@@ -22,18 +13,13 @@ function initials(name: string | null | undefined): string {
   return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
 }
 
-/** Дата создания в формате «12.08.2026 11:55:53». */
-function formatDate(value?: string): string {
-  if (!value) return "—";
-  const date = new Date(value);
-  return Number.isNaN(date.getTime()) ? "—" : format(date, "dd.MM.yyyy HH:mm:ss");
-}
-
-/** Список заявок. Фильтр по статусу — в адресной строке и в запросе к API. */
+/** Список заявок. Фильтр по статусу и поиск — в адресной строке и в запросе к API. */
 export function ShipmentsPage() {
+  const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const status = params.get("status") ?? "";
-  const { data: shipments = [], isLoading } = useShipments(status);
+  const [searchInput, setSearchInput] = useState(params.get("search") ?? "");
+  const { data: shipments = [], isLoading } = useShipments(status, params.get("search") ?? "");
 
   const statusFilter = (
     <select
@@ -47,7 +33,7 @@ export function ShipmentsPage() {
       }}
     >
       <option value="">Все статусы</option>
-      {Object.entries(STATUS).map(([k, v]) => (
+      {Object.entries(SHIPMENT_STATUS).map(([k, v]) => (
         <option key={k} value={k}>
           {v.label}
         </option>
@@ -57,7 +43,19 @@ export function ShipmentsPage() {
 
   return (
     <AppShell>
-      <ControlPanel title="Заявки" status={statusFilter} count={shipments.length} />
+      <ControlPanel
+        title="Заявки"
+        status={statusFilter}
+        count={shipments.length}
+        search={searchInput}
+        onSearch={(value) => {
+          setSearchInput(value);
+          const next = new URLSearchParams(params);
+          if (value) next.set("search", value);
+          else next.delete("search");
+          setParams(next);
+        }}
+      />
 
       <div className="flex-1 overflow-auto">
         <table className="w-full border-collapse text-[13px]">
@@ -83,22 +81,24 @@ export function ShipmentsPage() {
               </tr>
             )}
             {shipments.map((s) => {
-              const st = STATUS[s.status] ?? STATUS.new;
+              const st = SHIPMENT_STATUS[s.status] ?? SHIPMENT_STATUS.new;
               return (
                 <tr
                   key={s.id}
-                  className="border-b border-odoo-border-light bg-odoo-surface transition-colors hover:bg-odoo-bg"
+                  tabIndex={0}
+                  role="link"
+                  aria-label={`Открыть заявку ${s.number}`}
+                  onClick={() => navigate(`/shipments/${s.id}`)}
+                  onKeyDown={(e) => {
+                    if (e.key === "Enter") navigate(`/shipments/${s.id}`);
+                  }}
+                  className="cursor-pointer border-b border-odoo-border-light bg-odoo-surface outline-none transition-colors hover:bg-odoo-bg focus-visible:bg-odoo-bg"
                 >
-                  <td className="whitespace-nowrap px-3 py-2">
-                    <Link
-                      className="font-medium text-odoo-action hover:underline"
-                      to={`/shipments/${s.id}`}
-                    >
-                      {s.id}
-                    </Link>
+                  <td className="whitespace-nowrap px-3 py-2 font-medium text-odoo-action">
+                    {s.number}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2 text-odoo-text-muted">
-                    {formatDate(s.created_at)}
+                    {formatShipmentDate(s.created_at)}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2">
                     <span className="flex items-center gap-2">

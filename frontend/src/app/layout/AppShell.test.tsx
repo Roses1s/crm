@@ -8,7 +8,7 @@ describe("панель управления", () => {
   it("держит поиск нейтральным до получения фокуса", () => {
     renderWithProviders(<ControlPanel onSearch={vi.fn()} />);
 
-    const search = screen.getByRole("textbox", { name: "Поиск лидов" });
+    const search = screen.getByRole("textbox", { name: "Поиск" });
     const frame = search.parentElement;
 
     expect(frame).toHaveClass("border-odoo-border");

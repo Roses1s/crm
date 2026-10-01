@@ -58,6 +58,10 @@ class Shipment(Base, TimestampMixin):
     __tablename__ = "shipments"
 
     id: Mapped[int] = mapped_column(primary_key=True)
+    # Номер заявки — видимый пользователю идентификатор, который можно
+    # переименовать (в отличие от id). При создании по умолчанию равен id,
+    # но это просто стартовое значение текстового поля, не ограничение.
+    number: Mapped[str] = mapped_column(String(40), default="", nullable=False, index=True)
     lead_id: Mapped[int] = mapped_column(
         ForeignKey("leads.id", ondelete="CASCADE"), nullable=False, index=True
     )

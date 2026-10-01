@@ -55,6 +55,15 @@ export function TagsField({
     );
   }
 
+  /** Цвет применяется сразу по клику — его нельзя случайно «потерять»,
+   *  закрыв список, не нажав отдельную кнопку «Сохранить» (это ломало
+   *  ожидание: клик по цвету выглядит как законченное действие). Название
+   *  тега по-прежнему требует явного подтверждения — это ввод текста. */
+  function pickEditColor(hex: string) {
+    setEditColor(hex);
+    if (editingId !== null) updateTag.mutate({ id: editingId, color: hex });
+  }
+
   function removeTag(tag: Tag) {
     if (!window.confirm(`Удалить тег «${tag.name}»? Он пропадёт везде, где проставлен.`)) return;
     deleteTag.mutate(tag.id, {
@@ -130,7 +139,7 @@ export function TagsField({
                     className="rounded-[3px] border border-odoo-border bg-odoo-surface px-1.5 py-1 text-[12px] text-odoo-text outline-none focus:border-odoo-focus"
                     placeholder="Название тега"
                   />
-                  <ColorPicker value={editColor} onChange={setEditColor} />
+                  <ColorPicker value={editColor} onChange={pickEditColor} />
                   <div className="flex justify-end gap-1">
                     <button
                       type="button"

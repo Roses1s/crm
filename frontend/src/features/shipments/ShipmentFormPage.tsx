@@ -44,8 +44,10 @@ import {
   InnerGroup,
   Notebook,
   OdooCheckbox,
+  OdooInput,
 } from "@/shared/ui/odoo-form";
 import { FormSkeleton } from "@/shared/ui/skeleton";
+import { useToast } from "@/shared/ui/toast";
 import { TokenField } from "./TokenField";
 
 // Наша компания — статичная шапка бланка.
@@ -249,6 +251,7 @@ function OrderLinesTab({
 }
 
 const emptyForm = {
+  number: "",
   lead_id: 0,
   carrier_id: null as number | null,
   address_loading: "",
@@ -315,6 +318,7 @@ export function ShipmentFormPage() {
 function ShipmentForm({ id }: { id?: string }) {
   const isNew = !id || id === "new";
   const navigate = useNavigate();
+  const toast = useToast();
   const [searchParams] = useSearchParams();
 
   const { data: currentUser } = useMe();
@@ -352,6 +356,7 @@ function ShipmentForm({ id }: { id?: string }) {
     if (shipment && loadedId.current !== shipment.id) {
       loadedId.current = shipment.id;
       const next: FormState = {
+        number: shipment.number ?? "",
         lead_id: shipment.lead_id,
         carrier_id: shipment.carrier_id,
         address_loading: shipment.address_loading ?? "",
@@ -448,6 +453,7 @@ function ShipmentForm({ id }: { id?: string }) {
           navigate(`/shipments/${saved.id}`, { replace: true });
         } else {
           setPristine(form);
+          toast.show("Сохранено");
         }
       },
       onError: (err) => setError(describe(err, "Не удалось сохранить заявку")),
@@ -556,9 +562,13 @@ function ShipmentForm({ id }: { id?: string }) {
               ) : (
                 <>
                   <FormTitle>
-                    <span className="block px-0 text-[24px] font-normal leading-[34px] text-odoo-text">
-                      {title}
-                    </span>
+                    <OdooInput
+                      aria-label="Номер заявки"
+                      placeholder={isNew ? "Введётся автоматически" : "Номер заявки"}
+                      className="!px-0 !text-[24px] !leading-[34px]"
+                      value={form.number}
+                      onChange={(e) => set("number", e.target.value)}
+                    />
                   </FormTitle>
 
                   {/* --- Шапка: своя компания и заказчик (заказчик привязан к лиду) --- */}
