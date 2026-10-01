@@ -1,6 +1,7 @@
 # Инструкция для агента (и для нового разработчика)
 
-**Порядок чтения:** этот файл → [`docs/PROJECT.md`](docs/PROJECT.md) (весь контекст:
+**Порядок чтения:** [`docs/SNAPSHOT.md`](docs/SNAPSHOT.md) (паспорт проекта —
+собирается из кода, всегда актуален) → этот файл → [`docs/PROJECT.md`](docs/PROJECT.md) (весь контекст:
 архитектура, доменная модель, API, эксплуатация, подводные камни, журнал решений)
 → [`docs/STATUS.md`](docs/STATUS.md) (на каком этапе проект сейчас и что менялось).
 
@@ -60,6 +61,7 @@ cd backend && .venv/bin/ruff check . && .venv/bin/ruff format --check . \
   && .venv/bin/mypy app && .venv/bin/python -m pytest && .venv/bin/alembic check
 cd ../frontend && npm run lint && npm run format:check && npx tsc -b && npm test \
   && npm run build
+cd .. && python scripts/snapshot.py        # пересобрать паспорт проекта
 ```
 
 Нет `.venv` или `node_modules` — это нормально, песочница их не сохраняет:
@@ -87,6 +89,7 @@ git fetch origin "$(git rev-parse --abbrev-ref HEAD)" && git reset FETCH_HEAD &&
 | Логика прямо в роутере | Роутеры в `app/api/v1/` — только HTTP; логика идёт в `app/services/` |
 | Поменяли модель — CI красный | Создайте миграцию: `alembic check` в CI падает, если схема разошлась с моделями |
 | Добавили зависимость в pyproject | Пересоберите lock: `pip-compile --generate-hashes --extra dev --output-file requirements-dev.lock pyproject.toml` |
+| CI падает на «Паспорт проекта не протух» | Выполните `python scripts/snapshot.py` и закоммитьте `docs/SNAPSHOT.md` — файл руками не правят |
 
 Полный список — раздел «Подводные камни» в [`docs/PROJECT.md`](docs/PROJECT.md).
 
@@ -97,6 +100,7 @@ git fetch origin "$(git rev-parse --abbrev-ref HEAD)" && git reset FETCH_HEAD &&
 | [`docs/PROJECT.md`](docs/PROJECT.md) | полный контекст проекта |
 | [`docs/STATUS.md`](docs/STATUS.md) | текущее состояние, что сделано и что дальше |
 | [`docs/HANDOVER.md`](docs/HANDOVER.md) | что делается прямо сейчас — страховка от обрыва сессии |
+| [`docs/SNAPSHOT.md`](docs/SNAPSHOT.md) | паспорт проекта: состав кода, маршруты, таблицы, задачи, тесты, CI (собирается `scripts/snapshot.py`) |
 | [`docs/MASTER_PROMPT.md`](docs/MASTER_PROMPT.md) | промт для передачи проекта новому агенту |
 | [`docs/deploy/01-server-setup.md`](docs/deploy/01-server-setup.md) | сервер с нуля: SSH, UFW, Docker, TLS |
 | [`docs/deploy/02-deploy.md`](docs/deploy/02-deploy.md) | деплой, `deploy.sh`, чек-лист, частые проблемы |

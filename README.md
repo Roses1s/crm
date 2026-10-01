@@ -43,9 +43,11 @@ CRM для транспортной компании: у каждого мене
 
 ```
 AGENTS.md                   короткие правила для нового участника
+docs/SNAPSHOT.md            ← паспорт проекта: собирается из кода скриптом
 docs/PROJECT.md             ← полный контекст проекта
 docs/deploy/                инструкции: сервер с нуля и деплой
 deploy.sh                   деплой одной командой (с автооткатом)
+scripts/snapshot.py         сборка паспорта проекта (docs/SNAPSHOT.md)
 docker-compose.yml          весь стек: postgres · valkey · backend · worker · beat · frontend · nginx
 
 backend/                    FastAPI
