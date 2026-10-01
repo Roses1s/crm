@@ -31,6 +31,14 @@ class TransportType(enum.StrEnum):
     other = "other"
 
 
+class TaxRate(enum.StrEnum):
+    """Ставка НДС в позиции заказа — у заказчика и перевозчика выбирается независимо."""
+
+    vat_22 = "vat_22"  # НДС 22%
+    no_vat = "no_vat"  # Без НДС
+    vat_0 = "vat_0"  # НДС 0%
+
+
 def _enum(kind: type[enum.Enum]) -> Enum:
     return Enum(kind, native_enum=False, length=20, values_callable=lambda e: [x.value for x in e])
 
@@ -66,6 +74,17 @@ class Shipment(Base, TimestampMixin):
     cargo_weight: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     cargo_volume: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     comment: Mapped[str] = mapped_column(Text, default="", nullable=False)
+
+    # --- Позиция заказа: единственная строка «ТЭО», цена отдельно для
+    # заказчика и для перевозчика — у каждой своя ставка НДС. ---
+    customer_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    customer_tax: Mapped[TaxRate] = mapped_column(
+        _enum(TaxRate), default=TaxRate.vat_22, nullable=False
+    )
+    carrier_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
+    carrier_tax: Mapped[TaxRate] = mapped_column(
+        _enum(TaxRate), default=TaxRate.vat_22, nullable=False
+    )
 
     # --- Заказчик (шапка) ---
     customer_address: Mapped[str] = mapped_column(Text, default="", nullable=False)

@@ -127,6 +127,12 @@ export interface Shipment {
   cargo_volume?: string | null;
   comment?: string;
 
+  // Позиция заказа: цена заказчика/перевозчика, у каждой своя ставка НДС.
+  customer_price?: string | null;
+  customer_tax?: string;
+  carrier_price?: string | null;
+  carrier_tax?: string;
+
   // Заказчик (шапка).
   customer_address?: string;
   customer_contact?: string;

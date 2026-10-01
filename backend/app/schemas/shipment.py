@@ -5,7 +5,7 @@ from decimal import Decimal
 
 from pydantic import BaseModel, Field
 
-from app.models.shipment import ShipmentStatus, TransportType
+from app.models.shipment import ShipmentStatus, TaxRate, TransportType
 from app.schemas.common import ORMModel
 
 
@@ -21,6 +21,12 @@ class ShipmentBase(BaseModel):
     cargo_weight: Decimal | None = None
     cargo_volume: Decimal | None = None
     comment: str = ""
+
+    # Позиция заказа: цена заказчика/перевозчика, каждая со своей ставкой НДС.
+    customer_price: Decimal | None = None
+    customer_tax: TaxRate = TaxRate.vat_22
+    carrier_price: Decimal | None = None
+    carrier_tax: TaxRate = TaxRate.vat_22
 
     # Заказчик (шапка).
     customer_address: str = ""
@@ -80,6 +86,11 @@ class ShipmentUpdate(BaseModel):
     cargo_volume: Decimal | None = None
     comment: str | None = None
 
+    customer_price: Decimal | None = None
+    customer_tax: TaxRate | None = None
+    carrier_price: Decimal | None = None
+    carrier_tax: TaxRate | None = None
+
     customer_address: str | None = None
     customer_contact: str | None = None
     customer_signer: str | None = None
@@ -137,6 +148,11 @@ class ShipmentRead(ORMModel):
     cargo_weight: Decimal | None
     cargo_volume: Decimal | None
     comment: str
+
+    customer_price: Decimal | None
+    customer_tax: TaxRate
+    carrier_price: Decimal | None
+    carrier_tax: TaxRate
 
     customer_address: str
     customer_contact: str

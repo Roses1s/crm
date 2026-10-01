@@ -90,6 +90,153 @@ const TRANSPORT_OPTIONS: { value: string; label: string }[] = [
   { value: "other", label: "Другое" },
 ];
 
+// Позиция заказа: одна фиксированная услуга, цена заказчика и перевозчика —
+// каждая со своей ставкой НДС.
+const SERVICE_NAME = "Транспортно-экспедиционное обслуживание";
+
+const TAX_OPTIONS: { value: string; label: string }[] = [
+  { value: "vat_22", label: "НДС 22%" },
+  { value: "no_vat", label: "Без НДС" },
+  { value: "vat_0", label: "НДС 0%" },
+];
+
+function taxRatePercent(tax: string): number {
+  return tax === "vat_22" ? 22 : 0;
+}
+
+/** Сумма без НДС: price / (1 + ставка/100). */
+function netAmount(price: string, tax: string): number | null {
+  const value = Number(price);
+  if (!price || Number.isNaN(value)) return null;
+  return value / (1 + taxRatePercent(tax) / 100);
+}
+
+function formatMoney(value: number): string {
+  return value.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
+}
+
+/** Вкладка «Позиции заказа»: одна фиксированная строка услуги с ценой
+ * заказчика и перевозчика, у каждой свой НДС, плюс итоговая маржа. */
+function OrderLinesTab({
+  customerPrice,
+  customerTax,
+  carrierPrice,
+  carrierTax,
+  onCustomerPriceChange,
+  onCustomerTaxChange,
+  onCarrierPriceChange,
+  onCarrierTaxChange,
+}: {
+  customerPrice: string;
+  customerTax: string;
+  carrierPrice: string;
+  carrierTax: string;
+  onCustomerPriceChange: (value: string) => void;
+  onCustomerTaxChange: (value: string) => void;
+  onCarrierPriceChange: (value: string) => void;
+  onCarrierTaxChange: (value: string) => void;
+}) {
+  const customerNet = netAmount(customerPrice, customerTax);
+  const carrierNet = netAmount(carrierPrice, carrierTax);
+  const margin = customerNet != null && carrierNet != null ? customerNet - carrierNet : null;
+
+  const th = "whitespace-nowrap px-3 py-2 text-left font-semibold";
+  const td = "px-3 py-2 align-middle";
+
+  return (
+    <div>
+      <div className="overflow-x-auto">
+        <table className="w-full min-w-[720px] border-collapse text-[13px]">
+          <thead className="bg-odoo-surface-sunken text-odoo-text-muted">
+            <tr className="border-b border-odoo-border">
+              <th rowSpan={2} className={th}>
+                Продукт
+              </th>
+              <th colSpan={3} className={`${th} border-l border-odoo-border text-center`}>
+                Цена Заказчик
+              </th>
+              <th colSpan={3} className={`${th} border-l border-odoo-border text-center`}>
+                Цена Перевозчик
+              </th>
+            </tr>
+            <tr className="border-b border-odoo-border">
+              <th className={`${th} border-l border-odoo-border`}>Цена</th>
+              <th className={th}>Налог</th>
+              <th className={th}>Налог исключен.</th>
+              <th className={`${th} border-l border-odoo-border`}>Цена</th>
+              <th className={th}>Налог</th>
+              <th className={th}>Налог исключен.</th>
+            </tr>
+          </thead>
+          <tbody>
+            <tr className="border-b border-odoo-border-light bg-odoo-surface">
+              <td className={td}>{SERVICE_NAME}</td>
+              <td className={`${td} border-l border-odoo-border`}>
+                <SInput
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={customerPrice}
+                  onChange={(e) => onCustomerPriceChange(e.target.value)}
+                />
+              </td>
+              <td className={td}>
+                <select
+                  className={fieldStateCls(true)}
+                  value={customerTax}
+                  onChange={(e) => onCustomerTaxChange(e.target.value)}
+                >
+                  {TAX_OPTIONS.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </td>
+              <td className={`${td} text-odoo-text-muted`}>
+                {customerNet != null ? formatMoney(customerNet) : ""}
+              </td>
+              <td className={`${td} border-l border-odoo-border`}>
+                <SInput
+                  type="number"
+                  step="0.01"
+                  placeholder="0.00"
+                  value={carrierPrice}
+                  onChange={(e) => onCarrierPriceChange(e.target.value)}
+                />
+              </td>
+              <td className={td}>
+                <select
+                  className={fieldStateCls(true)}
+                  value={carrierTax}
+                  onChange={(e) => onCarrierTaxChange(e.target.value)}
+                >
+                  {TAX_OPTIONS.map((t) => (
+                    <option key={t.value} value={t.value}>
+                      {t.label}
+                    </option>
+                  ))}
+                </select>
+              </td>
+              <td className={`${td} text-odoo-text-muted`}>
+                {carrierNet != null ? formatMoney(carrierNet) : ""}
+              </td>
+            </tr>
+          </tbody>
+        </table>
+      </div>
+      <div className="mt-3 flex justify-end">
+        <div className="flex items-center gap-3 px-3 py-2 text-[13px]">
+          <span className="font-medium text-odoo-text-muted">Маржа</span>
+          <span className="font-semibold text-odoo-text">
+            {margin != null ? formatMoney(margin) : "—"}
+          </span>
+        </div>
+      </div>
+    </div>
+  );
+}
+
 const emptyForm = {
   lead_id: 0,
   carrier_id: null as number | null,
@@ -103,6 +250,12 @@ const emptyForm = {
   cargo_weight: "",
   cargo_volume: "",
   comment: "",
+
+  // Позиция заказа.
+  customer_price: "",
+  customer_tax: "vat_22",
+  carrier_price: "",
+  carrier_tax: "vat_22",
 
   // Заказчик (шапка).
   customer_contact: "",
@@ -170,7 +323,7 @@ function ShipmentForm({ id }: { id?: string }) {
   const [pristine, setPristine] = useState<FormState>(emptyForm);
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<Attachment | null>(null);
-  const [tab, setTab] = useState("info");
+  const [tab, setTab] = useState("lines");
   const loadedId = useRef<number | null>(null);
 
   // Заявка из карточки лида приходит со ссылкой /shipments/new?lead=42.
@@ -197,6 +350,11 @@ function ShipmentForm({ id }: { id?: string }) {
         cargo_weight: shipment.cargo_weight ?? "",
         cargo_volume: shipment.cargo_volume ?? "",
         comment: shipment.comment ?? "",
+
+        customer_price: shipment.customer_price ?? "",
+        customer_tax: shipment.customer_tax ?? "vat_22",
+        carrier_price: shipment.carrier_price ?? "",
+        carrier_tax: shipment.carrier_tax ?? "vat_22",
 
         customer_contact: shipment.customer_contact ?? "",
 
@@ -261,6 +419,8 @@ function ShipmentForm({ id }: { id?: string }) {
       cargo_weight: form.cargo_weight || null,
       cargo_volume: form.cargo_volume || null,
       capacity: form.capacity || null,
+      customer_price: form.customer_price || null,
+      carrier_price: form.carrier_price || null,
       loading_date_from: form.loading_date_from || null,
       loading_date_to: form.loading_date_to || null,
       unloading_date_from: form.unloading_date_from || null,
@@ -687,6 +847,22 @@ function ShipmentForm({ id }: { id?: string }) {
                     onSelect={setTab}
                     tabs={[
                       {
+                        id: "lines",
+                        label: "Позиции заказа",
+                        content: (
+                          <OrderLinesTab
+                            customerPrice={form.customer_price}
+                            customerTax={form.customer_tax}
+                            carrierPrice={form.carrier_price}
+                            carrierTax={form.carrier_tax}
+                            onCustomerPriceChange={(v) => set("customer_price", v)}
+                            onCustomerTaxChange={(v) => set("customer_tax", v)}
+                            onCarrierPriceChange={(v) => set("carrier_price", v)}
+                            onCarrierTaxChange={(v) => set("carrier_tax", v)}
+                          />
+                        ),
+                      },
+                      {
                         id: "info",
                         label: "Прочая информация",
                         content: (
@@ -697,15 +873,6 @@ function ShipmentForm({ id }: { id?: string }) {
                             value={form.comment}
                             onChange={(e) => set("comment", e.target.value)}
                           />
-                        ),
-                      },
-                      {
-                        id: "lines",
-                        label: "Позиции заказа",
-                        content: (
-                          <p className="text-[13px] text-odoo-text-light">
-                            Таблица позиций заказа с суммами и НДС появится позже.
-                          </p>
                         ),
                       },
                     ]}
