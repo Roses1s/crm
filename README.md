@@ -17,7 +17,7 @@ CRM для транспортной компании: у каждого мене
 
 | Слой | Технологии |
 |---|---|
-| ОС сервера | Ubuntu 26.04 LTS, 2 ГБ RAM, 15 ГБ диск |
+| ОС сервера | Ubuntu 26.04 LTS, 4 ГБ RAM, 15 ГБ диск |
 | Хранилища | PostgreSQL 18 · Valkey 8 |
 | Бэкенд | Python 3.13 · FastAPI · SQLAlchemy 2.0 (async) · Alembic · Pydantic v2 · Celery 5.5 · structlog · slowapi · fastapi-cache2 |
 | Фронтенд | React 19 · Vite 6 · Tailwind CSS v4 · TanStack Query v5 · React Router 7 · dnd-kit · Vitest |
