@@ -28,7 +28,7 @@ git diff --stat f7d9c43 FETCH_HEAD
 | Адрес | https://crmdetroid.ru — работает |
 | Контейнеров | 7/7, автозапуск через `crm.service` проверен перезагрузкой |
 | Обновление | `ssh crm /opt/crm/deploy.sh` (~30 с, с автооткатом) |
-| Версия на сервере | сверять: `ssh crm "cd /opt/crm && git log --oneline -1"` |
+| Версия на сервере | `8827bea` (01.10.2026); сверять: `ssh crm "cd /opt/crm && git log --oneline -1"` |
 | Место на диске | было 6,1 ГБ свободно |
 | Сертификат | Let's Encrypt, автопродление проверено `certbot renew --dry-run` |
 
