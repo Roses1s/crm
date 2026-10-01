@@ -77,6 +77,34 @@ async def test_logout_clears_cookie(client: AsyncClient, seeded: dict[str, objec
     assert (await client.post("/api/v1/auth/refresh")).status_code == 401
 
 
+async def test_stolen_refresh_token_is_useless_after_logout(
+    client: AsyncClient, seeded: dict[str, object]
+) -> None:
+    """Главное в выходе из системы: сам токен перестаёт работать.
+
+    Удаления куки мало — перехваченную копию можно подставить обратно.
+    После выхода идентификатор токена в чёрном списке, и продлить сессию
+    по нему нельзя.
+    """
+    await client.post(
+        "/api/v1/auth/login",
+        json={"email": "admin@crmdetroid.ru", "password": TEST_PASSWORD},
+    )
+    stolen = client.cookies["crm_refresh"]
+
+    assert (await client.post("/api/v1/auth/logout")).status_code == 204
+
+    # «Злоумышленник» возвращает украденную куку на место.
+    client.cookies.set("crm_refresh", stolen)
+    response = await client.post("/api/v1/auth/refresh")
+    assert response.status_code == 401
+
+
+async def test_logout_without_cookie_is_ok(client: AsyncClient) -> None:
+    """Выход без сессии не должен падать — просто ничего не делает."""
+    assert (await client.post("/api/v1/auth/logout")).status_code == 204
+
+
 async def test_access_token_is_not_accepted_as_refresh(
     client: AsyncClient, seeded: dict[str, object]
 ) -> None:

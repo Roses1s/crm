@@ -43,6 +43,10 @@ celery.conf.beat_schedule = {
         "task": "app.worker.tasks.backup_attachments",
         "schedule": crontab(hour=4, minute=0, day_of_week="sun"),
     },
+    "cleanup-revoked-tokens": {
+        "task": "app.worker.tasks.cleanup_revoked_tokens",
+        "schedule": crontab(hour=4, minute=45, day_of_week="sun"),
+    },
     "cleanup-attachments": {
         "task": "app.worker.tasks.cleanup_orphan_attachments",
         "schedule": crontab(hour=4, minute=30, day_of_week="sun"),

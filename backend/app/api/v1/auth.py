@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+from datetime import UTC, datetime
 from typing import Annotated
 
 import jwt
@@ -18,7 +19,7 @@ from app.core.security import (
     decode_token,
     verify_password,
 )
-from app.models.security import LoginAttempt
+from app.models.security import LoginAttempt, RevokedToken
 from app.models.user import User
 from app.schemas.auth import AccessToken, LoginRequest
 from app.schemas.user import UserRead
@@ -110,6 +111,11 @@ async def refresh(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Недействительный refresh-токен"
         ) from exc
 
+    # Токен, по которому уже вышли из системы, продлевать нельзя — даже если
+    # срок его жизни ещё не истёк и кто-то успел его перехватить.
+    if await _is_revoked(session, data.get("jti")):
+        raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Сессия завершена")
+
     user = await session.get(User, user_id)
     if user is None or not user.is_active:
         raise HTTPException(
@@ -118,9 +124,39 @@ async def refresh(
     return _issue(user, response)
 
 
+async def _is_revoked(session: SessionDep, jti: str | None) -> bool:
+    """Проверяет, не отозван ли токен с таким идентификатором."""
+    if not jti:
+        return False
+    found = await session.execute(select(RevokedToken.id).where(RevokedToken.jti == jti))
+    return found.scalar_one_or_none() is not None
+
+
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT, summary="Выход")
-async def logout(response: Response) -> None:
-    """Стирает куку сессии: без неё продлить доступ уже нельзя."""
+async def logout(
+    response: Response,
+    session: SessionDep,
+    crm_refresh: Annotated[str | None, Cookie()] = None,
+) -> None:
+    """Завершает сессию: стирает куку и отзывает обновляющий токен.
+
+    Одного удаления куки мало: сам токен остаётся действительным до конца
+    срока, и перехваченной копией можно было бы продлевать чужую сессию.
+    Поэтому идентификатор токена попадает в чёрный список.
+    """
+    if crm_refresh:
+        try:
+            data = decode_token(crm_refresh, "refresh")
+            jti = str(data.get("jti") or "")
+            expires_at = datetime.fromtimestamp(int(data["exp"]), tz=UTC)
+        except (jwt.PyJWTError, KeyError, ValueError, TypeError, OSError):
+            # Негодный токен отзывать нечего — просто стираем куку.
+            jti = ""
+            expires_at = datetime.now(tz=UTC)
+        if jti and not await _is_revoked(session, jti):
+            session.add(RevokedToken(jti=jti, expires_at=expires_at))
+            await session.commit()
+
     response.delete_cookie(REFRESH_COOKIE, path=COOKIE_PATH)
 
 

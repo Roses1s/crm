@@ -27,6 +27,7 @@ def test_celery_imports_task_modules() -> None:
         "app.worker.tasks.backup_attachments",
         "app.worker.tasks.backup_database",
         "app.worker.tasks.cleanup_orphan_attachments",
+        "app.worker.tasks.cleanup_revoked_tokens",
     }
 
 

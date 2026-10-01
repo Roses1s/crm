@@ -21,6 +21,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.logging import configure_logging, get_logger
+from app.models.security import RevokedToken
 from app.models.timeline import Attachment
 
 configure_logging()
@@ -144,3 +145,21 @@ def cleanup_orphan_attachments() -> dict[str, Any]:
         session.commit()
     log.info("cleanup.attachments", removed=removed)
     return {"removed": removed}
+
+
+@shared_task(name="app.worker.tasks.cleanup_revoked_tokens")
+def cleanup_revoked_tokens() -> dict[str, Any]:
+    """Чистит чёрный список токенов от записей, срок которых уже истёк.
+
+    Такая запись бесполезна: сам токен к этому моменту всё равно недействителен.
+    """
+    now = datetime.now(tz=UTC)
+    with _session() as session:
+        expired = list(
+            session.execute(select(RevokedToken).where(RevokedToken.expires_at < now)).scalars()
+        )
+        for token in expired:
+            session.delete(token)
+        session.commit()
+    log.info("cleanup.revoked_tokens", removed=len(expired))
+    return {"removed": len(expired)}
