@@ -55,8 +55,6 @@ class Shipment(Base, TimestampMixin):
         _enum(TransportType), default=TransportType.tent, nullable=False
     )
 
-    city_loading: Mapped[str] = mapped_column(String(120), default="", nullable=False)
-    city_unloading: Mapped[str] = mapped_column(String(120), default="", nullable=False)
     address_loading: Mapped[str] = mapped_column(String(255), default="", nullable=False)
     address_unloading: Mapped[str] = mapped_column(String(255), default="", nullable=False)
 
@@ -124,10 +122,9 @@ class Shipment(Base, TimestampMixin):
 
     @property
     def route(self) -> str:
-        # Маршрут для списка: сначала берём мультигорода-теги, иначе — старые
-        # одиночные поля города.
-        start = ", ".join(self.loading_cities) if self.loading_cities else self.city_loading
-        end = ", ".join(self.unloading_cities) if self.unloading_cities else self.city_unloading
+        # Маршрут для списка собирается из городов-тегов.
+        start = ", ".join(self.loading_cities)
+        end = ", ".join(self.unloading_cities)
         if start and end:
             return f"{start} → {end}"
         return start or end or "—"

@@ -21,9 +21,7 @@ depends_on: str | Sequence[str] | None = None
 def upgrade() -> None:
     with op.batch_alter_table("timeline_entries") as batch:
         batch.add_column(sa.Column("shipment_id", sa.Integer(), nullable=True))
-        batch.create_index(
-            op.f("ix_timeline_entries_shipment_id"), ["shipment_id"], unique=False
-        )
+        batch.create_index(op.f("ix_timeline_entries_shipment_id"), ["shipment_id"], unique=False)
         batch.create_foreign_key(
             op.f("fk_timeline_entries_shipment_id_shipments"),
             "shipments",
@@ -35,8 +33,6 @@ def upgrade() -> None:
 
 def downgrade() -> None:
     with op.batch_alter_table("timeline_entries") as batch:
-        batch.drop_constraint(
-            op.f("fk_timeline_entries_shipment_id_shipments"), type_="foreignkey"
-        )
+        batch.drop_constraint(op.f("fk_timeline_entries_shipment_id_shipments"), type_="foreignkey")
         batch.drop_index(op.f("ix_timeline_entries_shipment_id"))
         batch.drop_column("shipment_id")

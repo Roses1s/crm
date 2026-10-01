@@ -14,8 +14,8 @@ async def test_create_and_read_shipment(auth_client: AsyncClient, seeded: dict) 
         json={
             "lead_id": lead_id,
             "carrier_id": carrier_id,
-            "city_loading": "Челябинск",
-            "city_unloading": "Новосибирск",
+            "loading_cities": ["Челябинск"],
+            "unloading_cities": ["Новосибирск"],
         },
     )
     assert created.status_code == 201, created.text

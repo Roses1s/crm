@@ -187,8 +187,8 @@ async def seed() -> None:
             session.add(
                 Shipment(
                     lead_id=leads[0].id,
-                    city_loading="Челябинск",
-                    city_unloading="Новосибирск",
+                    loading_cities=["Челябинск"],
+                    unloading_cities=["Новосибирск"],
                     status=ShipmentStatus.loaded,
                 )
             )

@@ -86,8 +86,6 @@ export interface Shipment {
   carrier_id: number | null;
   carrier_name?: string | null;
   created_at: string;
-  city_loading?: string;
-  city_unloading?: string;
   address_loading?: string;
   address_unloading?: string;
   contact_loading_name?: string;

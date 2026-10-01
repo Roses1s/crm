@@ -584,8 +584,6 @@ export function useLeadShipments(id: number | string | undefined) {
 export interface ShipmentPayload {
   lead_id: number;
   carrier_id?: number | null;
-  city_loading?: string;
-  city_unloading?: string;
   address_loading?: string;
   address_unloading?: string;
   contact_loading_name?: string;

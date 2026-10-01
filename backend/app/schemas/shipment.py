@@ -10,9 +10,7 @@ from app.schemas.common import ORMModel
 
 
 class ShipmentBase(BaseModel):
-    # Маршрут (старые одиночные поля оставлены для совместимости).
-    city_loading: str = ""
-    city_unloading: str = ""
+    # Маршрут (адреса и контакты; города — списком тегов ниже).
     address_loading: str = ""
     address_unloading: str = ""
     contact_loading_name: str = ""
@@ -72,8 +70,6 @@ class ShipmentUpdate(BaseModel):
     carrier_id: int | None = None
     status: ShipmentStatus | None = None
     transport_type: TransportType | None = None
-    city_loading: str | None = None
-    city_unloading: str | None = None
     address_loading: str | None = None
     address_unloading: str | None = None
     contact_loading_name: str | None = None
@@ -130,8 +126,6 @@ class ShipmentRead(ORMModel):
     transport_type: TransportType
     route: str
 
-    city_loading: str
-    city_unloading: str
     address_loading: str
     address_unloading: str
     contact_loading_name: str
