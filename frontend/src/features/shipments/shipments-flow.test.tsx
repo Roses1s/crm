@@ -66,11 +66,15 @@ describe("Сценарий: список заявок", () => {
     expect(await screen.findByText("Москва — Казань", undefined, { timeout: 5000 })).toBeVisible();
     expect(screen.getByText("ООО Ромашка")).toBeVisible();
     expect(screen.getByText("ИП Сидоров")).toBeVisible();
-    expect(screen.getByText("101")).toBeVisible();
+    // Номер — настоящая ссылка (можно открыть в новой вкладке, скопировать
+    // адрес и т.д.), а не просто текст с обработчиком клика.
+    const link = screen.getByRole("link", { name: "101" });
+    expect(link).toHaveAttribute("href", "/shipments/101");
 
-    // Вся строка кликабельна — ведёт на карточку заявки, а не только номер.
+    // Но и вся строка кликабельна — клик по любой другой ячейке тоже ведёт
+    // на карточку заявки.
     const user = userEvent.setup();
-    await user.click(screen.getByRole("link", { name: "Открыть заявку 101" }));
+    await user.click(screen.getByText("Москва — Казань"));
     expect(await screen.findByText("Карточка заявки открыта")).toBeVisible();
   });
 
@@ -102,6 +106,34 @@ describe("Сценарий: список заявок", () => {
 
     await waitFor(() =>
       expect(server?.calls.some((call) => call.url.includes("status=loaded"))).toBe(true),
+    );
+  });
+
+  it("поиск уходит в запрос с задержкой (не на каждое нажатие клавиши)", async () => {
+    setAccessToken("токен");
+    server = startFakeApi([
+      { path: "/auth/me", response: ME },
+      { path: "/shipments", response: page(SHIPMENTS) },
+    ]);
+
+    const user = userEvent.setup();
+    renderWithProviders(<ShipmentsPage />, { route: "/shipments" });
+    await screen.findByText("Москва — Казань", undefined, { timeout: 5000 });
+
+    const before = server.calls.filter((call) => call.url.includes("/shipments")).length;
+    await user.type(screen.getByPlaceholderText(/Поиск/i), "Ромашка");
+
+    // Сразу после ввода новый запрос ещё не ушёл — это и есть дебаунс.
+    expect(server.calls.filter((call) => call.url.includes("/shipments")).length).toBe(before);
+
+    await waitFor(
+      () =>
+        expect(
+          server?.calls.some(
+            (call) => call.url.includes("/shipments") && call.url.includes("search="),
+          ),
+        ).toBe(true),
+      { timeout: 3000 },
     );
   });
 });

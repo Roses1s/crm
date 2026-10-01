@@ -26,6 +26,10 @@ export function TagsField({
   const [editingId, setEditingId] = useState<number | null>(null);
   const [editName, setEditName] = useState("");
   const [editColor, setEditColor] = useState(NEW_TAG_COLOR);
+  // Цвет, который был у тега до открытия редактирования — чтобы «Отмена»
+  // могла по-настоящему откатить уже автосохранённый клик по пресету
+  // (см. pickEditColor/cancelEdit ниже), а не просто закрыть панель.
+  const [originalColor, setOriginalColor] = useState(NEW_TAG_COLOR);
   const [creating, setCreating] = useState(false);
   const [draftName, setDraftName] = useState("");
   const [draftColor, setDraftColor] = useState(NEW_TAG_COLOR);
@@ -41,9 +45,11 @@ export function TagsField({
   }
 
   function startEdit(tag: Tag) {
+    const color = isValidHexColor(tag.color) ? tag.color : NEW_TAG_COLOR;
     setEditingId(tag.id);
     setEditName(tag.name);
-    setEditColor(isValidHexColor(tag.color) ? tag.color : NEW_TAG_COLOR);
+    setEditColor(color);
+    setOriginalColor(color);
     setCreating(false);
   }
 
@@ -62,6 +68,17 @@ export function TagsField({
   function pickEditColor(hex: string) {
     setEditColor(hex);
     if (editingId !== null) updateTag.mutate({ id: editingId, color: hex });
+  }
+
+  /** «Отмена» должна по-настоящему отменять — включая цвет, который к этому
+   *  моменту мог уже уйти на сервер по клику на пресет (см. pickEditColor).
+   *  Название не трогаем отдельно: оно и так не сохраняется без явного
+   *  клика на «Сохранить», так что просто закрыть панель для него достаточно. */
+  function cancelEdit() {
+    if (editingId !== null && editColor !== originalColor) {
+      updateTag.mutate({ id: editingId, color: originalColor });
+    }
+    setEditingId(null);
   }
 
   function removeTag(tag: Tag) {
@@ -144,7 +161,7 @@ export function TagsField({
                     <button
                       type="button"
                       className="rounded-[3px] px-2 py-0.5 text-[12px] text-odoo-text-muted hover:bg-odoo-bg"
-                      onClick={() => setEditingId(null)}
+                      onClick={cancelEdit}
                     >
                       Отмена
                     </button>

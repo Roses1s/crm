@@ -435,8 +435,17 @@ function ShipmentForm({ id }: { id?: string }) {
       setError("Выберите лид, по которому создаётся заявка");
       return;
     }
+    // У новой заявки номер ещё не присвоен (поле пустое до создания — сервер
+    // сам подставит id). У уже существующей — это единственный видимый
+    // идентификатор, стирать его в пустоту нельзя (не на чем будет
+    // восстановиться само собой).
+    if (!isNew && !form.number.trim()) {
+      setError("Номер заявки не может быть пустым");
+      return;
+    }
     const payload: ShipmentPayload = {
       ...form,
+      number: form.number.trim(),
       cargo_weight: form.cargo_weight || null,
       cargo_volume: form.cargo_volume || null,
       capacity: form.capacity || null,

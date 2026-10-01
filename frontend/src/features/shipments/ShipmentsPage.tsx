@@ -1,5 +1,5 @@
-import { useState } from "react";
-import { useNavigate, useSearchParams } from "react-router-dom";
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { AppShell, ControlPanel } from "@/app/layout/AppShell";
 import { useShipments } from "@/shared/api/hooks";
@@ -18,8 +18,29 @@ export function ShipmentsPage() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
   const status = params.get("status") ?? "";
-  const [searchInput, setSearchInput] = useState(params.get("search") ?? "");
-  const { data: shipments = [], isLoading } = useShipments(status, params.get("search") ?? "");
+  const search = params.get("search") ?? "";
+  const [searchInput, setSearchInput] = useState(search);
+  const { data: shipments = [], isLoading } = useShipments(status, search);
+
+  // Поиск дебаунсим на 300мс и пишем в адресную строку с replace — как на
+  // «Лидах» и «Клиентах» (KanbanPage/CustomersPage): иначе запрос к API
+  // улетал бы на каждое нажатие клавиши, а история браузера забивалась бы
+  // записью на каждый символ, ломая кнопку «Назад».
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (searchInput) next.set("search", searchInput);
+          else next.delete("search");
+          return next;
+        },
+        { replace: true },
+      );
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchInput]);
 
   const statusFilter = (
     <select
@@ -48,13 +69,7 @@ export function ShipmentsPage() {
         status={statusFilter}
         count={shipments.length}
         search={searchInput}
-        onSearch={(value) => {
-          setSearchInput(value);
-          const next = new URLSearchParams(params);
-          if (value) next.set("search", value);
-          else next.delete("search");
-          setParams(next);
-        }}
+        onSearch={setSearchInput}
       />
 
       <div className="flex-1 overflow-auto">
@@ -85,17 +100,21 @@ export function ShipmentsPage() {
               return (
                 <tr
                   key={s.id}
-                  tabIndex={0}
-                  role="link"
-                  aria-label={`Открыть заявку ${s.number}`}
                   onClick={() => navigate(`/shipments/${s.id}`)}
-                  onKeyDown={(e) => {
-                    if (e.key === "Enter") navigate(`/shipments/${s.id}`);
-                  }}
-                  className="cursor-pointer border-b border-odoo-border-light bg-odoo-surface outline-none transition-colors hover:bg-odoo-bg focus-visible:bg-odoo-bg"
+                  className="cursor-pointer border-b border-odoo-border-light bg-odoo-surface transition-colors hover:bg-odoo-bg"
                 >
                   <td className="whitespace-nowrap px-3 py-2 font-medium text-odoo-action">
-                    {s.number}
+                    {/* Настоящая ссылка — держит клавиатурный фокус, открытие в
+                        новой вкладке средней кнопкой/Ctrl-клик и «копировать
+                        ссылку» по правому клику. Клик по ней не даёт событию
+                        всплыть до <tr>, чтобы не навигировать дважды. */}
+                    <Link
+                      to={`/shipments/${s.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="hover:underline"
+                    >
+                      {s.number}
+                    </Link>
                   </td>
                   <td className="whitespace-nowrap px-3 py-2 text-odoo-text-muted">
                     {formatShipmentDate(s.created_at)}

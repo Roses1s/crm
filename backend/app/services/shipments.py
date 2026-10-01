@@ -87,16 +87,19 @@ async def list_shipments(
     stmt = visible_shipments(select(Shipment).order_by(Shipment.created_at.desc()), user)
     if status_filter is not None:
         stmt = stmt.where(Shipment.status == status_filter)
-    if search:
-        pattern = f"%{search.strip()}%"
+    if search and search.strip():
+        # Экранируем спецсимволы ILIKE (% и _), иначе поиск, например,
+        # «50%» молча вёл бы себя как маска «50» + что угодно.
+        escaped = search.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
+        pattern = f"%{escaped}%"
         stmt = stmt.join(Lead, Shipment.lead_id == Lead.id).outerjoin(
             Carrier, Shipment.carrier_id == Carrier.id
         )
         stmt = stmt.where(
             or_(
-                Shipment.number.ilike(pattern),
-                Lead.name.ilike(pattern),
-                Carrier.name.ilike(pattern),
+                Shipment.number.ilike(pattern, escape="\\"),
+                Lead.name.ilike(pattern, escape="\\"),
+                Carrier.name.ilike(pattern, escape="\\"),
             )
         )
     items, total = await paginate(session, stmt, params)

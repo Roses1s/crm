@@ -12,7 +12,7 @@ from app.schemas.crm import TagRead
 
 class ShipmentBase(BaseModel):
     # Номер заявки — редактируемый пользователем текст (по умолчанию = id).
-    number: str = ""
+    number: str = Field(default="", max_length=40)
 
     # Маршрут (адреса и контакты; города — списком тегов ниже).
     address_loading: str = ""
@@ -78,7 +78,10 @@ class ShipmentCreate(ShipmentBase):
 
 
 class ShipmentUpdate(BaseModel):
-    number: str | None = None
+    # min_length=1 — номер можно не передавать (тогда он не меняется), но
+    # если передан явно, пустым быть не должен: иначе заявка молча теряет
+    # свой единственный видимый идентификатор без возможности откатить.
+    number: str | None = Field(default=None, min_length=1, max_length=40)
     lead_id: int | None = None
     carrier_id: int | None = None
     status: ShipmentStatus | None = None

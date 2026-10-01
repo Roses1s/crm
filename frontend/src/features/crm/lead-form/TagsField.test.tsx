@@ -53,3 +53,34 @@ it("цвет тега сохраняется сразу по клику на п�
   await user.click(screen.getByRole("button", { name: "Закрыть" }));
   expect(current.color).toBe("#1e8449");
 });
+
+it("«Отмена» откатывает уже автосохранённый цвет (а не только закрывает панель)", async () => {
+  let current = { id: 1, name: "Важное", color: "#112233" };
+  server = startFakeApi([
+    { method: "GET", path: "/crm/tags", response: () => [current] },
+    {
+      method: "PATCH",
+      path: "/crm/tags/1",
+      response: (body: unknown) => {
+        current = { ...current, ...(body as object) };
+        return current;
+      },
+    },
+  ]);
+
+  renderWithProviders(<Harness />);
+  const user = userEvent.setup();
+
+  await screen.findByText("Важное");
+  await user.click(screen.getByRole("button", { name: "Теги" }));
+  await user.click(await screen.findByRole("button", { name: "Изменить тег Важное" }));
+  await user.click(await screen.findByRole("button", { name: "Цвет #1e8449" }));
+
+  // Цвет уже ушёл на сервер по клику на пресет...
+  await waitFor(() => expect(current.color).toBe("#1e8449"));
+
+  // ...но «Отмена» — это именно отмена: должна откатить его обратно на то,
+  // что было у тега до открытия панели редактирования.
+  await user.click(screen.getByRole("button", { name: "Отмена" }));
+  await waitFor(() => expect(current.color).toBe("#112233"));
+});

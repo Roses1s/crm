@@ -58,6 +58,19 @@ async def test_shipment_number_is_editable(auth_client: AsyncClient, seeded: dic
     assert again.json()["number"] == "ЗНТ-042"
 
 
+async def test_shipment_number_cannot_be_blanked(auth_client: AsyncClient, seeded: dict) -> None:
+    """Номер — единственный видимый идентификатор заявки: стереть его в PATCH
+    пустой строкой нельзя (иначе заявка молча теряет имя без отката)."""
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    shipment = (await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})).json()
+
+    blanked = await auth_client.patch(f"/api/v1/shipments/{shipment['id']}", json={"number": ""})
+    assert blanked.status_code == 422
+
+    unchanged = await auth_client.get(f"/api/v1/shipments/{shipment['id']}")
+    assert unchanged.json()["number"] == str(shipment["id"])
+
+
 async def test_shipments_search(auth_client: AsyncClient, seeded: dict) -> None:
     lead_id = seeded["lead"].id  # type: ignore[attr-defined]
     carrier_id = seeded["carrier"].id  # type: ignore[attr-defined]
@@ -78,6 +91,26 @@ async def test_shipments_search(auth_client: AsyncClient, seeded: dict) -> None:
 
     no_match = await auth_client.get("/api/v1/shipments?search=несуществующий-текст")
     assert no_match.json()["count"] == 0
+
+
+async def test_shipments_search_escapes_like_wildcards(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    """«%» и «_» в строке поиска — это литералы, а не маска ILIKE."""
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    shipment = (await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})).json()
+    await auth_client.patch(f"/api/v1/shipments/{shipment['id']}", json={"number": "50%"})
+
+    literal_match = await auth_client.get("/api/v1/shipments?search=50%25")
+    assert literal_match.json()["count"] == 1
+
+    # Без экранирования «50» тоже матчился бы (ILIKE «%50%» воспринял бы
+    # «%» как спецсимвол маски) — здесь проверяем, что это не так: другая
+    # заявка без «%» в номере под такой поиск не попадает.
+    other = (await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})).json()
+    await auth_client.patch(f"/api/v1/shipments/{other['id']}", json={"number": "50"})
+    still_one = await auth_client.get("/api/v1/shipments?search=50%25")
+    assert still_one.json()["count"] == 1
 
 
 async def test_status_transition(auth_client: AsyncClient, seeded: dict) -> None:
