@@ -1,12 +1,15 @@
 import { useState } from "react";
 
+import { TagsField } from "@/features/crm/lead-form/TagsField";
 import { ApiError } from "@/shared/api/client";
-import { useCarriers, useCreateCarrier } from "@/shared/api/hooks";
+import { useCarriers, useCreateCarrier, useSetCarrierTags, useTags } from "@/shared/api/hooks";
 import { Button } from "@/shared/ui/button";
 
 export function CarriersPage() {
   const { data: carriers = [] } = useCarriers();
+  const { data: allTags = [] } = useTags();
   const create = useCreateCarrier();
+  const setTags = useSetCarrierTags();
   const [name, setName] = useState("");
   const [inn, setInn] = useState("");
   const [error, setError] = useState("");
@@ -62,6 +65,7 @@ export function CarriersPage() {
             <th className="p-2 text-left">Название</th>
             <th className="p-2 text-left">ИНН</th>
             <th className="p-2 text-left">Активен</th>
+            <th className="p-2 text-left">Теги</th>
           </tr>
         </thead>
         <tbody>
@@ -70,6 +74,13 @@ export function CarriersPage() {
               <td className="p-2">{c.name}</td>
               <td className="p-2">{c.inn}</td>
               <td className="p-2">{c.is_active ? "да" : "нет"}</td>
+              <td className="p-2">
+                <TagsField
+                  all={allTags}
+                  value={c.tags?.map((t) => t.id) ?? []}
+                  onChange={(ids) => setTags.mutate({ id: c.id, tagIds: ids })}
+                />
+              </td>
             </tr>
           ))}
         </tbody>

@@ -16,7 +16,7 @@ const OPEN_CUSTOMER: Customer = {
   logist_contact: "Громов Сергей",
   priority: 2,
   stage_name: "Переговоры",
-  tags: [{ id: 1, name: "Крупный клиент", color: "green" }],
+  tags: [{ id: 1, name: "Крупный клиент", color: "#1e8449" }],
   updated_at: "2026-10-01T00:00:00Z",
 };
 

@@ -7,7 +7,7 @@ import { Link } from "react-router-dom";
 import { useUpdateLeadPriority } from "@/shared/api/hooks";
 import { ownerInitials, ownerLabel } from "@/shared/lib/owner";
 import type { Lead } from "@/shared/types";
-import { DEFAULT_TAG_STYLE, TAG_STYLES } from "@/shared/ui/tag-styles";
+import { TagChip } from "@/shared/ui/tag-chip";
 import { StarRating } from "./StarRating";
 
 export function LeadCardBody({
@@ -41,13 +41,7 @@ export function LeadCardBody({
       {lead.tags?.length > 0 && (
         <div className="mt-0.5 flex flex-wrap gap-1 overflow-hidden">
           {lead.tags.map((tag) => (
-            <span
-              key={tag.id}
-              title={tag.name}
-              className={`inline-flex max-w-full items-center rounded-full px-1.5 py-px text-[10px] font-normal leading-[13px] ${TAG_STYLES[tag.color] ?? DEFAULT_TAG_STYLE}`}
-            >
-              <span className="max-w-[150px] truncate">{tag.name}</span>
-            </span>
+            <TagChip key={tag.id} name={tag.name} color={tag.color} />
           ))}
         </div>
       )}

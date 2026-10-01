@@ -23,9 +23,11 @@ import {
   useShipment,
   useShipmentAttachments,
   useShipmentTimeline,
+  useTags,
   useUploadShipmentAttachment,
   type ShipmentPayload,
 } from "@/shared/api/hooks";
+import { TagsField } from "@/features/crm/lead-form/TagsField";
 import type { Attachment } from "@/shared/types";
 import { Chatter } from "@/shared/ui/chatter";
 import { FilePreview } from "@/shared/ui/file-preview";
@@ -298,6 +300,8 @@ const emptyForm = {
   capacity: "",
   body_type: [] as string[],
   loading_method: [] as string[],
+
+  tag_ids: [] as number[],
 };
 
 type FormState = typeof emptyForm;
@@ -317,6 +321,7 @@ function ShipmentForm({ id }: { id?: string }) {
   const { data: shipment, isLoading } = useShipment(id);
   const { data: carriers = [] } = useCarriers();
   const { data: leads = [] } = useLeads();
+  const { data: allTags = [] } = useTags();
   const { data: timeline = [] } = useShipmentTimeline(id);
   const { data: attachments = [] } = useShipmentAttachments(shipment?.id);
 
@@ -392,6 +397,8 @@ function ShipmentForm({ id }: { id?: string }) {
         capacity: shipment.capacity ?? "",
         body_type: shipment.body_type ?? [],
         loading_method: shipment.loading_method ?? [],
+
+        tag_ids: shipment.tags?.map((t) => t.id) ?? [],
       };
       setForm(next);
       setPristine(next);
@@ -569,7 +576,17 @@ function ShipmentForm({ id }: { id?: string }) {
                         </Field>
                       </InnerGroup>
                     </div>
-                    <div />
+                    <div>
+                      <InnerGroup>
+                        <Field label="Теги" help="Рабочие пометки заявки — видны в списке заявок">
+                          <TagsField
+                            all={allTags}
+                            value={form.tag_ids}
+                            onChange={(ids) => set("tag_ids", ids)}
+                          />
+                        </Field>
+                      </InnerGroup>
+                    </div>
                   </FormGroup>
 
                   {/* --- Погрузка / Выгрузка --- */}

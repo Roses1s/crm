@@ -14,7 +14,7 @@ const LEAD = {
   logist_contact: "Громов Сергей",
   priority: 2,
   stage_id: 1,
-  tags: [{ id: 1, name: "Крупный клиент", color: "green" }],
+  tags: [{ id: 1, name: "Крупный клиент", color: "#1e8449" }],
   assigned_to_email: "manager@crmdetroid.ru",
 } as unknown as Lead;
 
@@ -27,7 +27,13 @@ describe("Карточка лида на канбане", () => {
     expect(screen.getByText("Громов Сергей")).toBeInTheDocument();
     const tag = screen.getByText("Крупный клиент");
     expect(tag).toBeInTheDocument();
-    expect(tag.parentElement).toHaveClass("bg-odoo-tag-green-bg");
+    // Цвет тега теперь произвольный HEX — пилюля красится инлайн-стилем,
+    // посчитанным из HEX (HSL), а не фиксированным Tailwind-классом.
+    // jsdom нормализует hsl() в rgb() при сохранении атрибута — проверяем
+    // сам факт инлайн-раскраски, а не конкретные числа.
+    const style = tag.parentElement?.getAttribute("style") ?? "";
+    expect(style).toMatch(/background-color: rgb\(/);
+    expect(style).toMatch(/color: rgb\(/);
   });
 
   it("меняет приоритет по звезде без открытия карточки", async () => {

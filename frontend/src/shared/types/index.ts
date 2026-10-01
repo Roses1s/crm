@@ -169,6 +169,8 @@ export interface Shipment {
   capacity?: string | null;
   body_type?: string[];
   loading_method?: string[];
+
+  tags?: Tag[];
 }
 
 export interface Carrier {
@@ -176,6 +178,7 @@ export interface Carrier {
   name: string;
   inn: string;
   is_active: boolean;
+  tags: Tag[];
 }
 
 export interface Pager {

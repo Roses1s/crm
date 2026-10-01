@@ -119,6 +119,51 @@ export function useTags() {
   });
 }
 
+/**
+ * Тег — свободный общий справочник: доступен любому пользователю, не только
+ * админу. Создание с именем, совпадающим (без учёта регистра) с уже
+ * существующим тегом, переиспользует его — сервер сам решает, бэкенд здесь
+ * ни о чём не предупреждает отдельно.
+ */
+export function useCreateTag() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { name: string; color: string }) =>
+      api<Tag>("/crm/tags", { method: "POST", body }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.tags }),
+  });
+}
+
+export function useUpdateTag() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, ...body }: { id: number; name?: string; color?: string }) =>
+      api<Tag>(`/crm/tags/${id}`, { method: "PATCH", body }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.tags });
+      // Название/цвет тега показаны везде, где он проставлен.
+      void qc.invalidateQueries({ queryKey: ["leads"] });
+      void qc.invalidateQueries({ queryKey: ["customers"] });
+      void qc.invalidateQueries({ queryKey: ["shipments"] });
+      void qc.invalidateQueries({ queryKey: keys.carriers });
+    },
+  });
+}
+
+export function useDeleteTag() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => api<void>(`/crm/tags/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.tags });
+      void qc.invalidateQueries({ queryKey: ["leads"] });
+      void qc.invalidateQueries({ queryKey: ["customers"] });
+      void qc.invalidateQueries({ queryKey: ["shipments"] });
+      void qc.invalidateQueries({ queryKey: keys.carriers });
+    },
+  });
+}
+
 export function useLossReasons() {
   return useQuery({
     queryKey: keys.lossReasons,
@@ -214,6 +259,16 @@ export function useCreateCarrier() {
   return useMutation({
     mutationFn: (body: { name: string; inn: string }) =>
       api<Carrier>("/carriers", { method: "POST", body }),
+    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.carriers }),
+  });
+}
+
+/** Теги перевозчика — рабочая пометка, её может проставить любой сотрудник. */
+export function useSetCarrierTags() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, tagIds }: { id: number; tagIds: number[] }) =>
+      api<Carrier>(`/carriers/${id}/tags`, { method: "PUT", body: { tag_ids: tagIds } }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: keys.carriers }),
   });
 }
@@ -696,6 +751,8 @@ export interface ShipmentPayload {
   capacity?: string | null;
   body_type?: string[];
   loading_method?: string[];
+
+  tag_ids?: number[];
 }
 
 export function useSaveShipment(id: string | undefined) {

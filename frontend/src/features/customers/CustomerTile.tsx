@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { ownerInitials, ownerLabel } from "@/shared/lib/owner";
 import type { Customer } from "@/shared/types";
 import { StarRating } from "@/features/crm/board/StarRating";
-import { DEFAULT_TAG_STYLE, TAG_STYLES } from "@/shared/ui/tag-styles";
+import { TagChip } from "@/shared/ui/tag-chip";
 
 /** Две буквы названия компании — для цветного квадрата вместо логотипа. */
 function companyInitials(name: string): string {
@@ -72,13 +72,12 @@ export function CustomerTile({ customer }: { customer: Customer }) {
       {customer.can_open && (customer.tags?.length ?? 0) > 0 && (
         <div className="flex flex-wrap gap-1 overflow-hidden">
           {customer.tags!.map((tag) => (
-            <span
+            <TagChip
               key={tag.id}
-              title={tag.name}
-              className={`inline-flex max-w-full items-center rounded-full px-1.5 py-px text-[10px] font-normal leading-[13px] ${TAG_STYLES[tag.color] ?? DEFAULT_TAG_STYLE}`}
-            >
-              <span className="max-w-[120px] truncate">{tag.name}</span>
-            </span>
+              name={tag.name}
+              color={tag.color}
+              maxWidthClassName="max-w-[120px]"
+            />
           ))}
         </div>
       )}
