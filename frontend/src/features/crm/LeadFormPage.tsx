@@ -39,6 +39,7 @@ import type { Attachment } from "@/shared/types";
 import { DeleteLeadDialog } from "@/features/crm/lead-form/DeleteLeadDialog";
 import { LoseLeadDialog } from "@/features/crm/lead-form/LoseLeadDialog";
 import { QuickCreateLeadDialog } from "@/features/crm/lead-form/QuickCreateLeadDialog";
+import { QuickCreateShipmentDialog } from "@/features/shipments/QuickCreateShipmentDialog";
 import { LostRibbon } from "@/features/crm/lead-form/LostRibbon";
 import { TransferDialog } from "@/features/crm/lead-form/TransferDialog";
 import { Chatter } from "@/shared/ui/chatter";
@@ -107,6 +108,8 @@ function LeadForm({ id }: { id?: string }) {
   const [restoreError, setRestoreError] = useState("");
   // Кнопка «Новый» в шапке карточки — та же простая форма, что и на доске.
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
+  // Кнопка «Создать заявку» — простая форма вместо полного бланка заявки.
+  const [shipmentCreateOpen, setShipmentCreateOpen] = useState(false);
   const loadedId = useRef<number | null>(null);
 
   // Загруженную карточку кладём в форму один раз: фоновое обновление
@@ -292,12 +295,13 @@ function LeadForm({ id }: { id?: string }) {
             </tbody>
           </table>
           <div className="px-4 pt-2 lg:px-6">
-            <Link
-              to={`/shipments/new?lead=${lead?.id ?? ""}`}
+            <button
+              type="button"
+              onClick={() => setShipmentCreateOpen(true)}
               className="text-[13px] text-odoo-action hover:underline"
             >
               Добавить заявку
-            </Link>
+            </button>
           </div>
         </div>
       ),
@@ -460,12 +464,13 @@ function LeadForm({ id }: { id?: string }) {
               !isNew ? (
                 <>
                   {(!lead?.is_archived || isOwner) && (
-                    <Link
-                      to={`/shipments/new?lead=${lead?.id ?? ""}`}
+                    <button
+                      type="button"
+                      onClick={() => setShipmentCreateOpen(true)}
                       className="inline-flex h-[30px] items-center rounded-[4px] bg-odoo-primary px-3 text-[13px] font-medium text-white transition-colors hover:bg-odoo-primary-hover"
                     >
                       Создать заявку
-                    </Link>
+                    </button>
                   )}
                   {lead?.is_archived ? (
                     <button
@@ -718,6 +723,10 @@ function LeadForm({ id }: { id?: string }) {
       )}
 
       {quickCreateOpen && <QuickCreateLeadDialog onClose={() => setQuickCreateOpen(false)} />}
+
+      {shipmentCreateOpen && lead && (
+        <QuickCreateShipmentDialog leadId={lead.id} onClose={() => setShipmentCreateOpen(false)} />
+      )}
 
       {preview && <FilePreview file={preview} onClose={() => setPreview(null)} />}
     </AppShell>
