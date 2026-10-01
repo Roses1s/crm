@@ -2,7 +2,20 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
 from httpx import AsyncClient
+
+from app.core.config import settings
+from tests.conftest import TEST_PASSWORD
+
+
+async def manager_headers(client: AsyncClient) -> dict[str, str]:
+    login = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "manager@crmdetroid.ru", "password": TEST_PASSWORD},
+    )
+    return {"Authorization": f"Bearer {login.json()['access_token']}"}
 
 
 async def test_list_leads_is_paginated(auth_client: AsyncClient) -> None:
@@ -141,3 +154,82 @@ async def test_missing_lead_is_404(auth_client: AsyncClient) -> None:
     response = await auth_client.get("/api/v1/crm/leads/999")
     assert response.status_code == 404
     assert response.json()["code"] == "not_found"
+
+
+async def test_manager_cannot_delete_lead_permanently(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    """Безвозвратное удаление — право только администратора, менеджер видит 403.
+
+    Лид для проверки должен принадлежать самому менеджеру: на чужом он получил
+    бы 404 ещё на проверке видимости, и роль ни при чём было бы не проверить.
+    """
+    headers = await manager_headers(auth_client)
+    stage_id = seeded["stage_new"].id  # type: ignore[attr-defined]
+    own_lead = (
+        await auth_client.post(
+            "/api/v1/crm/leads",
+            json={"name": "ООО «Своё дело»", "inn": "5404123455", "stage_id": stage_id},
+            headers=headers,
+        )
+    ).json()
+
+    response = await auth_client.delete(
+        f"/api/v1/crm/leads/{own_lead['id']}/permanent", headers=headers
+    )
+    assert response.status_code == 403
+    assert response.json()["code"] == "permission_denied"
+
+    # Лид остался на месте.
+    assert (
+        await auth_client.get(f"/api/v1/crm/leads/{own_lead['id']}", headers=headers)
+    ).status_code == 200
+
+
+async def test_admin_deletes_lead_with_everything_attached(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    """Удаление администратором стирает заявку, ленту и файлы — и с диска тоже."""
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+
+    # Заявка с вложением.
+    shipment = (await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})).json()
+    shipment_file = await auth_client.post(
+        f"/api/v1/shipments/{shipment['id']}/attachments",
+        files={"file": ("Накладная.pdf", b"%PDF-1.4 ttn", "application/pdf")},
+    )
+    assert shipment_file.status_code == 201, shipment_file.text
+
+    # Вложение самого лида и запись в ленте.
+    lead_file = await auth_client.post(
+        f"/api/v1/crm/leads/{lead_id}/attachments",
+        files={"file": ("Договор.pdf", b"%PDF-1.4 fake", "application/pdf")},
+    )
+    assert lead_file.status_code == 201, lead_file.text
+    await auth_client.post(f"/api/v1/crm/leads/{lead_id}/notes", json={"body": "заметка"})
+
+    saved_paths = [
+        Path(settings.attachments_dir) / str(lead_id),
+        Path(settings.attachments_dir) / "shipments" / str(shipment["id"]),
+    ]
+    files_on_disk = [p for root in saved_paths if root.exists() for p in root.glob("*")]
+    assert len(files_on_disk) == 2  # файл лида и файл заявки реально легли на диск
+
+    deleted = await auth_client.delete(f"/api/v1/crm/leads/{lead_id}/permanent")
+    assert deleted.status_code == 204
+
+    # Лид пропал целиком — его не видно даже среди архивных.
+    assert (await auth_client.get(f"/api/v1/crm/leads/{lead_id}")).status_code == 404
+    assert (await auth_client.get("/api/v1/crm/leads")).json()["count"] == 0
+    archived = await auth_client.get("/api/v1/crm/leads", params={"is_archived": True})
+    assert archived.json()["count"] == 0
+    assert (await auth_client.get(f"/api/v1/shipments/{shipment['id']}")).status_code == 404
+
+    # Файлы стёрты с диска, а не просто помечены в базе.
+    for p in files_on_disk:
+        assert not p.exists()
+
+
+async def test_delete_missing_lead_permanently_is_404(auth_client: AsyncClient) -> None:
+    response = await auth_client.delete("/api/v1/crm/leads/999/permanent")
+    assert response.status_code == 404

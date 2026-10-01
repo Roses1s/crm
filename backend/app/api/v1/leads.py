@@ -80,6 +80,15 @@ async def archive_lead(lead_id: int, session: SessionDep, user: CurrentUser) -> 
     await service.archive_lead(session, user, lead_id)
 
 
+@router.delete(
+    "/{lead_id}/permanent",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Удалить лид безвозвратно (только администратор)",
+)
+async def delete_lead_permanently(lead_id: int, session: SessionDep, user: CurrentUser) -> None:
+    await service.delete_lead_permanently(session, user, lead_id)
+
+
 @router.get(
     "/{lead_id}/timeline",
     response_model=list[TimelineEntryRead],

@@ -6,18 +6,20 @@
 
 from __future__ import annotations
 
+from pathlib import Path
 from typing import Any
 
 from sqlalchemy import Select, and_, func, or_, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
+from starlette.concurrency import run_in_threadpool
 
 from app.api.v1.stages import board_stage_for
-from app.core.errors import AppError, NotFoundError
+from app.core.errors import AppError, NotFoundError, PermissionDeniedError
 from app.core.logging import get_logger
 from app.core.pagination import PageParams, build_page, paginate
 from app.models.crm import Lead, Tag, lead_tags
-from app.models.timeline import EntryType, TimelineEntry
+from app.models.timeline import Attachment, EntryType, TimelineEntry
 from app.models.user import Role, User
 from app.schemas.crm import LeadCreate, LeadTransfer, LeadUpdate, NoteCreate, NoteUpdate
 
@@ -174,6 +176,43 @@ async def archive_lead(session: AsyncSession, user: User, lead_id: int) -> None:
     lead.is_archived = True
     await session.commit()
     log.info("lead.archived", lead_id=lead_id, by=user.id)
+
+
+async def delete_lead_permanently(session: AsyncSession, user: User, lead_id: int) -> None:
+    """Безвозвратно удаляет лид: заявки, ленту переписки и вложения — тоже.
+
+    В отличие от архивации (мягкое удаление, см. `archive_lead`) эта операция
+    необратима и доступна только администратору — рядовой менеджер может лишь
+    архивировать свою карточку. Файлы вложений лежат на диске отдельно от базы,
+    поэтому их приходится собирать и удалять вручную, не полагаясь на
+    ORM-каскад (он покрывает только вложения, прицепленные к записям ленты).
+    """
+    lead = await get_lead_or_404(session, lead_id, user)
+    if user.role != Role.admin:
+        raise PermissionDeniedError("Безвозвратно удалить лид может только администратор")
+
+    # lead_id у вложений заявки тоже указывает на лид (см. комментарий в
+    # models/timeline.py), поэтому один запрос находит файлы и самого лида,
+    # и всех его заявок разом.
+    attachments = (
+        (await session.execute(select(Attachment).where(Attachment.lead_id == lead_id)))
+        .scalars()
+        .all()
+    )
+    paths = [Path(a.storage_path) for a in attachments if a.storage_path]
+
+    # Строки из базы удаляются каскадом (заявки и лента — через ORM-cascade на
+    # Lead, вложения — через ON DELETE CASCADE в базе), поэтому достаточно
+    # удалить сам объект лида.
+    await session.delete(lead)
+    await session.commit()
+
+    # Диск чистим уже после успешного commit: если бы файл стёрся раньше,
+    # а транзакция потом откатилась, он пропал бы, а запись в базе осталась.
+    for path in paths:
+        await run_in_threadpool(path.unlink, missing_ok=True)
+
+    log.info("lead.deleted", lead_id=lead_id, files=len(paths), by=user.id)
 
 
 async def transfer_lead(
