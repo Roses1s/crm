@@ -76,6 +76,7 @@
 
 | Раздел | Страницы |
 |---|---|
+| `accounting` | `AccountingPage` |
 | `admin` | `CarriersPage`, `SecurityPage`, `UsersPage` |
 | `auth` | `LoginPage` |
 | `crm` | `KanbanPage`, `LeadFormPage` |
