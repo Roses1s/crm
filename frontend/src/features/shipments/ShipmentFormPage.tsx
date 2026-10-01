@@ -115,6 +115,10 @@ function formatMoney(value: number): string {
   return value.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+// Маржа показывается не «как есть», а за вычетом фиксированной доли —
+// так попросил владелец бизнеса.
+const MARGIN_DEDUCTION_RATE = 0.25;
+
 /** Вкладка «Позиции заказа»: одна фиксированная строка услуги с ценой
  * заказчика и перевозчика, у каждой свой НДС, плюс итоговая маржа. */
 function OrderLinesTab({
@@ -138,7 +142,12 @@ function OrderLinesTab({
 }) {
   const customerNet = netAmount(customerPrice, customerTax);
   const carrierNet = netAmount(carrierPrice, carrierTax);
-  const margin = customerNet != null && carrierNet != null ? customerNet - carrierNet : null;
+  // Из получившейся разницы дополнительно вычитаем 25% — по требованию
+  // владельца бизнеса (доп. расходы/комиссия, не связанные с НДС).
+  const margin =
+    customerNet != null && carrierNet != null
+      ? (customerNet - carrierNet) * (1 - MARGIN_DEDUCTION_RATE)
+      : null;
 
   const th = "whitespace-nowrap px-3 py-2 text-left font-semibold";
   const td = "px-3 py-2 align-middle";
