@@ -33,6 +33,7 @@ import { Column } from "@/features/crm/board/Column";
 import { LeadCard } from "@/features/crm/board/LeadCard";
 import { isStageDragId, reorderedStageIds, stageDragId } from "@/features/crm/board/stage-order";
 import { LeadListView } from "@/features/crm/list/LeadListView";
+import { QuickCreateLeadDialog } from "@/features/crm/lead-form/QuickCreateLeadDialog";
 import {
   useCreateStage,
   useLeads,
@@ -80,6 +81,9 @@ export function KanbanPage() {
   });
   const [activeLead, setActiveLead] = useState<Lead | null>(null);
   const [newStage, setNewStage] = useState(false);
+  // Кнопка «Новый»: вместо перехода на полную карточку — простая форма
+  // с четырьмя обязательными полями (см. QuickCreateLeadDialog).
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const [stageName, setStageName] = useState("");
 
   useEffect(() => {
@@ -231,7 +235,7 @@ export function KanbanPage() {
         title="Лиды"
         search={searchInput}
         onSearch={setSearchInput}
-        createTo="/crm/leads/new"
+        onNew={() => setQuickCreateOpen(true)}
         view={view}
         onView={(v) => setFilter("view", v === "list" ? "list" : "")}
         count={view === "list" ? leads.length : undefined}
@@ -344,6 +348,8 @@ export function KanbanPage() {
           }
         </div>
       )}
+
+      {quickCreateOpen && <QuickCreateLeadDialog onClose={() => setQuickCreateOpen(false)} />}
     </AppShell>
   );
 }

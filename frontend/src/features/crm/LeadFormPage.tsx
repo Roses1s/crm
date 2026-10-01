@@ -38,6 +38,7 @@ import { ownerInitials, ownerLabel } from "@/shared/lib/owner";
 import type { Attachment } from "@/shared/types";
 import { DeleteLeadDialog } from "@/features/crm/lead-form/DeleteLeadDialog";
 import { LoseLeadDialog } from "@/features/crm/lead-form/LoseLeadDialog";
+import { QuickCreateLeadDialog } from "@/features/crm/lead-form/QuickCreateLeadDialog";
 import { LostRibbon } from "@/features/crm/lead-form/LostRibbon";
 import { TransferDialog } from "@/features/crm/lead-form/TransferDialog";
 import { Chatter } from "@/shared/ui/chatter";
@@ -104,6 +105,8 @@ function LeadForm({ id }: { id?: string }) {
   const [loseOpen, setLoseOpen] = useState(false);
   const [loseError, setLoseError] = useState("");
   const [restoreError, setRestoreError] = useState("");
+  // Кнопка «Новый» в шапке карточки — та же простая форма, что и на доске.
+  const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const loadedId = useRef<number | null>(null);
 
   // Загруженную карточку кладём в форму один раз: фоновое обновление
@@ -334,7 +337,7 @@ function LeadForm({ id }: { id?: string }) {
   return (
     <AppShell>
       <ControlPanel
-        onNew={() => navigate("/crm/leads/new")}
+        onNew={() => setQuickCreateOpen(true)}
         crumbs={[{ label: "Лиды", to: "/crm" }, { label: form.name || "Новый лид" }]}
         status={
           <FormStatusIndicator dirty={dirty} saving={saving} onSave={save} onDiscard={discard} />
@@ -713,6 +716,8 @@ function LeadForm({ id }: { id?: string }) {
           onConfirm={confirmLose}
         />
       )}
+
+      {quickCreateOpen && <QuickCreateLeadDialog onClose={() => setQuickCreateOpen(false)} />}
 
       {preview && <FilePreview file={preview} onClose={() => setPreview(null)} />}
     </AppShell>
