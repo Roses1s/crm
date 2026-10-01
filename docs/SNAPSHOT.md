@@ -26,7 +26,8 @@
 | `carriers.py` | `/carriers` | 3 |
 | `health.py` | `—` | 2 |
 | `launcher.py` | `/launcher` | 1 |
-| `leads.py` | `/crm/leads` | 12 |
+| `leads.py` | `/crm/leads` | 13 |
+| `loss_reasons.py` | `/crm/loss-reasons` | 3 |
 | `shipments.py` | `—` | 10 |
 | `stages.py` | `/crm/stages` | 5 |
 | `tags.py` | `/crm/tags` | 3 |
@@ -50,6 +51,7 @@
 | `Carrier` | `carriers` |
 | `Lead` | `leads` |
 | `LoginAttempt` | `login_attempts` |
+| `LossReason` | `loss_reasons` |
 | `RevokedToken` | `revoked_tokens` |
 | `Shipment` | `shipments` |
 | `Stage` | `stages` |
@@ -57,7 +59,7 @@
 | `TimelineEntry` | `timeline_entries` |
 | `User` | `users` |
 
-Миграций: **15**, последняя в цепочке — `f6a7b8c9d0e1 — Убрать старые одиночные поля города у заявки`.
+Миграций: **16**, последняя в цепочке — `a7b8c9d0e1f2 — Причины проигрыша лида`.
 
 ## Фоновые задачи (Celery beat)
 
@@ -80,7 +82,7 @@
 
 ## Тесты
 
-- бэкенд (pytest): **78** тест-функций
+- бэкенд (pytest): **89** тест-функций
 - фронтенд (vitest): **36** тестов
 - сценарные (подменяется только сеть, остальное настоящее):
   - `frontend/src/features/auth/login-flow.test.tsx`
