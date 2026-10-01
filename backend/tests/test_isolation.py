@@ -115,9 +115,12 @@ async def test_pager_counts_only_own_leads(
     denied = await client.get(f"/api/v1/crm/leads/{foreign_id}/pager", headers=headers)
     assert denied.status_code == 404
 
-    # Админ видит обе карточки.
+    # Админ видит карточку менеджера, но листалка не смешивает две доски:
+    # у лида админа своя доска из одной карточки, сосед менеджера сюда не
+    # попадает (иначе стрелками «вперёд/назад» можно было бы случайно
+    # перескочить на чужую доску — баг, который правили 01.10.2026).
     admin_pager = await auth_client.get(f"/api/v1/crm/leads/{foreign_id}/pager")
-    assert admin_pager.json()["total"] == 2
+    assert admin_pager.json()["total"] == 1
 
 
 async def test_lead_transfer_moves_card_to_colleague_board(

@@ -150,6 +150,42 @@ async def test_pager_reports_position(auth_client: AsyncClient, seeded: dict) ->
     assert response.json() == {"position": 1, "total": 1, "prev_id": None, "next_id": None}
 
 
+async def test_admin_pager_does_not_leak_into_another_managers_board(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    """Листая карточки под админом, нельзя попасть на лида другого менеджера.
+
+    Раньше диапазон листания для администратора считался по всей базе сразу —
+    соседней карточкой могла оказаться чужая, с доски другого сотрудника.
+    """
+    stage_id = seeded["stage_new"].id  # type: ignore[attr-defined]
+    admin_lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+
+    # Второй лид на доске админа — чтобы было куда листать внутри своей доски.
+    second_admin_lead = (
+        await auth_client.post(
+            "/api/v1/crm/leads",
+            json={"name": "ООО «Второй»", "inn": "5404123455", "stage_id": stage_id},
+        )
+    ).json()
+
+    # Лид менеджера на отдельной доске — не должен попасть в диапазон листания админа.
+    manager_lead = (
+        await auth_client.post(
+            "/api/v1/crm/leads",
+            json={"name": "ООО «Чужой»", "inn": "7447112236", "stage_id": stage_id},
+            headers=await manager_headers(auth_client),
+        )
+    ).json()
+
+    pager = (await auth_client.get(f"/api/v1/crm/leads/{admin_lead_id}/pager")).json()
+    assert pager["total"] == 2  # только два лида админа, лид менеджера не считается
+    assert manager_lead["id"] not in (pager["prev_id"], pager["next_id"])
+    # Открытый лид — самый старый из двух своих, поэтому сосед — второй лид
+    # админа (более новый по времени изменения), а не лид менеджера.
+    assert pager["prev_id"] == second_admin_lead["id"]
+
+
 async def test_missing_lead_is_404(auth_client: AsyncClient) -> None:
     response = await auth_client.get("/api/v1/crm/leads/999")
     assert response.status_code == 404

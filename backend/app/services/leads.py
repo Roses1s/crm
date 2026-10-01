@@ -318,10 +318,19 @@ async def lead_pager(session: AsyncSession, user: User, lead_id: int) -> dict[st
     узнавал количество чужих карточек и номера соседних записей.
     Позиция и соседи берутся запросами с ограничением, без выгрузки всех
     идентификаторов в память — на большой базе это заметно быстрее.
+
+    Диапазон листания дополнительно сужен до доски того сотрудника, чей лид
+    открыт (``assigned_to_id`` самого лида). Для менеджера это ничего не
+    меняет — он и так видит только свои карточки, — а для администратора
+    избавляет от неожиданного перескока на лида другого менеджера: без этого
+    сужения листалка считала позицию и соседей по всей базе сразу, вперемешку
+    по всем сотрудникам.
     """
     lead = await get_lead_or_404(session, lead_id, user)
 
-    base = visible_only(select(Lead).where(Lead.is_archived.is_(False)), user)
+    base = visible_only(select(Lead).where(Lead.is_archived.is_(False)), user).where(
+        Lead.assigned_to_id == lead.assigned_to_id
+    )
 
     total = int(
         (
