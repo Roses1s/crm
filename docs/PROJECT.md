@@ -111,9 +111,9 @@ Docker пишет правила в обход UFW, поэтому любой `p
 |---|---|---|
 | `users` | сотрудники | роли `admin` / `manager` (администратор и менеджер) |
 | `stages` | колонки канбана | своя доска у каждого сотрудника (`owner_id`); `sequence` — порядок, `is_closed`, `color` |
-| `tags` | метки лидов | цвет из фиксированной палитры |
+| `tags` | свободные метки | общий справочник: любой сотрудник создаёт/красит (любой HEX)/переименовывает/удаляет; имя уникально без учёта регистра (01.10.2026, было — фиксированная палитра и права manager+) |
 | `leads` | потенциальные клиенты | ИНН с контрольной суммой, `priority` 0–3, `is_archived` |
-| `lead_tags` | связь лид↔тег | many-to-many |
+| `lead_tags` / `carrier_tags` / `shipment_tags` | связь лид/перевозчик/заявка ↔ тег | три отдельные many-to-many таблицы — тег один общий справочник, но проставляется независимо на трёх сущностях |
 | `timeline_entries` | лента чаттера | примечания и история изменений полей |
 | `attachments` | файлы | на диске в томе, в базе только карточка; `shipment_id` — документ заявки |
 | `shipments` | заявки на перевозку | статус, маршрут, перевозчик, груз |
@@ -163,8 +163,10 @@ GET    /launcher/apps                   плитки приложений (фи�
 GET    /crm/stages                      этапы своей доски; ?owner_id= — доска сотрудника (админ)
 PATCH  /crm/stages/{id}                 переименовать, цвет, is_closed (только свой этап)
 DELETE /crm/stages/{id}                 удалить; ?fallback_stage_id= — куда перенести лиды
-GET    /crm/tags                        теги (POST — создать, manager+)
-DELETE /crm/tags/{id}                   удалить тег (manager+)
+GET    /crm/tags                        теги; POST — создать (get-or-create по имени, без учёта регистра)
+PATCH  /crm/tags/{id}                   переименовать / перекрасить (любой HEX)
+DELETE /crm/tags/{id}                   удалить тег
+                                        (все ручки тегов доступны любому пользователю, не только manager+)
 GET    /crm/leads                       список: search, stage, tag, priority,
                                         assigned_to, is_archived, page, page_size
 POST   /crm/leads                       создание
@@ -187,6 +189,7 @@ GET    /shipments/{id}/attachments      документы заявки; POST �
 GET    /carriers                        перевозчики (?only_active=true)
 POST   /carriers                        добавить (manager+)
 PATCH  /carriers/{id}                   изменить (manager+)
+PUT    /carriers/{id}/tags              проставить теги — любой пользователь, в отличие от остальных полей
 GET    /admin/users                     пользователи (admin)
 POST   /admin/users                     создать (admin)
 PATCH  /admin/users/{id}                изменить, в т. ч. сменить пароль (admin)
