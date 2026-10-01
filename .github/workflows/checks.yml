@@ -36,7 +36,14 @@ jobs:
           cache: pip
 
       - name: Установка зависимостей
-        run: pip install -e ".[dev]"
+        # Строго по lock-файлу и с проверкой хешей: прогон полностью
+        # воспроизводим, свежий релиз библиотеки не может внезапно уронить
+        # сборку. Сам пакет ставим без зависимостей — они уже из lock.
+        # Обновление: cd backend && pip-compile --generate-hashes --extra dev
+        #             --output-file requirements-dev.lock pyproject.toml
+        run: |
+          pip install --require-hashes -r requirements-dev.lock
+          pip install -e . --no-deps
 
       - name: Стиль и формат
         run: |
