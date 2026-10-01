@@ -49,17 +49,27 @@ import { TokenField } from "./TokenField";
 // Наша компания — статичная шапка бланка.
 const OWN_COMPANY = 'ООО "Детроид"';
 
-// Поля ввода на карточке видны всегда (мягкая рамка + едва заметный фон),
-// но не выбиваются из общего стиля; рамка чуть темнеет при наведении/фокусе.
-const fieldCls =
-  "w-full rounded-[3px] border border-odoo-border/50 bg-odoo-surface/60 px-1.5 py-[3px] text-[13px] leading-[19px] text-odoo-text outline-none transition-colors placeholder:text-odoo-text-light hover:border-odoo-border focus:border-odoo-focus/60";
+// Поле без значения — почти невидимое (рамка появляется только при наведении
+// или фокусе), чтобы не рисовать пустые «коробки» там, где нечего показывать.
+// Как только в поле есть значение, оно получает мягкую подсветку фоном —
+// видно с первого взгляда, что заполнено, без слова «не указано» или тире.
+const fieldBaseCls =
+  "w-full rounded-[3px] border border-transparent px-1.5 py-[3px] text-[13px] leading-[19px] text-odoo-text outline-none transition-colors placeholder:text-odoo-text-light focus:border-odoo-focus/60";
+const fieldEmptyCls = "bg-transparent hover:border-odoo-border/50";
+const fieldFilledCls = "bg-odoo-primary-soft/50 hover:bg-odoo-primary-soft/70";
+
+function fieldStateCls(filled: boolean) {
+  return `${fieldBaseCls} ${filled ? fieldFilledCls : fieldEmptyCls}`;
+}
 
 function SInput({ className = "", ...props }: InputHTMLAttributes<HTMLInputElement>) {
-  return <input {...props} className={`${fieldCls} ${className}`} />;
+  const filled = Boolean(props.value);
+  return <input {...props} className={`${fieldStateCls(filled)} ${className}`} />;
 }
 
 function STextarea({ className = "", ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return <textarea {...props} className={`${fieldCls} resize-y ${className}`} />;
+  const filled = Boolean(props.value);
+  return <textarea {...props} className={`${fieldStateCls(filled)} resize-y ${className}`} />;
 }
 
 // Этапы заявки — единая воронка (Новая → … → Машина выгрузилась). Статусбар
@@ -79,8 +89,6 @@ const TRANSPORT_OPTIONS: { value: string; label: string }[] = [
   { value: "gazel", label: "Газель" },
   { value: "other", label: "Другое" },
 ];
-
-const selectCls = fieldCls;
 
 const emptyForm = {
   lead_id: 0,
@@ -380,7 +388,7 @@ function ShipmentForm({ id }: { id?: string }) {
                         </Field>
                         <Field label="ИНН заказчика">
                           <span className="px-1.5 py-[3px] text-odoo-text-muted">
-                            {selectedLead?.inn || "—"}
+                            {selectedLead?.inn}
                           </span>
                         </Field>
                         <Field label="Контакт заказчика" htmlFor="ship-cust-contact">
@@ -515,7 +523,7 @@ function ShipmentForm({ id }: { id?: string }) {
                         <Field label="Перевозчик" htmlFor="ship-carrier">
                           <select
                             id="ship-carrier"
-                            className={selectCls}
+                            className={fieldStateCls(form.carrier_id != null)}
                             value={form.carrier_id ?? ""}
                             onChange={(e) =>
                               set("carrier_id", e.target.value ? Number(e.target.value) : null)
@@ -658,7 +666,7 @@ function ShipmentForm({ id }: { id?: string }) {
                         <Field label="Тип транспорта" htmlFor="ship-transport">
                           <select
                             id="ship-transport"
-                            className={selectCls}
+                            className={fieldStateCls(Boolean(form.transport_type))}
                             value={form.transport_type}
                             onChange={(e) => set("transport_type", e.target.value)}
                           >

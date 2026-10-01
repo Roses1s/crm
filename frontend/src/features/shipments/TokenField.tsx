@@ -23,11 +23,17 @@ export function TokenField({
   }
 
   return (
-    <div className="flex w-full flex-wrap items-center gap-1 rounded-[3px] border border-odoo-border/50 bg-odoo-surface/60 px-1.5 py-[3px] transition-colors focus-within:border-odoo-focus/60 hover:border-odoo-border">
+    <div
+      className={`flex w-full flex-wrap items-center gap-1 rounded-[3px] border px-1.5 py-[3px] transition-colors focus-within:border-odoo-focus/60 ${
+        value.length > 0
+          ? "border-transparent bg-odoo-primary-soft/50 hover:bg-odoo-primary-soft/70"
+          : "border-transparent bg-transparent hover:border-odoo-border/50"
+      }`}
+    >
       {value.map((tag) => (
         <span
           key={tag}
-          className="inline-flex max-w-[220px] items-center gap-1 rounded-full bg-odoo-tag-blue-bg px-2 py-0.5 text-[11px] leading-[16px] text-odoo-tag-blue-text"
+          className="inline-flex max-w-[220px] items-center gap-1 rounded-full bg-odoo-primary-soft px-2 py-0.5 text-[11px] leading-[16px] text-odoo-primary-soft-text"
         >
           <span className="truncate" title={tag}>
             {tag}
