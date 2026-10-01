@@ -394,7 +394,9 @@ export function Notebook({
   );
 }
 
-/** .o_form_status_indicator — иконки сохранить / отменить. */
+/** .o_form_status_indicator — иконки сохранить / отменить.
+ *  Форма сохраняется сама через паузу в правках (см. вызывающую страницу) —
+ *  эти кнопки на случай, если хочется сохранить сейчас же или откатить. */
 export function FormStatusIndicator({
   dirty,
   saving,
@@ -413,7 +415,9 @@ export function FormStatusIndicator({
         type="button"
         onClick={onSave}
         disabled={saving}
-        title="Сохранить вручную"
+        title={
+          saving ? "Сохранение…" : "Сохранить сейчас (иначе сохранится само через пару секунд)"
+        }
         aria-label="Сохранить"
         className="inline-flex h-6 w-6 items-center justify-center rounded-sm text-odoo-text-muted hover:bg-odoo-bg hover:text-odoo-text disabled:cursor-wait disabled:opacity-60"
       >

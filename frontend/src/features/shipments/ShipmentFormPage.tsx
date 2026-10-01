@@ -463,6 +463,17 @@ function ShipmentForm({ id }: { id?: string }) {
     setForm(pristine);
   }
 
+  // Автосохранение: через 3с без правок сохраняем сами, кнопка в хедере
+  // остаётся — для спокойствия и чтобы сохранить можно было сразу, не ждя.
+  // Новую (ещё не созданную) заявку не трогаем — её создаёт только сам
+  // пользователь явным сохранением.
+  useEffect(() => {
+    if (isNew || !dirty || saving) return;
+    const timer = setTimeout(() => submit(), 3000);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isNew, dirty, saving, form]);
+
   // Смена этапа у сохранённой заявки уходит на сервер сразу — как в Odoo.
   function selectStage(stageIndex: number) {
     const stage = STAGES[stageIndex];

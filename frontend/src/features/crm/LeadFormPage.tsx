@@ -189,6 +189,17 @@ function LeadForm({ id }: { id?: string }) {
     setForm(pristine);
   }
 
+  // Автосохранение: через 3с без правок сохраняем сами, кнопка в хедере
+  // остаётся — для спокойствия и чтобы сохранить можно было сразу, не ждя.
+  // Новую (ещё не созданную) карточку не трогаем — её создаёт только сам
+  // пользователь явным сохранением.
+  useEffect(() => {
+    if (isNew || !dirty || saving) return;
+    const timer = setTimeout(() => save(), 3000);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [isNew, dirty, saving, form]);
+
   function confirmLose(reasonId: number) {
     if (!lead) return;
     setLoseError("");

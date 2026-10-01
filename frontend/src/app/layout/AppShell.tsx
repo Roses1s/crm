@@ -114,15 +114,23 @@ export function ControlPanel({
               <span className="truncate text-[14px] font-medium leading-[18px] text-odoo-text">
                 {crumbs[crumbs.length - 1].label}
               </span>
+              {(cog || status) && (
+                <span className="flex shrink-0 items-center gap-0.5">
+                  {cog}
+                  {status}
+                </span>
+              )}
             </span>
           </nav>
         ) : (
-          <span className="text-[14px] font-medium leading-none text-odoo-text">{title}</span>
-        )}
-        {(cog || status) && (
-          <span className="flex items-center gap-0.5">
-            {cog}
-            {status}
+          <span className="flex items-center gap-1">
+            <span className="text-[14px] font-medium leading-none text-odoo-text">{title}</span>
+            {(cog || status) && (
+              <span className="flex shrink-0 items-center gap-0.5">
+                {cog}
+                {status}
+              </span>
+            )}
           </span>
         )}
         {stats && (
