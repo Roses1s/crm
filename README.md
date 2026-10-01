@@ -51,17 +51,18 @@ docker-compose.yml          весь стек: postgres · valkey · backend · 
 backend/                    FastAPI
 ├── app/core/               конфиг, безопасность, логи, кеш, лимитер, ошибки, пагинация
 ├── app/models/             users, stages, tags, leads, timeline, attachments, shipments, carriers, security
-├── app/api/v1/             auth · launcher · stages · leads · attachments · shipments · carriers · tags · admin · health
-├── app/worker/             Celery: бэкапы базы и вложений, чистка осиротевших файлов
+├── app/api/v1/             HTTP-слой: auth · launcher · stages · leads · attachments · shipments · carriers · tags · users · admin · health
+├── app/services/           бизнес-логика отдельно от HTTP: leads · shipments · attachments
+├── app/worker/             Celery: бэкапы базы и вложений, уборка файлов и отозванных токенов
 ├── app/cli.py              createsuperuser, seed, resetboard (сброс доски к стандартной)
-├── alembic/                8 миграций
-└── tests/                  pytest, 60 тестов на SQLite в памяти
+├── alembic/                15 миграций
+└── tests/                  pytest, 77 тестов на SQLite в памяти
 
 frontend/                   React 19
 ├── src/app/                router, providers, layout (AppShell, Navbar, ControlPanel)
 ├── src/features/           auth · launcher · crm (board, list, lead-form) · shipments · admin
 ├── src/shared/             api (клиент, сессия, хуки), ui, lib, types
-└── src/test/               окружение Vitest; тестов интерфейса — 7
+└── src/test/               окружение Vitest и поддельный сервер; тестов интерфейса — 36
 
 deploy/                     инфраструктура сервера
 ├── nginx/conf.d/           боевые конфиги сайта
@@ -71,7 +72,9 @@ deploy/                     инфраструктура сервера
 ├── restore-test.sh         учебное восстановление из бэкапа во временную базу
 └── scripts/                deploy-hook Certbot (мягкая перезагрузка nginx)
 
-.github/workflows/          автопроверки: ruff, mypy, pytest, миграции, tsc, vitest, сборка
+.github/workflows/          автопроверки: ruff, mypy, pytest, миграции и alembic check,
+                            аудит зависимостей, те же тесты на настоящем PostgreSQL,
+                            tsc, vitest, сборка; dependabot.yml — еженедельные обновления
 ```
 
 ## Запуск локально
@@ -91,8 +94,9 @@ cd ../frontend && npm install && npm run dev           # http://localhost:5173
 ## Проверки перед отправкой кода
 
 ```bash
-cd backend && .venv/bin/ruff check . && .venv/bin/mypy app && .venv/bin/python -m pytest
-cd frontend && npx tsc -b && npm test && npm run build
+cd backend && .venv/bin/ruff check . && .venv/bin/mypy app && .venv/bin/python -m pytest \
+  && .venv/bin/alembic check
+cd frontend && npm run lint && npx tsc -b && npm test && npm run build
 ```
 
 То же самое GitHub Actions прогоняет автоматически при каждой отправке.

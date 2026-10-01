@@ -57,8 +57,9 @@ CRM для транспортной компании: лиды, канбан-в�
 
 ```bash
 cd backend && .venv/bin/ruff check . && .venv/bin/ruff format --check . \
-  && .venv/bin/mypy app && .venv/bin/python -m pytest
-cd ../frontend && npx tsc -b && npm run build
+  && .venv/bin/mypy app && .venv/bin/python -m pytest && .venv/bin/alembic check
+cd ../frontend && npm run lint && npm run format:check && npx tsc -b && npm test \
+  && npm run build
 ```
 
 Нет `.venv` или `node_modules` — это нормально, песочница их не сохраняет:
@@ -83,6 +84,9 @@ git fetch origin "$(git rev-parse --abbrev-ref HEAD)" && git reset FETCH_HEAD &&
 | Данные после `PATCH` приходят старые | Добавить `.execution_options(populate_existing=True)` |
 | Классы Tailwind из v3 | В v4 `shadow-sm`→`shadow-xs`, `rounded`→`rounded-[4px]`; тема — `@theme inline` + `@custom-variant dark` |
 | Выдуманные ИНН в тестах | Проверяется контрольная сумма ФНС — пересчитывайте последнюю цифру |
+| Логика прямо в роутере | Роутеры в `app/api/v1/` — только HTTP; логика идёт в `app/services/` |
+| Поменяли модель — CI красный | Создайте миграцию: `alembic check` в CI падает, если схема разошлась с моделями |
+| Добавили зависимость в pyproject | Пересоберите lock: `pip-compile --generate-hashes --extra dev --output-file requirements-dev.lock pyproject.toml` |
 
 Полный список — раздел «Подводные камни» в [`docs/PROJECT.md`](docs/PROJECT.md).
 

@@ -8,6 +8,9 @@ FastAPI · SQLAlchemy 2.0 (async) · PostgreSQL 18 · Alembic · Celery 5.5 + Va
 cd backend
 python -m venv .venv
 .venv/bin/pip install -e ".[dev]"
+# воспроизводимая установка (так ставит CI):
+#   .venv/bin/pip install --require-hashes -r requirements-dev.lock
+#   .venv/bin/pip install -e . --no-deps
 cp .env.example .env            # при необходимости поправить
 
 # схема БД
@@ -35,7 +38,9 @@ export DATABASE_URL="sqlite+aiosqlite:///./crm.db"
 .venv/bin/ruff check .        # линтер
 .venv/bin/ruff format .       # форматирование
 .venv/bin/mypy app            # типы (strict)
-.venv/bin/python -m pytest    # тесты (22 шт., идут на SQLite в памяти)
+.venv/bin/python -m pytest    # тесты (77 шт., идут на SQLite в памяти)
+.venv/bin/alembic check       # модели и миграции совпадают
+.venv/bin/pip-audit           # уязвимости в зависимостях
 ```
 
 ## Структура
@@ -50,18 +55,23 @@ backend/
 │   │   ├── security.py    bcrypt + JWT (access / refresh)
 │   │   ├── logging.py     structlog: JSON в проде, цветной вывод локально
 │   │   ├── cache.py       fastapi-cache2 поверх Valkey (fallback — память)
-│   │   ├── rate_limit.py  slowapi: защита /auth/login от перебора
+│   │   ├── rate_limit.py  slowapi: защита /auth/login от перебора (2-й рубеж после nginx)
 │   │   ├── errors.py      единый формат ошибок {detail, code, request_id}
 │   │   └── pagination.py  {count, next, previous, results}
 │   ├── db/                Base с naming_convention, async engine, сессия-зависимость
-│   ├── models/            User · Stage · Tag · Lead · Carrier · Shipment · TimelineEntry · Attachment
+│   ├── models/            User · Stage · Tag · Lead · Carrier · Shipment · TimelineEntry ·
+│   │                      Attachment · LoginAttempt · RevokedToken
 │   ├── schemas/           Pydantic v2: запросы и ответы
 │   ├── api/
 │   │   ├── deps.py        сессия, текущий пользователь, проверка ролей
-│   │   └── v1/            auth · launcher · stages · tags · leads · shipments · carriers · admin · health
-│   └── worker/            Celery: приложение и задачи (бэкапы, чистка вложений)
+│   │   └── v1/            ТОЛЬКО HTTP: маршруты, параметры, коды ответов
+│   │                      auth · launcher · stages · tags · leads · shipments ·
+│   │                      attachments · carriers · users · admin · health
+│   ├── services/          бизнес-логика, отделённая от HTTP: leads · shipments · attachments
+│   └── worker/            Celery: приложение и задачи (бэкапы, уборка)
 ├── alembic/               миграции (первая создаёт всю схему)
 ├── tests/                 pytest + httpx ASGITransport
+├── requirements-dev.lock  точные версии зависимостей с хешами (для CI)
 ├── Dockerfile             многоступенчатая сборка на Python 3.13
 └── gunicorn.conf.py       Gunicorn 23 + UvicornWorker
 ```
@@ -72,7 +82,7 @@ backend/
 |---|---|---|
 | POST | `/api/v1/auth/login` | все (лимит 10/мин) |
 | POST | `/api/v1/auth/refresh` | по куке `crm_refresh` (HttpOnly) |
-| POST | `/api/v1/auth/logout` | все (стирает куку) |
+| POST | `/api/v1/auth/logout` | все (стирает куку и отзывает обновляющий токен) |
 | GET | `/api/v1/auth/me` | авторизованные |
 | GET | `/api/v1/launcher/apps` | авторизованные (фильтр по роли) |
 | GET/POST/PATCH/DELETE | `/api/v1/crm/stages` | своя доска; `?owner_id=` — доска сотрудника (админ) |

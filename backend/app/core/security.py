@@ -31,6 +31,8 @@ def _create_token(subject: str | int, token_type: TokenType, ttl: timedelta) -> 
         "type": token_type,
         "iat": int(now.timestamp()),
         "exp": int((now + ttl).timestamp()),
+        # Уникальный номер токена: по нему обновляющий токен попадает
+        # в чёрный список при выходе (см. app/api/v1/auth.py).
         "jti": uuid.uuid4().hex,
     }
     return jwt.encode(payload, settings.secret_key, algorithm=settings.jwt_algorithm)
