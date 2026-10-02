@@ -44,6 +44,42 @@ async def test_create_and_read_shipment(auth_client: AsyncClient, seeded: dict) 
     assert len(by_lead.json()) == 1
 
 
+async def test_shipment_created_at_is_choosable_and_editable(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    """Заявку часто заводят в CRM позже, чем она реально возникла — нужно
+    уметь указать дату создания задним числом при заведении и поправить её
+    потом, а если не трогать поле вовсе — работает обычный now() из базы."""
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+
+    # 1. Не передали created_at — подставляется текущее время сервером.
+    default_created = (
+        await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})
+    ).json()
+    assert default_created["created_at"]  # просто не пусто
+
+    # 2. Указали дату создания явно при заведении заявки — задним числом.
+    backdated = await auth_client.post(
+        "/api/v1/shipments",
+        json={"lead_id": lead_id, "created_at": "2026-01-15T09:30:00+00:00"},
+    )
+    assert backdated.status_code == 201, backdated.text
+    assert backdated.json()["created_at"].startswith("2026-01-15T09:30:00")
+
+    # 3. Дату создания можно поправить и у уже существующей заявки.
+    shipment_id = backdated.json()["id"]
+    patched = await auth_client.patch(
+        f"/api/v1/shipments/{shipment_id}",
+        json={"created_at": "2025-12-01T00:00:00+00:00"},
+    )
+    assert patched.status_code == 200, patched.text
+    assert patched.json()["created_at"].startswith("2025-12-01T00:00:00")
+
+    # Заявка со старой датой создания должна и в списке её показывать.
+    fetched = await auth_client.get(f"/api/v1/shipments/{shipment_id}")
+    assert fetched.json()["created_at"].startswith("2025-12-01T00:00:00")
+
+
 async def test_shipment_number_is_editable(auth_client: AsyncClient, seeded: dict) -> None:
     lead_id = seeded["lead"].id  # type: ignore[attr-defined]
     shipment = (await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})).json()

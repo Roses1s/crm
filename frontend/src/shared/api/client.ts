@@ -37,6 +37,15 @@ async function request(
   const token = auth ? getAccessToken() : null;
 
   const response = await fetch(`${BASE}${path}`, {
+    // Справочники (теги, перевозчики, причины отказа) бэкенд отдаёт с
+    // заголовком `Cache-Control: max-age=...` — это кеш fastapi-cache на
+    // стороне сервера, который корректно сбрасывается при изменении записи.
+    // Но тот же заголовок видит и браузер: без явного `no-store` он сам
+    // кеширует GET-ответ и после инвалидации в React Query отдаёт запросу
+    // ту же самую устаревшую копию из своего HTTP-кеша, в обход сервера.
+    // Поэтому именно браузерный кеш запросов всегда отключаем — за актуальность
+    // данных отвечает React Query на клиенте и fastapi-cache на сервере.
+    cache: "no-store",
     ...init,
     headers: {
       ...(token ? { Authorization: `Bearer ${token}` } : {}),

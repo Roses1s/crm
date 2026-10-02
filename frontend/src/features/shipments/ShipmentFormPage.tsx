@@ -119,6 +119,22 @@ function formatMoney(value: number): string {
   return value.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
+/** ISO-строка с сервера -> локальное время для <input type="datetime-local">
+ * (без секунд и часового пояса — ровно то, что понимает сам input). */
+function toDatetimeLocal(iso: string): string {
+  const d = new Date(iso);
+  if (Number.isNaN(d.getTime())) return "";
+  const pad = (n: number) => String(n).padStart(2, "0");
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+}
+
+/** Обратное преобразование для отправки на сервер: datetime-local без пояса
+ * браузер и спецификация ECMAScript трактуют как локальное время — то же
+ * самое, что ввёл человек в поле, без сюрпризов со сдвигом даты. */
+function fromDatetimeLocal(value: string): string {
+  return new Date(value).toISOString();
+}
+
 // Маржа показывается не «как есть», а за вычетом фиксированной доли —
 // так попросил владелец бизнеса.
 const MARGIN_DEDUCTION_RATE = 0.25;
@@ -254,6 +270,10 @@ const emptyForm = {
   number: "",
   lead_id: 0,
   carrier_id: null as number | null,
+  // Дата создания — по умолчанию «сейчас» (проставляется эффектом при
+  // открытии формы новой заявки, см. ниже), но её можно поправить задним
+  // числом прямо при заведении (см. toDatetimeLocal/fromDatetimeLocal).
+  created_at: "",
   address_loading: "",
   address_unloading: "",
   contact_loading_name: "",
@@ -337,8 +357,13 @@ function ShipmentForm({ id }: { id?: string }) {
   const uploadAttachment = useUploadShipmentAttachment(shipment?.id);
   const deleteAttachment = useDeleteShipmentAttachment(shipment?.id);
 
-  const [form, setForm] = useState<FormState>(emptyForm);
-  const [pristine, setPristine] = useState<FormState>(emptyForm);
+  // Лениво: emptyForm — общий модуль, "сейчас" должно считаться в момент
+  // открытия именно этой формы, а не один раз при загрузке приложения.
+  const [form, setForm] = useState<FormState>(() => ({
+    ...emptyForm,
+    created_at: toDatetimeLocal(new Date().toISOString()),
+  }));
+  const [pristine, setPristine] = useState<FormState>(form);
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<Attachment | null>(null);
   const [tab, setTab] = useState("lines");
@@ -357,6 +382,7 @@ function ShipmentForm({ id }: { id?: string }) {
       loadedId.current = shipment.id;
       const next: FormState = {
         number: shipment.number ?? "",
+        created_at: toDatetimeLocal(shipment.created_at),
         lead_id: shipment.lead_id,
         carrier_id: shipment.carrier_id,
         address_loading: shipment.address_loading ?? "",
@@ -446,6 +472,10 @@ function ShipmentForm({ id }: { id?: string }) {
     const payload: ShipmentPayload = {
       ...form,
       number: form.number.trim(),
+      // Поле всегда заполнено (по умолчанию — «сейчас»), но на случай, если
+      // человек всё-таки очистил его руками, не шлём пустую строку: сервер
+      // не примет null/"" в NOT NULL колонку — просто не меняем дату.
+      created_at: form.created_at ? fromDatetimeLocal(form.created_at) : undefined,
       cargo_weight: form.cargo_weight || null,
       cargo_volume: form.cargo_volume || null,
       capacity: form.capacity || null,
@@ -586,6 +616,14 @@ function ShipmentForm({ id }: { id?: string }) {
                       <InnerGroup title="Заявка">
                         <Field label="Компания">
                           <span className="px-1.5 py-[3px] text-odoo-text">{OWN_COMPANY}</span>
+                        </Field>
+                        <Field label="Дата создания" htmlFor="ship-created-at">
+                          <SInput
+                            id="ship-created-at"
+                            type="datetime-local"
+                            value={form.created_at}
+                            onChange={(e) => set("created_at", e.target.value)}
+                          />
                         </Field>
                         <Field label="Заказчик">
                           <span className="px-1.5 py-[3px] text-odoo-text">

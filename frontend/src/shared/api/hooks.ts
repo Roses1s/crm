@@ -722,6 +722,11 @@ export interface ShipmentPayload {
   number?: string;
   lead_id: number;
   carrier_id?: number | null;
+  // Дата создания — редактируема (заявку часто заводят в CRM позже, чем она
+  // реально возникла). ISO-строка с временем; null сервер не примет (колонка
+  // NOT NULL) — форма всегда отправляет либо настоящее значение, либо вообще
+  // не включает поле в тело запроса.
+  created_at?: string;
   address_loading?: string;
   address_unloading?: string;
   contact_loading_name?: string;

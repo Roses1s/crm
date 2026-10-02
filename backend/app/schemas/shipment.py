@@ -75,6 +75,11 @@ class ShipmentBase(BaseModel):
 class ShipmentCreate(ShipmentBase):
     lead_id: int
     carrier_id: int | None = None
+    # Дата создания редактируема: заявку часто заводят в системе позже, чем
+    # она реально возникла (задним числом), и нужно видеть её в списке по
+    # настоящей дате, а не по дате ввода в CRM. Не передано — ставит сама БД
+    # (см. create_shipment: при None поле не попадает в INSERT).
+    created_at: datetime | None = None
 
 
 class ShipmentUpdate(BaseModel):
@@ -85,6 +90,9 @@ class ShipmentUpdate(BaseModel):
     lead_id: int | None = None
     carrier_id: int | None = None
     status: ShipmentStatus | None = None
+    # См. ShipmentCreate.created_at — здесь это просто обычное поле: раз
+    # передано явно (exclude_unset), значит его и меняем.
+    created_at: datetime | None = None
     transport_type: TransportType | None = None
     address_loading: str | None = None
     address_unloading: str | None = None

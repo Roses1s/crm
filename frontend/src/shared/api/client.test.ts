@@ -110,3 +110,27 @@ describe("401 посреди запроса -> тихий refresh и один п
     expect(fetchMock).toHaveBeenCalledTimes(3);
   });
 });
+
+describe("кеш справочников (tags/carriers) не должен оседать в браузере", () => {
+  it(
+    "api() всегда запрашивает сеть с cache: no-store, даже если сервер " +
+      "прислал Cache-Control: max-age (так отдаёт /crm/tags серверный fastapi-cache)",
+    async () => {
+      setAccessToken("токен");
+
+      const fetchMock = vi.fn(async () =>
+        jsonResponse([{ id: 1, name: "Важное", color: "#112233" }]),
+      );
+      vi.stubGlobal("fetch", fetchMock);
+
+      await api("/crm/tags");
+
+      expect(fetchMock).toHaveBeenCalledTimes(1);
+      const [, init] = fetchMock.mock.calls[0] as unknown as [unknown, RequestInit];
+      // Без этого флага браузер сам закэширует GET по заголовку сервера
+      // Cache-Control: max-age=60 и после инвалидации в React Query будет
+      // молча отдавать старый цвет тега вместо повторного запроса к серверу.
+      expect(init.cache).toBe("no-store");
+    },
+  );
+});

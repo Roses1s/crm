@@ -109,8 +109,14 @@ async def list_shipments(
 async def create_shipment(session: AsyncSession, user: User, payload: ShipmentCreate) -> Shipment:
     # Заявку можно завести только по своему лиду.
     await get_lead_or_404(session, payload.lead_id, user)
-    data = payload.model_dump(exclude={"tag_ids"})
+    # created_at исключаем отдельно: колонка NOT NULL со server_default=now().
+    # Если прислали None (поле не заполнили), явная передача None в конструктор
+    # модели перекрыла бы server_default и упала бы на вставке NULL — вместо
+    # этого просто не передаём атрибут, и дата проставится сама по умолчанию.
+    data = payload.model_dump(exclude={"tag_ids", "created_at"})
     shipment = Shipment(**data)
+    if payload.created_at is not None:
+        shipment.created_at = payload.created_at
     shipment.tags = await fetch_tags(session, payload.tag_ids)
     session.add(shipment)
     await session.flush()
