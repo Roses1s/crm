@@ -19,12 +19,18 @@ PageParamsDep = Annotated[PageParams, Depends(page_params)]
 @router.get(
     "/by-inn",
     response_model=list[CustomerRead],
-    summary="Лиды с таким же ИНН (предупреждение о дубле при создании)",
+    summary="Лиды с таким же ИНН (предупреждение о дубле при создании/правке)",
 )
 async def customers_by_inn(
-    session: SessionDep, user: CurrentUser, inn: str
+    session: SessionDep,
+    user: CurrentUser,
+    inn: str,
+    exclude_id: Annotated[
+        int | None,
+        Query(description="Исключить этот id из результата — сам редактируемый лид"),
+    ] = None,
 ) -> list[dict[str, Any]]:
-    return await service.find_by_inn(session, user, inn)
+    return await service.find_by_inn(session, user, inn, exclude_id=exclude_id)
 
 
 @router.get("", response_model=Page[CustomerRead], summary="Все клиенты компании")

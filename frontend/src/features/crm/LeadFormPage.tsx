@@ -16,6 +16,7 @@ import { ApiError } from "@/shared/api/client";
 import {
   useAddNote,
   useCreateLead,
+  useCustomersByInn,
   useDeleteAttachment,
   useDeleteLead,
   useDeleteTimelineEntry,
@@ -114,6 +115,11 @@ function LeadForm({ id }: { id?: string }) {
   // Кнопка «Создать заявку» — простая форма вместо полного бланка заявки.
   const [shipmentCreateOpen, setShipmentCreateOpen] = useState(false);
   const loadedId = useRef<number | null>(null);
+
+  // Предупреждение о дубле ИНН — некритичное, не блокирует сохранение;
+  // проверяется и при создании, и при редактировании (свой же лид исключён
+  // через exclude_id, иначе лид бы постоянно «находил дубль самого себя»).
+  const { data: sameInn = [] } = useCustomersByInn(form.inn.trim(), lead?.id);
 
   // Загруженную карточку кладём в форму один раз: фоновое обновление
   // не должно затирать несохранённые правки.
@@ -609,6 +615,18 @@ function LeadForm({ id }: { id?: string }) {
                               onChange={(e) => set("inn", e.target.value)}
                             />
                           </Field>
+                          {sameInn.length > 0 && (
+                            <p
+                              role="alert"
+                              className="rounded-[4px] bg-odoo-tag-yellow-bg px-2.5 py-2 text-[12px] leading-5 text-odoo-tag-yellow-text"
+                            >
+                              Лид с таким ИНН уже есть: «{sameInn[0].name}»
+                              {sameInn[0].assigned_to_name
+                                ? `, ответственный — ${sameInn[0].assigned_to_name}`
+                                : ""}
+                              . Это просто предупреждение, сохранить можно.
+                            </p>
+                          )}
                           <Field label="Продавец">
                             {/* Щелчок по имени открывает передачу лида коллеге. */}
                             <button

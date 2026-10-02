@@ -118,3 +118,14 @@ async def test_by_inn_empty_when_no_match(auth_client: AsyncClient, seeded: dict
     response = await auth_client.get("/api/v1/crm/customers/by-inn", params={"inn": "0000000000"})
     assert response.status_code == 200
     assert response.json() == []
+
+
+async def test_by_inn_exclude_id_hides_own_lead(auth_client: AsyncClient, seeded: dict) -> None:
+    """При редактировании лида проверка не должна «находить дубль самого себя»."""
+    lead_id = seeded["lead"].id
+    response = await auth_client.get(
+        "/api/v1/crm/customers/by-inn",
+        params={"inn": "7451234565", "exclude_id": lead_id},
+    )
+    assert response.status_code == 200
+    assert response.json() == []

@@ -306,11 +306,14 @@ export function useCustomers(search: string) {
  * как в списке «Клиенты». `enabled` — чтобы не долбить сервер на каждый
  * символ, пока ИНН ещё не дописан до валидной длины.
  */
-export function useCustomersByInn(inn: string) {
+export function useCustomersByInn(inn: string, excludeId?: number) {
   return useQuery({
-    queryKey: ["customers-by-inn", inn],
-    queryFn: () =>
-      api<Customer[]>(`/crm/customers/by-inn?${new URLSearchParams({ inn }).toString()}`),
+    queryKey: ["customers-by-inn", inn, excludeId],
+    queryFn: () => {
+      const params = new URLSearchParams({ inn });
+      if (excludeId != null) params.set("exclude_id", String(excludeId));
+      return api<Customer[]>(`/crm/customers/by-inn?${params.toString()}`);
+    },
     enabled: inn.length >= 10,
     staleTime: 10_000,
   });
