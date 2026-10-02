@@ -300,6 +300,22 @@ export function useCustomers(search: string) {
   });
 }
 
+/**
+ * Предупреждение о дубле ИНН при создании лида: ищет среди вообще всех
+ * лидов (не только своих), бэкенд сам маскирует чужой активный лид так же,
+ * как в списке «Клиенты». `enabled` — чтобы не долбить сервер на каждый
+ * символ, пока ИНН ещё не дописан до валидной длины.
+ */
+export function useCustomersByInn(inn: string) {
+  return useQuery({
+    queryKey: ["customers-by-inn", inn],
+    queryFn: () =>
+      api<Customer[]>(`/crm/customers/by-inn?${new URLSearchParams({ inn }).toString()}`),
+    enabled: inn.length >= 10,
+    staleTime: 10_000,
+  });
+}
+
 export function useLead(id: string | undefined) {
   return useQuery({
     queryKey: keys.lead(id ?? "new"),

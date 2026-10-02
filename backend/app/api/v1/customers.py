@@ -16,6 +16,17 @@ router = APIRouter(prefix="/crm/customers", tags=["crm: клиенты"])
 PageParamsDep = Annotated[PageParams, Depends(page_params)]
 
 
+@router.get(
+    "/by-inn",
+    response_model=list[CustomerRead],
+    summary="Лиды с таким же ИНН (предупреждение о дубле при создании)",
+)
+async def customers_by_inn(
+    session: SessionDep, user: CurrentUser, inn: str
+) -> list[dict[str, Any]]:
+    return await service.find_by_inn(session, user, inn)
+
+
 @router.get("", response_model=Page[CustomerRead], summary="Все клиенты компании")
 async def list_customers(
     session: SessionDep,

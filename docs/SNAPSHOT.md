@@ -24,7 +24,7 @@
 | `attachments.py` | `/crm` | 6 |
 | `auth.py` | `/auth` | 4 |
 | `carriers.py` | `/carriers` | 4 |
-| `customers.py` | `/crm/customers` | 1 |
+| `customers.py` | `/crm/customers` | 2 |
 | `health.py` | `—` | 2 |
 | `launcher.py` | `/launcher` | 1 |
 | `leads.py` | `/crm/leads` | 13 |
@@ -87,8 +87,8 @@
 
 ## Тесты
 
-- бэкенд (pytest): **105** тест-функций
-- фронтенд (vitest): **42** тестов
+- бэкенд (pytest): **108** тест-функций
+- фронтенд (vitest): **46** тестов
 - сценарные (подменяется только сеть, остальное настоящее):
   - `frontend/src/features/auth/login-flow.test.tsx`
   - `frontend/src/features/crm/kanban-flow.test.tsx`

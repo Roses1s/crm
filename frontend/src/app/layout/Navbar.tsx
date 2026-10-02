@@ -111,7 +111,7 @@ export function Navbar() {
                     navigate("/admin");
                   }}
                 >
-                  Отчёты
+                  Панель управления
                 </button>
               )}
               <button

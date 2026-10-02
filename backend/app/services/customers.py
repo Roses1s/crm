@@ -73,3 +73,17 @@ async def list_customers(
     items, total = await paginate(session, stmt, params)
     customers = [_to_customer(lead, user) for lead in items]
     return build_page(customers, total, params)
+
+
+async def find_by_inn(session: AsyncSession, user: User, inn: str) -> list[dict[str, Any]]:
+    """Лиды с точно таким же ИНН — для предупреждения о дубле при создании.
+
+    Ищем среди вообще всех лидов (не только своих), но отдаём их тем же
+    урезанным видом, что и список «Клиенты»: для чужого активного лида — не
+    больше, чем уже и так видно на той странице (название, ИНН, ответственный).
+    Проверка строго на точное совпадение: раз ИНН уже проверен контрольной
+    суммой, не нужен ни ilike, ни частичное совпадение — только дубль.
+    """
+    stmt = select(Lead).where(Lead.inn == inn)
+    rows = (await session.execute(stmt)).scalars().all()
+    return [_to_customer(lead, user) for lead in rows]

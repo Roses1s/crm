@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { ApiError } from "@/shared/api/client";
-import { useCreateLead, useStages } from "@/shared/api/hooks";
+import { useCreateLead, useCustomersByInn, useStages } from "@/shared/api/hooks";
 
 const inputCls =
   "w-full rounded-[4px] border border-odoo-border bg-odoo-surface px-2 py-1.5 text-[13px] text-odoo-text placeholder:text-odoo-text-light outline-none transition-colors hover:border-odoo-border focus:border-odoo-focus";
@@ -24,6 +24,11 @@ export function QuickCreateLeadDialog({ onClose }: { onClose: () => void }) {
   const createLead = useCreateLead();
   const [form, setForm] = useState<QuickForm>(emptyForm);
   const [error, setError] = useState("");
+
+  // Предупреждение о дубле ИНН: не блокирует создание, только предупреждает,
+  // если лид с таким ИНН уже есть — своя раскладка видимости, как в «Клиентах»
+  // (чужой активный лид отдаётся урезанным — название, ИНН, ответственный).
+  const { data: sameInn = [] } = useCustomersByInn(form.inn.trim());
 
   function set<K extends keyof QuickForm>(key: K, value: QuickForm[K]) {
     setForm((f) => ({ ...f, [key]: value }));
@@ -106,6 +111,18 @@ export function QuickCreateLeadDialog({ onClose }: { onClose: () => void }) {
               onChange={(e) => set("inn", e.target.value)}
             />
           </label>
+
+          {sameInn.length > 0 && (
+            <p
+              role="alert"
+              className="rounded-[4px] bg-odoo-tag-yellow-bg px-2.5 py-2 text-[12px] leading-5 text-odoo-tag-yellow-text"
+            >
+              Лид с таким ИНН уже есть: «{sameInn[0].name}»
+              {sameInn[0].assigned_to_name ? `, ответственный — ${sameInn[0].assigned_to_name}` : ""}
+              . Можно продолжить — это просто предупреждение.
+            </p>
+          )}
+
           <label>
             <span className={labelCls}>Контакт логиста</span>
             <input

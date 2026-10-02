@@ -88,3 +88,33 @@ async def test_search_matches_name_or_inn_only(client: AsyncClient, seeded: dict
 async def test_customers_endpoint_requires_auth(client: AsyncClient) -> None:
     response = await client.get("/api/v1/crm/customers")
     assert response.status_code == 401
+
+
+async def test_by_inn_masked_for_colleague(client: AsyncClient, seeded: dict) -> None:
+    """Предупреждение о дубле ИНН не должно раскрывать больше, чем и так видно
+    в «Клиентах» про чужой активный лид."""
+    headers = await manager_headers(client)
+    response = await client.get(
+        "/api/v1/crm/customers/by-inn", params={"inn": "7451234565"}, headers=headers
+    )
+    assert response.status_code == 200
+    body = response.json()
+    assert len(body) == 1
+    row = body[0]
+    assert row["can_open"] is False
+    assert row["name"] == "ООО «Уралпромснаб»"
+    assert row["assigned_to_name"]
+    assert row["logist_contact"] is None
+
+
+async def test_by_inn_full_for_owner(auth_client: AsyncClient, seeded: dict) -> None:
+    response = await auth_client.get("/api/v1/crm/customers/by-inn", params={"inn": "7451234565"})
+    row = response.json()[0]
+    assert row["can_open"] is True
+    assert row["logist_contact"] == "Громов Сергей"
+
+
+async def test_by_inn_empty_when_no_match(auth_client: AsyncClient, seeded: dict) -> None:
+    response = await auth_client.get("/api/v1/crm/customers/by-inn", params={"inn": "0000000000"})
+    assert response.status_code == 200
+    assert response.json() == []
