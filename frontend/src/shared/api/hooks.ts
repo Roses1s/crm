@@ -20,7 +20,7 @@ import type {
   TimelineEntry,
   User,
 } from "@/shared/types";
-import { clearTokens, setAccessToken } from "./auth";
+import { clearTokens, startSession } from "./auth";
 import { api, apiBlob, apiUpload, type Page } from "./client";
 
 export interface LeadFilters {
@@ -80,13 +80,16 @@ export function useLogin() {
         auth: false,
       }),
     // Обновляющий токен сервер кладёт в куку сам, нам приходит только короткий.
-    onSuccess: (data) => setAccessToken(data.access_token),
+    // Новая учётная запись всегда начинает с пустого Query cache.
+    onSuccess: (data) => startSession(data.access_token),
   });
 }
 
 export function logout(): void {
-  // Куку может стереть только сервер — она недоступна скриптам.
-  void fetch("/api/v1/auth/logout", { method: "POST" }).finally(() => clearTokens());
+  // Данные прежнего сотрудника скрываем синхронно, не дожидаясь сети. Куку
+  // может стереть только сервер — она недоступна скриптам.
+  clearTokens();
+  void fetch("/api/v1/auth/logout", { method: "POST" });
 }
 
 export function useMe() {

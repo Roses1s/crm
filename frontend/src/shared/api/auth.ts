@@ -10,7 +10,12 @@
 
 import { useSyncExternalStore } from "react";
 
+import { clearSessionCache } from "./query-client";
+
 let accessToken: string | null = null;
+// Номер поколения не даёт позднему refresh, начатому до logout, воскресить
+// уже завершённую сессию после очистки токена и пользовательского кеша.
+let sessionGeneration = 0;
 // Пока не спросили сервер, мы не знаем, есть ли сессия: пускать на страницу
 // входа рано, иначе при каждом обновлении F5 мелькал бы логин.
 let restored = false;
@@ -30,6 +35,14 @@ export function setAccessToken(token: string | null): void {
   notify();
 }
 
+/** Начинает новую учётную сессию, не переиспользуя данные предыдущей. */
+export function startSession(token: string): void {
+  sessionGeneration += 1;
+  clearSessionCache();
+  accessToken = token;
+  notify();
+}
+
 export function markRestored(): void {
   restored = true;
   notify();
@@ -40,7 +53,9 @@ export function isRestored(): boolean {
 }
 
 export function clearTokens(): void {
+  sessionGeneration += 1;
   accessToken = null;
+  clearSessionCache();
   notify();
 }
 
@@ -73,10 +88,13 @@ export function useSessionRestored(): boolean {
  * короткого токена. Кука уходит автоматически, тело запроса не нужно.
  */
 export async function refreshSession(): Promise<boolean> {
+  const generationAtStart = sessionGeneration;
   try {
     const response = await fetch("/api/v1/auth/refresh", { method: "POST" });
-    if (!response.ok) return false;
+    if (!response.ok || generationAtStart !== sessionGeneration) return false;
     const data = (await response.json()) as { access_token: string };
+    // Это продление той же сессии, поэтому кеш сбрасывать не нужно. Если пока
+    // ждали ответ случился logout/login, проверка поколения выше его отбросит.
     setAccessToken(data.access_token);
     return true;
   } catch {
