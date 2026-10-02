@@ -395,6 +395,8 @@ request — сначала спросить владельца.
 | Загрузка вложений падает по правам | Пустой именованный том берёт владельца из образа; если каталога в образе нет — том остаётся root'овым | Создавать `/var/lib/crm/attachments` **в Dockerfile** с `chown app:app` |
 | Ночной бэкап не снимается | `pg_dump` 17 из Debian не умеет дампить сервер 18 | Ставить `postgresql-client-18` из репозитория PGDG |
 | Сборка фронтенда падает с `killed` | Не хватило памяти на 2 ГБ VPS | Временно увеличить swap до 4 ГБ |
+| `deploy.sh` выкатил не ту версию: в итоге `Версия: <старый хеш>` | Скрипт делает `git pull --ff-only` по **текущей ветке клона** `/opt/crm`, а сессия Arena работает в новой ветке. Клон остался на прежней и подтянул её последний коммит | Сначала один раз переключить клон на ветку сессии (команда в [`deploy/02-deploy.md`](deploy/02-deploy.md)), потом запускать деплой; проверять итог по хешу в последней строке вывода |
+| Конфиг nginx обновился в git, но в браузере старые заголовки | Файлы `deploy/nginx/` примонтированы в контейнер только для чтения; `docker compose up -d` не пересоздаёт nginx, если его описание в compose не менялось | После `git pull` перечитать конфигурацию: `docker compose exec nginx nginx -t && docker compose exec nginx nginx -s reload` |
 | `nginx: host not found in upstream "backend"` | nginx стартовал раньше бэкенда | `docker compose up -d nginx` после подъёма остальных |
 | В логах nginx `ssl_stapling ignored, no OCSP responder URL` | Let's Encrypt с 2025 года не кладёт OCSP-адрес в сертификаты | Не включать `ssl_stapling` |
 
