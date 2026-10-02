@@ -43,10 +43,12 @@
 
 Локально пройден весь доступный набор: Ruff/format/mypy, 138 backend-прогонов;
 чистый Alembic upgrade/check и перенос специально рассинхронизированных данных;
-ESLint/Prettier/`tsc`, 62 frontend-теста и build; `bash -n`. Docker/PostgreSQL
-локально недоступны. Следующие действия: собрать этот паспорт, закоммитить
-документацию, отправить только `origin arena/01a0fd83-crm`, дождаться всех CI.
-Production до зелёного CI не выкатывать; деплой выполняет только владелец.
+ESLint/Prettier/`tsc`, 62 frontend-теста и build; `bash -n`. Первый CI на
+PostgreSQL обнаружил недопустимый `FOR UPDATE` nullable joined-таблиц; коммит
+`3bb5abc` сузил блокировку до строки `shipments`. Итоговый GitHub Actions
+`37053499064` зелёный: 4/4 задания, включая PostgreSQL и Docker. Всё отправлено
+только в `origin arena/01a0fd83-crm`; production ещё не обновлялся. Деплой
+выполняет только владелец вручную.
 
 ---
 
