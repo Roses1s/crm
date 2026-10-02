@@ -168,3 +168,37 @@ jobs:
 
       - name: Сборка
         run: npm run build
+
+      - name: Аудит зависимостей на уязвимости
+        # Как и pip-audit у бэкенда — информационный шаг (не роняет сборку).
+        # audit-level=high: низкоприоритетные советы npm в основном шумят.
+        continue-on-error: true
+        run: npm audit --audit-level=high
+
+  docker-build:
+    name: Docker — сборка образов и docker compose config
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+
+      - name: docker compose config проверяет весь стек разом
+        # Распознаёт опечатки в docker-compose.yml и .env.example (например,
+        # отсутствие переменной, на которую ссылается compose) ещё в CI,
+        # а не при первом разворачивании на сервере.
+        run: |
+          cp .env.example .env
+          docker compose config --quiet
+
+      - uses: docker/setup-buildx-action@v3
+
+      - name: Сборка backend-образа
+        uses: docker/build-push-action@v6
+        with:
+          context: backend
+          push: false
+
+      - name: Сборка frontend-образа
+        uses: docker/build-push-action@v6
+        with:
+          context: frontend
+          push: false

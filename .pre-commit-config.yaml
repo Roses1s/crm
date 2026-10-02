@@ -28,18 +28,21 @@ repos:
 
   - repo: local
     hooks:
+      # entry — не жёстко backend/.venv/bin/mypy: у части контрибьюторов venv
+      # называется иначе или окружение активировано другим менеджером
+      # (uv/pyenv). scripts/run-backend-check.sh сам находит интерпретатор:
+      # VIRTUAL_ENV -> backend/.venv -> system python3.
       - id: mypy
         name: mypy (backend)
-        entry: backend/.venv/bin/mypy
+        entry: scripts/run-backend-check.sh mypy app
         language: system
         types: [python]
         files: ^backend/app/
         pass_filenames: false
-        args: ["backend/app"]
 
       - id: pytest
         name: pytest (backend)
-        entry: bash -c 'cd backend && .venv/bin/python -m pytest -q'
+        entry: scripts/run-backend-check.sh pytest -q
         language: system
         types: [python]
         files: ^backend/

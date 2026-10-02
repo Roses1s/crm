@@ -140,17 +140,40 @@ def backup_attachments() -> dict[str, Any]:
     return {"ok": True, "file": target.name, "size": size}
 
 
+# Размер одной партии при постраничном проходе cleanup_orphan_attachments.
+_CLEANUP_BATCH_SIZE = 500
+
+
 @shared_task(name="app.worker.tasks.cleanup_orphan_attachments")
 def cleanup_orphan_attachments() -> dict[str, Any]:
-    """Удаляет записи о файлах, которых уже нет на диске."""
+    """Удаляет записи о файлах, которых уже нет на диске.
+
+    Раньше весь список вложений вычитывался одним `select()` целиком — на
+    базе с большим архивом это разом съедало память воркера и держало одну
+    длинную транзакцию открытой. Теперь идём по таблице партиями по id
+    (keyset-пагинация, не OFFSET — тот на больших смещениях деградирует по
+    скорости) и коммитим после каждой партии.
+    """
     removed = 0
+    last_id = 0
     with _session() as session:
-        attachments = list(session.execute(select(Attachment)).scalars())
-        for attachment in attachments:
-            if attachment.storage_path and not Path(attachment.storage_path).exists():
-                session.delete(attachment)
-                removed += 1
-        session.commit()
+        while True:
+            batch = list(
+                session.execute(
+                    select(Attachment)
+                    .where(Attachment.id > last_id)
+                    .order_by(Attachment.id)
+                    .limit(_CLEANUP_BATCH_SIZE)
+                ).scalars()
+            )
+            if not batch:
+                break
+            last_id = batch[-1].id
+            for attachment in batch:
+                if attachment.storage_path and not Path(attachment.storage_path).exists():
+                    session.delete(attachment)
+                    removed += 1
+            session.commit()
     log.info("cleanup.attachments", removed=removed)
     return {"removed": removed}
 
