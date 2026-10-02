@@ -134,7 +134,24 @@ jobs:
       - name: Тесты на PostgreSQL
         env:
           TEST_DATABASE_URL: postgresql+asyncpg://crm:crm@localhost:5432/crm_test
-        run: python -m pytest -q
+        run: python -m pytest -q 2>&1 | tee /tmp/postgres-pytest.log
+
+      - name: Причина падения PostgreSQL-тестов
+        if: failure()
+        run: |
+          {
+            echo '### Последние строки PostgreSQL-тестов'
+            echo '```text'
+            tail -120 /tmp/postgres-pytest.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          python - <<'PY'
+          from pathlib import Path
+
+          text = "\n".join(Path("/tmp/postgres-pytest.log").read_text().splitlines()[-80:])
+          escaped = text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+          print(f"::error title=PostgreSQL pytest::{escaped}")
+          PY
 
   frontend:
     name: Фронтенд — типы, тесты, сборка

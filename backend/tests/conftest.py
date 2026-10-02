@@ -56,20 +56,6 @@ from app.models.user import Role, User
 TEST_PASSWORD = "SuperSecret123"
 
 
-def pytest_runtest_logreport(report: pytest.TestReport) -> None:
-    """Показывает traceback прямо в аннотации GitHub, а не только в raw log.
-
-    Логи Actions хранятся во внешнем blob-хранилище и иногда недоступны из
-    рабочей среды. Без этой аннотации GitHub сообщает лишь exit code, из-за чего
-    PostgreSQL-регрессию нельзя диагностировать по результату CI.
-    """
-    if not os.environ.get("GITHUB_ACTIONS") or not report.failed:
-        return
-    path, line, _ = report.location
-    message = report.longreprtext.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
-    print(f"::error file={path},line={line + 1},title=pytest::{message}")
-
-
 @pytest.fixture(autouse=True)
 def _clean_attachments() -> AsyncGenerator[None, None]:  # type: ignore[misc]
     """Каждый тест начинает с пустым каталогом вложений."""
