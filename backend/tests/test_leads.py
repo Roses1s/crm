@@ -139,22 +139,27 @@ async def test_history_entry_cannot_be_edited(auth_client: AsyncClient, seeded: 
     assert bad.status_code == 400
 
 
-async def test_timeline_entry_can_be_deleted(auth_client: AsyncClient, seeded: dict) -> None:
+async def test_note_can_be_deleted_but_history_is_immutable(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
     lead_id = seeded["lead"].id  # type: ignore[attr-defined]
     talks_id = seeded["stage_talks"].id  # type: ignore[attr-defined]
     await auth_client.patch(f"/api/v1/crm/leads/{lead_id}", json={"stage_id": talks_id})
     await auth_client.post(f"/api/v1/crm/leads/{lead_id}/notes", json={"body": "заметка"})
 
-    timeline = await auth_client.get(f"/api/v1/crm/leads/{lead_id}/timeline")
-    entries = timeline.json()
-    assert len(entries) == 2
+    entries = (await auth_client.get(f"/api/v1/crm/leads/{lead_id}/timeline")).json()
+    note = next(entry for entry in entries if entry["type"] == "note")
+    history = next(entry for entry in entries if entry["type"] == "history")
 
-    for entry in entries:
-        deleted = await auth_client.delete(f"/api/v1/crm/leads/{lead_id}/timeline/{entry['id']}")
-        assert deleted.status_code == 204
+    protected = await auth_client.delete(f"/api/v1/crm/leads/{lead_id}/timeline/{history['id']}")
+    assert protected.status_code == 400
+    assert protected.json()["code"] == "history_immutable"
 
-    after = await auth_client.get(f"/api/v1/crm/leads/{lead_id}/timeline")
-    assert after.json() == []
+    deleted = await auth_client.delete(f"/api/v1/crm/leads/{lead_id}/timeline/{note['id']}")
+    assert deleted.status_code == 204
+
+    after = (await auth_client.get(f"/api/v1/crm/leads/{lead_id}/timeline")).json()
+    assert [entry["id"] for entry in after] == [history["id"]]
 
 
 async def test_delete_missing_entry_is_404(auth_client: AsyncClient, seeded: dict) -> None:

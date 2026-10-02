@@ -165,6 +165,24 @@ async def test_status_transition(auth_client: AsyncClient, seeded: dict) -> None
     assert response.json()["status"] == "loaded"
 
 
+async def test_status_cannot_bypass_history_through_generic_patch(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    shipment = (await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})).json()
+
+    bypass = await auth_client.patch(
+        f"/api/v1/shipments/{shipment['id']}", json={"status": "loaded"}
+    )
+    assert bypass.status_code == 422
+    assert bypass.json()["code"] == "validation_error"
+
+    unchanged = await auth_client.get(f"/api/v1/shipments/{shipment['id']}")
+    assert unchanged.json()["status"] == "new"
+    timeline = await auth_client.get(f"/api/v1/shipments/{shipment['id']}/timeline")
+    assert timeline.json() == []
+
+
 async def test_status_change_is_written_to_shipment_timeline(
     auth_client: AsyncClient, seeded: dict
 ) -> None:
@@ -180,6 +198,12 @@ async def test_status_change_is_written_to_shipment_timeline(
     assert entries[0]["type"] == "history"
     assert entries[0]["old_value"] == "Новая"
     assert entries[0]["new_value"] == "Машина загрузилась"
+
+    protected = await auth_client.delete(
+        f"/api/v1/shipments/{shipment_id}/timeline/{entries[0]['id']}"
+    )
+    assert protected.status_code == 400
+    assert protected.json()["code"] == "history_immutable"
 
     # Лента лида не должна показывать записи заявки.
     lead_timeline = await auth_client.get(f"/api/v1/crm/leads/{lead_id}/timeline")

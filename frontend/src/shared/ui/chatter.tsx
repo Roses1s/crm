@@ -518,37 +518,40 @@ export function Chatter({
                   )}
                 </div>
 
-                {editingId !== entry.id && (onEditNote || onDeleteEntry) && (
-                  <div className="absolute right-0 top-1.5 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                    {onEditNote && entry.type === "note" && (
-                      <button
-                        type="button"
-                        aria-label="Изменить примечание"
-                        title="Изменить"
-                        onClick={() => {
-                          setEditingId(Number(entry.id));
-                          setEditText(entry.body);
-                        }}
-                        className="inline-flex h-6 w-6 items-center justify-center rounded-sm text-odoo-text-muted transition-colors hover:bg-odoo-bg hover:text-odoo-text"
-                      >
-                        <Pencil className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                    {onDeleteEntry && (
-                      <button
-                        type="button"
-                        aria-label="Удалить запись"
-                        title="Удалить"
-                        onClick={() => {
-                          if (window.confirm("Удалить эту запись из ленты?")) onDeleteEntry(entry);
-                        }}
-                        className="inline-flex h-6 w-6 items-center justify-center rounded-sm text-odoo-text-muted transition-colors hover:bg-odoo-bg hover:text-odoo-danger"
-                      >
-                        <Trash2 className="h-3.5 w-3.5" />
-                      </button>
-                    )}
-                  </div>
-                )}
+                {editingId !== entry.id &&
+                  entry.type === "note" &&
+                  (onEditNote || onDeleteEntry) && (
+                    <div className="absolute right-0 top-1.5 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
+                      {onEditNote && (
+                        <button
+                          type="button"
+                          aria-label="Изменить примечание"
+                          title="Изменить"
+                          onClick={() => {
+                            setEditingId(Number(entry.id));
+                            setEditText(entry.body);
+                          }}
+                          className="inline-flex h-6 w-6 items-center justify-center rounded-sm text-odoo-text-muted transition-colors hover:bg-odoo-bg hover:text-odoo-text"
+                        >
+                          <Pencil className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                      {onDeleteEntry && (
+                        <button
+                          type="button"
+                          aria-label="Удалить запись"
+                          title="Удалить"
+                          onClick={() => {
+                            if (window.confirm("Удалить эту запись из ленты?"))
+                              onDeleteEntry(entry);
+                          }}
+                          className="inline-flex h-6 w-6 items-center justify-center rounded-sm text-odoo-text-muted transition-colors hover:bg-odoo-bg hover:text-odoo-danger"
+                        >
+                          <Trash2 className="h-3.5 w-3.5" />
+                        </button>
+                      )}
+                    </div>
+                  )}
               </div>
             ))}
           </div>

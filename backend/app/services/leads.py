@@ -418,6 +418,10 @@ async def delete_timeline_entry(
 ) -> None:
     await get_lead_or_404(session, lead_id, user)
     entry = await _get_entry_or_404(session, lead_id, entry_id)
+    # История этапов/передач/проигрыша — системный аудит, а не пользовательская
+    # заметка. Она остаётся неизменяемой даже при прямом вызове API.
+    if entry.type is not EntryType.note:
+        raise AppError("Системную историю нельзя удалить", code="history_immutable")
     await session.delete(entry)
     await session.commit()
     log.info("timeline.entry_deleted", lead_id=lead_id, entry_id=entry_id, by=user.id)

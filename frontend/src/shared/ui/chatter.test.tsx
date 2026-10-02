@@ -101,4 +101,18 @@ describe("Лента примечаний", () => {
 
     expect(onSubmit).toHaveBeenCalledWith("Уточнить ставку у перевозчика", []);
   });
+
+  it("показывает изменение и удаление только для примечания, но не для history", () => {
+    renderWithProviders(
+      <Chatter
+        timeline={TIMELINE}
+        onEditNote={vi.fn()}
+        onDeleteEntry={vi.fn()}
+        authorInitials="М"
+      />,
+    );
+
+    expect(screen.getAllByRole("button", { name: "Изменить примечание" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Удалить запись" })).toHaveLength(1);
+  });
 });

@@ -3,7 +3,7 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, Field, field_validator
+from pydantic import BaseModel, ConfigDict, Field, field_validator
 
 from app.models.shipment import ShipmentStatus, TaxRate, TransportType
 from app.schemas.common import ORMModel
@@ -91,12 +91,16 @@ class ShipmentCreate(ShipmentBase):
 
 
 class ShipmentUpdate(BaseModel):
+    # Обычный PATCH не меняет системный статус: для этого есть отдельная ручка,
+    # которая обязательно пишет событие в ленту. extra="forbid" не даёт полю
+    # status (или опечатке в другом имени) тихо проигнорироваться с ложным 200.
+    model_config = ConfigDict(extra="forbid")
+
     # min_length=1 — номер можно не передавать (тогда он не меняется), но
     # если передан явно, пустым быть не должен: иначе заявка молча теряет
     # свой единственный видимый идентификатор без возможности откатить.
     number: str | None = Field(default=None, min_length=1, max_length=40)
     lead_id: int | None = None
-    status: ShipmentStatus | None = None
     # См. ShipmentCreate.created_at — здесь это просто обычное поле: раз
     # передано явно (exclude_unset), значит его и меняем.
     created_at: datetime | None = None

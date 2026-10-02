@@ -228,6 +228,10 @@ async def update_entry(
 async def delete_entry(session: AsyncSession, user: User, shipment_id: int, entry_id: int) -> None:
     await get_shipment_or_404(session, shipment_id, user)
     entry = await _get_entry_or_404(session, shipment_id, entry_id)
+    # Системная история — аудит изменения заявки. Если разрешить удалить её
+    # через ту же ручку, статус можно переписать без проверяемого следа.
+    if entry.type is not EntryType.note:
+        raise AppError("Системную историю нельзя удалить", code="history_immutable")
     await session.delete(entry)
     await session.commit()
     log.info("shipment.entry_deleted", shipment_id=shipment_id, entry_id=entry_id, by=user.id)
