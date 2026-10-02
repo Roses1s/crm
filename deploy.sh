@@ -11,7 +11,9 @@
 #
 #  Что скрипт делает такого, чего не делает `docker compose up -d`:
 #    * не даёт запустить два деплоя одновременно (блокировка);
-#    * запоминает текущие образы и откатывается на них, если релиз не поднялся;
+#    * до миграций проверяет место и создаёт свежий проверяемый дамп базы;
+#    * мигрирует схему отдельным шагом, до запуска нового приложения;
+#    * откатывает образы только когда схема совместима со старым бэкендом;
 #    * ждёт, пока контейнеры станут healthy, и проверяет сайт снаружи;
 #    * пишет журнал и подчищает старые образы (диск здесь всего 15 ГБ).
 # =============================================================================
@@ -23,12 +25,16 @@ LOCK_FILE="/tmp/crm-deploy.lock"
 LOG_FILE="${PROJECT_DIR}/.deploy.log"
 SITE_URL="${SITE_URL:-https://crmdetroid.ru}"
 HEALTH_TIMEOUT="${HEALTH_TIMEOUT:-180}"   # секунд ждать готовности контейнеров
+MIN_FREE_MB="${MIN_FREE_MB:-2048}"         # оставить после дампа для сборки/работы
+BACKUP_DIR="/var/backups/crm"
 BUILT_SERVICES=(backend frontend)
 SERVICES=(crm-postgres crm-valkey crm-backend crm-worker crm-beat crm-frontend crm-nginx)
 
 DO_PULL=1
 DO_BUILD=1
 MODE="deploy"
+SCHEMA_CHANGED=0
+PRE_DEPLOY_BACKUP=""
 
 # --- вывод -------------------------------------------------------------------
 if [[ -t 1 ]]; then
@@ -57,6 +63,7 @@ usage() {
 Переменные окружения:
   SITE_URL=https://crmdetroid.ru   какой адрес проверять после запуска
   HEALTH_TIMEOUT=180               сколько секунд ждать готовности контейнеров
+  MIN_FREE_MB=2048                 сколько места оставить после свежего дампа
 TEXT
     exit 0
 }
@@ -79,9 +86,14 @@ cd "$PROJECT_DIR"
 # --- проверки окружения -------------------------------------------------------
 require_env() {
     command -v docker >/dev/null || die "docker не найден"
+    command -v git >/dev/null || die "git не найден"
+    command -v curl >/dev/null || die "curl не найден"
+    command -v flock >/dev/null || die "flock не найден"
     docker compose version >/dev/null 2>&1 || die "docker compose не установлен"
     [[ -f docker-compose.yml ]] || die "docker-compose.yml не найден в $PROJECT_DIR"
     [[ -f .env ]] || die ".env отсутствует — скопируйте .env.example и заполните секреты"
+    [[ "$MIN_FREE_MB" =~ ^[0-9]+$ && "$MIN_FREE_MB" -ge 512 ]] \
+        || die "MIN_FREE_MB должен быть целым числом не меньше 512"
 }
 
 container_state() {
@@ -99,6 +111,102 @@ show_status() {
         printf '%-14s %-12s %s\n' "$name" "$(container_state "$name")" "$(container_health "$name")"
     done
     printf '\n'
+}
+
+human_kb() {
+    awk -v kb="$1" 'BEGIN {printf "%.1f ГБ", kb / 1024 / 1024}'
+}
+
+db_query() {
+    local sql="$1"
+    docker compose exec -T postgres sh -c \
+        'psql -X -v ON_ERROR_STOP=1 -U "$POSTGRES_USER" -d "$POSTGRES_DB" -Atqc "$1"' \
+        sh "$sql"
+}
+
+current_db_revision() {
+    local revision
+    if ! revision="$(db_query "SELECT version_num FROM alembic_version" 2>/dev/null)"; then
+        # На самом первом развёртывании таблицы alembic_version ещё нет.
+        printf 'base\n'
+        return
+    fi
+    [[ -n "$revision" ]] && printf '%s\n' "$revision" || printf 'base\n'
+}
+
+image_schema_head() {
+    local image="$1"
+    docker run --rm --network crm_internal --env-file .env \
+        -e POSTGRES_HOST=postgres -e VALKEY_URL=redis://valkey:6379/0 \
+        "$image" alembic heads 2>/dev/null | awk '/\(head\)/ {print $1}'
+}
+
+wait_core_services() {
+    local deadline=$((SECONDS + HEALTH_TIMEOUT))
+    local postgres_health valkey_health
+    while (( SECONDS < deadline )); do
+        postgres_health="$(container_health crm-postgres)"
+        valkey_health="$(container_health crm-valkey)"
+        if [[ "$postgres_health" == "healthy" && "$valkey_health" == "healthy" ]]; then
+            return 0
+        fi
+        sleep 2
+    done
+    die "PostgreSQL/Valkey не стали healthy за ${HEALTH_TIMEOUT}с"
+}
+
+preflight_space() {
+    local host_free_kb db_bytes db_kb required_kb
+    host_free_kb="$(df -Pk "$PROJECT_DIR" | awk 'NR==2 {print $4}')"
+    db_bytes="$(db_query "SELECT pg_database_size(current_database())")"
+    db_kb=$(( (db_bytes + 1023) / 1024 ))
+    # Оцениваем дамп консервативно по полному размеру базы и сверх него
+    # оставляем минимум для слоёв Docker, логов и обычной работы PostgreSQL.
+    required_kb=$(( db_kb + MIN_FREE_MB * 1024 ))
+
+    log "Свободно на диске: $(human_kb "$host_free_kb"); база: $(human_kb "$db_kb")"
+    if (( host_free_kb < required_kb )); then
+        die "Недостаточно места: нужно не меньше $(human_kb "$required_kb") (дамп базы + ${MIN_FREE_MB} МБ запаса), свободно $(human_kb "$host_free_kb")"
+    fi
+    ok "Места достаточно; после оценочного дампа останется не меньше ${MIN_FREE_MB} МБ"
+}
+
+create_pre_deploy_backup() {
+    local stamp revision db_bytes db_kb backup_required_kb
+    stamp="$(date '+%Y%m%d-%H%M%S')"
+    revision="$(git rev-parse --short HEAD)"
+    PRE_DEPLOY_BACKUP="${BACKUP_DIR}/crm-pre-deploy-${stamp}-${revision}.dump"
+    db_bytes="$(db_query "SELECT pg_database_size(current_database())")"
+    db_kb=$(( (db_bytes + 1023) / 1024 ))
+    backup_required_kb=$(( db_kb + 256 * 1024 ))
+
+    step "Свежая резервная копия перед миграцией"
+    # Команда выполняется новым backend-образом, но пишет в постоянный том
+    # backups. Пароль передаётся pg_dump через окружение, а не аргументы.
+    if ! docker compose run --rm --no-deps -T worker sh -ceu '
+        target="$1"
+        required_kb="$2"
+        tmp="${target}.tmp"
+        set -- $(df -Pk "$(dirname "$target")" | tail -1)
+        available_kb="$4"
+        if [ "$available_kb" -lt "$required_kb" ]; then
+            echo "В томе бэкапов недостаточно места: нужно ${required_kb} КБ, свободно ${available_kb} КБ" >&2
+            exit 1
+        fi
+        trap '\''rm -f "$tmp"'\'' EXIT
+        PGPASSWORD="$POSTGRES_PASSWORD" pg_dump \
+            --host postgres --username "${POSTGRES_USER:-crm}" \
+            --dbname "${POSTGRES_DB:-crm}" --format custom --no-owner \
+            --file "$tmp"
+        test -s "$tmp"
+        pg_restore --list "$tmp" >/dev/null
+        mv "$tmp" "$target"
+        trap - EXIT
+        ls -lh "$target"
+    ' sh "$PRE_DEPLOY_BACKUP" "$backup_required_kb" 2>&1 | tee -a "$LOG_FILE"; then
+        die "Не удалось создать и проверить свежий дамп. Миграции не запускались"
+    fi
+    ok "Дамп создан и читается: $PRE_DEPLOY_BACKUP"
 }
 
 # --- образы для отката ---------------------------------------------------------
@@ -167,8 +275,29 @@ check_site() {
     return 1
 }
 
+assert_rollback_schema_compatible() {
+    local current_revision previous_head head_count backup_hint
+    docker image inspect crm-backend:previous >/dev/null 2>&1 \
+        || die "Предыдущего backend-образа нет — безопасный откат невозможен"
+
+    current_revision="$(current_db_revision)"
+    if ! previous_head="$(image_schema_head crm-backend:previous)"; then
+        die "Не удалось прочитать Alembic head предыдущего backend-образа"
+    fi
+    head_count="$(printf '%s\n' "$previous_head" | grep -c . || true)"
+    [[ "$head_count" -eq 1 ]] \
+        || die "Не удалось однозначно определить схему предыдущего backend-образа"
+
+    if [[ "$current_revision" != "$previous_head" ]]; then
+        backup_hint="${PRE_DEPLOY_BACKUP:-последний ${BACKUP_DIR}/crm-pre-deploy-*.dump}"
+        die "Откат запрещён: база уже на ревизии $current_revision, а предыдущий backend ожидает $previous_head. Старый образ автоматически не запускаем. Используйте $backup_hint и исправление вперёд либо согласованное восстановление базы"
+    fi
+    ok "Схема $current_revision совместима с предыдущим backend-образом"
+}
+
 rollback() {
     step "Откат на предыдущие образы"
+    assert_rollback_schema_compatible
     if restore_previous; then
         docker compose up -d --remove-orphans 2>&1 | tee -a "$LOG_FILE"
         if wait_healthy; then
@@ -177,13 +306,30 @@ rollback() {
             die "Откат не помог — смотрите: docker compose logs backend --tail 50"
         fi
     else
-        warn "Предыдущих образов нет (первый деплой?) — откатывать нечего"
+        die "Предыдущих образов нет (первый деплой?) — откатывать нечего"
     fi
+}
+
+release_failed() {
+    local reason="$1"
+    warn "$reason"
+    if [[ "$SCHEMA_CHANGED" -eq 1 ]]; then
+        warn "Схема базы уже изменилась. Автооткат старых образов ЗАПРЕЩЁН."
+        warn "Свежий дамп до миграции: $PRE_DEPLOY_BACKUP"
+        die "Оставляем новые образы для диагностики и исправления вперёд; старый backend не запускаем"
+    fi
+    rollback
+    die "Деплой отменён, версия возвращена. Журнал: $LOG_FILE"
 }
 
 # =============================================================================
 #  Сценарии
 # =============================================================================
+# Тесты безопасности загружают функции без обращения к Docker/production.
+if [[ "${DEPLOY_SOURCE_ONLY:-0}" == "1" ]]; then
+    return 0 2>/dev/null || exit 0
+fi
+
 require_env
 
 # Состояние можно смотреть в любой момент, в том числе во время деплоя.
@@ -229,7 +375,15 @@ else
     ok "Обновление кода пропущено (--skip-pull)"
 fi
 
-# --- 2. Сборка -----------------------------------------------------------------
+# --- 2. Preflight --------------------------------------------------------------
+step "Проверка PostgreSQL, Valkey и свободного места"
+# На первом развёртывании создаём только инфраструктуру. На рабочем сервере эта
+# команда ничего не пересоздаёт и не трогает ещё работающий backend.
+docker compose up -d postgres valkey 2>&1 | tee -a "$LOG_FILE"
+wait_core_services
+preflight_space
+
+# --- 3. Сборка -----------------------------------------------------------------
 tag_previous
 if [[ $DO_BUILD -eq 1 ]]; then
     step "Сборка образов"
@@ -241,36 +395,70 @@ else
     ok "Сборка пропущена (--no-build)"
 fi
 
-# --- 3. Запуск ------------------------------------------------------------------
+# Сборка могла занять заметную часть диска: повторно считаем место уже перед
+# дампом, чтобы обещанный запас действительно остался после его создания.
+preflight_space
+# Дамп создаётся после сборки (нужен образ с pg_dump), но строго до остановки
+# приложения и до любых миграций.
+create_pre_deploy_backup
+
+# --- 4. Управляемая миграция ----------------------------------------------------
+DB_REVISION_BEFORE="$(current_db_revision)"
+if ! NEW_IMAGE_HEAD="$(image_schema_head crm-backend:latest)"; then
+    die "Не удалось прочитать Alembic head нового backend-образа"
+fi
+HEAD_COUNT="$(printf '%s\n' "$NEW_IMAGE_HEAD" | grep -c . || true)"
+[[ "$HEAD_COUNT" -eq 1 ]] \
+    || die "Не удалось однозначно определить целевую ревизию нового backend-образа"
+log "Схема базы до миграции: $DB_REVISION_BEFORE; цель нового образа: $NEW_IMAGE_HEAD"
+
+step "Остановка процессов, которые пишут в базу"
+docker compose stop backend worker beat 2>&1 | tee -a "$LOG_FILE"
+
+step "Миграция базы отдельным шагом"
+if ! docker compose run --rm --no-deps -T backend alembic upgrade head \
+    2>&1 | tee -a "$LOG_FILE"; then
+    DB_REVISION_AFTER="$(current_db_revision)"
+    [[ "$DB_REVISION_AFTER" != "$DB_REVISION_BEFORE" ]] && SCHEMA_CHANGED=1
+    release_failed "Миграция завершилась ошибкой (было $DB_REVISION_BEFORE, стало $DB_REVISION_AFTER)"
+fi
+
+DB_REVISION_AFTER="$(current_db_revision)"
+[[ "$DB_REVISION_AFTER" != "$DB_REVISION_BEFORE" ]] && SCHEMA_CHANGED=1
+if [[ "$DB_REVISION_AFTER" != "$NEW_IMAGE_HEAD" ]]; then
+    release_failed "После миграции база на $DB_REVISION_AFTER вместо ожидаемой $NEW_IMAGE_HEAD"
+fi
+ok "Схема базы готова: $DB_REVISION_AFTER"
+
+# --- 5. Запуск ------------------------------------------------------------------
 step "Запуск контейнеров"
-docker compose up -d --remove-orphans 2>&1 | tee -a "$LOG_FILE"
+if ! docker compose up -d --remove-orphans 2>&1 | tee -a "$LOG_FILE"; then
+    release_failed "Docker Compose не смог запустить новый релиз"
+fi
 
 step "Ожидание готовности"
 if ! wait_healthy; then
-    warn "Контейнеры не вышли в рабочее состояние"
     docker compose logs backend --tail 30 2>&1 | tee -a "$LOG_FILE"
-    rollback
-    die "Деплой отменён, версия возвращена. Журнал: $LOG_FILE"
+    release_failed "Контейнеры не вышли в рабочее состояние"
 fi
 ok "Все контейнеры в рабочем состоянии"
 
 if ! check_site; then
     docker compose logs nginx --tail 20 2>&1 | tee -a "$LOG_FILE"
-    rollback
-    die "Сайт не отвечает после обновления, версия возвращена. Журнал: $LOG_FILE"
+    release_failed "Сайт не отвечает после обновления"
 fi
 ok "Сайт отвечает: ${SITE_URL}"
 
-# --- 4. Итоги -------------------------------------------------------------------
+# --- 6. Итоги -------------------------------------------------------------------
 step "Уборка"
 docker image prune -f >/dev/null 2>&1 || true
 ok "Старые образы удалены, свободно: $(df -h / | awk 'NR==2 {print $4}')"
 
-MIGRATIONS="$(docker compose logs backend 2>/dev/null | grep -c 'Running upgrade' || true)"
-if [[ "${MIGRATIONS:-0}" -gt 0 ]]; then
-    warn "В этом запуске применялись миграции базы ($MIGRATIONS шт.)."
-    warn "Откат образов НЕ отменяет миграции — схема останется новой."
+if [[ "$SCHEMA_CHANGED" -eq 1 ]]; then
+    warn "Схема изменилась: $DB_REVISION_BEFORE → $DB_REVISION_AFTER."
+    warn "Ручной --rollback не запустит старый backend с этой схемой."
 fi
+ok "Предмиграционный дамп: $PRE_DEPLOY_BACKUP"
 
 log ""
 ok "Готово за $((SECONDS - START_TS)) с. Версия: $(git rev-parse --short HEAD)"

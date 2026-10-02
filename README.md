@@ -107,9 +107,15 @@ cd frontend && npm run lint && npx tsc -b && npm test && npm run build
 
 ```bash
 cp .env.example .env     # заполнить SECRET_KEY и POSTGRES_PASSWORD
-docker compose up -d --build
+docker compose up -d postgres valkey
+docker compose build
+docker compose run --rm backend alembic upgrade head
+docker compose up -d
 docker compose exec backend python -m app.cli createsuperuser --email you@example.com --password ...
 ```
+
+Обычный старт backend намеренно не запускает миграции. На production всегда
+используйте `deploy.sh`: он делает дамп и применяет схему отдельным шагом.
 
 ## Обновление продакшена
 
@@ -118,8 +124,10 @@ ssh crm /opt/crm/deploy.sh      # со своего компьютера
 cd /opt/crm && ./deploy.sh      # или на сервере
 ```
 
-`deploy.sh` обновляет код, собирает образы, ждёт готовности контейнеров,
-проверяет сайт снаружи и **откатывается сам**, если релиз не поднялся.
+`deploy.sh` обновляет код, проверяет свободное место, создаёт и проверяет свежий
+дамп, собирает образы, отдельно применяет миграции и проверяет сайт снаружи.
+Автооткат старых образов выполняется только при совместимой схеме; после новой
+миграции скрипт безопасно откажется запускать старый backend.
 Флаги: `--status`, `--no-build`, `--skip-pull`, `--rollback`, `--help`.
 
 ## Продакшен

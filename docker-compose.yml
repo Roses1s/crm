@@ -3,7 +3,8 @@
 #  фронтенд и nginx.
 #  На сервере лежит в /opt/crm/docker-compose.yml (каталог = клон репозитория).
 #
-#  Запуск:   docker compose up -d --build
+#  Production: ./deploy.sh (дамп, отдельная миграция, безопасный запуск)
+#  Локально: см. README.md — сначала build и `run backend alembic upgrade head`
 #  Логи:     docker compose logs -f backend
 #  Остановка: docker compose down
 #
@@ -105,10 +106,10 @@ services:
       POSTGRES_HOST: postgres
       VALKEY_URL: redis://valkey:6379/0
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
-    # Миграции накатываются один раз при старте API — до приёма трафика.
-    command: >
-      sh -c "alembic upgrade head &&
-             gunicorn app.main:app -c gunicorn.conf.py"
+    # Миграции запускает deploy.sh отдельным контролируемым шагом до замены
+    # контейнеров. API сам схему не меняет: иначе автоматический рестарт мог бы
+    # неожиданно применить миграцию вне окна деплоя.
+    command: gunicorn app.main:app -c gunicorn.conf.py
     volumes:
       - backups:/var/backups/crm
       # Вложения лидов: том переживает пересборку образа и перезапуск.
