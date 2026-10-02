@@ -9,7 +9,6 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type {
   Attachment,
-  Carrier,
   Customer,
   LauncherApp,
   Lead,
@@ -61,7 +60,6 @@ export const keys = {
   attachments: (id: string | number) => ["attachments", String(id)] as const,
   shipmentAttachments: (id: string | number) => ["shipment-attachments", String(id)] as const,
   shipmentTimeline: (id: string | number) => ["shipment-timeline", String(id)] as const,
-  carriers: ["carriers"] as const,
   users: ["users"] as const,
   backups: ["backups"] as const,
   colleagues: ["colleagues"] as const,
@@ -145,7 +143,6 @@ export function useUpdateTag() {
       void qc.invalidateQueries({ queryKey: ["leads"] });
       void qc.invalidateQueries({ queryKey: ["customers"] });
       void qc.invalidateQueries({ queryKey: ["shipments"] });
-      void qc.invalidateQueries({ queryKey: keys.carriers });
     },
   });
 }
@@ -159,7 +156,6 @@ export function useDeleteTag() {
       void qc.invalidateQueries({ queryKey: ["leads"] });
       void qc.invalidateQueries({ queryKey: ["customers"] });
       void qc.invalidateQueries({ queryKey: ["shipments"] });
-      void qc.invalidateQueries({ queryKey: keys.carriers });
     },
   });
 }
@@ -168,13 +164,6 @@ export function useLossReasons() {
   return useQuery({
     queryKey: keys.lossReasons,
     queryFn: () => api<LossReason[]>("/crm/loss-reasons"),
-  });
-}
-
-export function useCarriers() {
-  return useQuery({
-    queryKey: keys.carriers,
-    queryFn: () => api<Carrier[]>("/carriers"),
   });
 }
 
@@ -251,25 +240,6 @@ export function useDeleteStage() {
       void qc.invalidateQueries({ queryKey: keys.stages });
       void qc.invalidateQueries({ queryKey: ["leads"] });
     },
-  });
-}
-
-export function useCreateCarrier() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: (body: { name: string; inn: string }) =>
-      api<Carrier>("/carriers", { method: "POST", body }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.carriers }),
-  });
-}
-
-/** Теги перевозчика — рабочая пометка, её может проставить любой сотрудник. */
-export function useSetCarrierTags() {
-  const qc = useQueryClient();
-  return useMutation({
-    mutationFn: ({ id, tagIds }: { id: number; tagIds: number[] }) =>
-      api<Carrier>(`/carriers/${id}/tags`, { method: "PUT", body: { tag_ids: tagIds } }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: keys.carriers }),
   });
 }
 
@@ -721,7 +691,6 @@ export function useLeadShipments(id: number | string | undefined) {
 export interface ShipmentPayload {
   number?: string;
   lead_id: number;
-  carrier_id?: number | null;
   // Дата создания — редактируема (заявку часто заводят в CRM позже, чем она
   // реально возникла). ISO-строка с временем; null сервер не примет (колонка
   // NOT NULL) — форма всегда отправляет либо настоящее значение, либо вообще
@@ -763,7 +732,9 @@ export interface ShipmentPayload {
   unloading_time_from?: string;
   unloading_time_to?: string;
 
-  // Перевозчик.
+  // Перевозчик — свободный текст прямо в заявке, без справочника.
+  carrier_name?: string;
+  carrier_inn?: string;
   carrier_contact?: string;
   vehicle?: string;
   vehicle_number?: string;

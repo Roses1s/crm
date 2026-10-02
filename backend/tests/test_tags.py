@@ -58,22 +58,6 @@ async def test_update_tag_name_and_color(auth_client: AsyncClient, seeded: dict)
     assert body["color"] == "#abcdef"
 
 
-async def test_carrier_tags_can_be_set_by_any_user(auth_client: AsyncClient, seeded: dict) -> None:
-    headers = await manager_headers(auth_client)
-    carrier_id = seeded["carrier"].id  # type: ignore[attr-defined]
-    tag_id = seeded["tag"].id  # type: ignore[attr-defined]
-
-    resp = await auth_client.put(
-        f"/api/v1/carriers/{carrier_id}/tags", json={"tag_ids": [tag_id]}, headers=headers
-    )
-    assert resp.status_code == 200, resp.text
-    assert [t["id"] for t in resp.json()["tags"]] == [tag_id]
-
-    listed = await auth_client.get("/api/v1/carriers")
-    carrier = next(c for c in listed.json() if c["id"] == carrier_id)
-    assert [t["id"] for t in carrier["tags"]] == [tag_id]
-
-
 async def test_shipment_tags_roundtrip(auth_client: AsyncClient, seeded: dict) -> None:
     lead_id = seeded["lead"].id  # type: ignore[attr-defined]
     tag_id = seeded["tag"].id  # type: ignore[attr-defined]

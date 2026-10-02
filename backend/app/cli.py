@@ -14,7 +14,6 @@ from sqlalchemy import func, select
 
 from app.core.security import hash_password
 from app.db.session import SessionLocal
-from app.models.carrier import Carrier
 from app.models.crm import Lead, Stage, Tag
 from app.models.shipment import Shipment, ShipmentStatus
 from app.models.user import Role, User
@@ -163,18 +162,6 @@ async def seed() -> None:
             await session.commit()
 
         if (
-            int((await session.execute(select(func.count()).select_from(Carrier))).scalar_one())
-            == 0
-        ):
-            session.add_all(
-                [
-                    Carrier(name="ООО «АвтоТрансЛайн»", inn="7447112236"),
-                    Carrier(name="ООО «РефСервис»", inn="5405998876"),
-                ]
-            )
-            await session.commit()
-
-        if (
             int((await session.execute(select(func.count()).select_from(Shipment))).scalar_one())
             == 0
         ):
@@ -184,6 +171,9 @@ async def seed() -> None:
                 loading_cities=["Челябинск"],
                 unloading_cities=["Новосибирск"],
                 status=ShipmentStatus.loaded,
+                # Перевозчика теперь просто вписывают текстом в саму заявку.
+                carrier_name="ООО «АвтоТрансЛайн»",
+                carrier_inn="7447112236",
             )
             session.add(demo_shipment)
             await session.flush()

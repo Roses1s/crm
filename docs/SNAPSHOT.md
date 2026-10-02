@@ -23,7 +23,6 @@
 | `admin.py` | `/admin` | 7 |
 | `attachments.py` | `/crm` | 6 |
 | `auth.py` | `/auth` | 4 |
-| `carriers.py` | `/carriers` | 4 |
 | `customers.py` | `/crm/customers` | 2 |
 | `health.py` | `—` | 2 |
 | `launcher.py` | `/launcher` | 1 |
@@ -52,7 +51,6 @@
 | Модель | Таблица |
 |---|---|
 | `Attachment` | `attachments` |
-| `Carrier` | `carriers` |
 | `Lead` | `leads` |
 | `LoginAttempt` | `login_attempts` |
 | `LossReason` | `loss_reasons` |
@@ -63,7 +61,7 @@
 | `TimelineEntry` | `timeline_entries` |
 | `User` | `users` |
 
-Миграций: **19**, последняя в цепочке — `ebb7a6f2080f — Номер заявки — редактируемое поле`.
+Миграций: **20**, последняя в цепочке — `97a47d928571 — Справочник перевозчиков заменён на свободный текст в заявке`.
 
 ## Фоновые задачи (Celery beat)
 
@@ -79,7 +77,7 @@
 | Раздел | Страницы |
 |---|---|
 | `accounting` | `AccountingPage` |
-| `admin` | `CarriersPage`, `SecurityPage`, `UsersPage` |
+| `admin` | `SecurityPage`, `UsersPage` |
 | `auth` | `LoginPage` |
 | `crm` | `KanbanPage`, `LeadFormPage` |
 | `customers` | `CustomersPage` |
@@ -88,8 +86,8 @@
 
 ## Тесты
 
-- бэкенд (pytest): **123** тест-функций
-- фронтенд (vitest): **54** тестов
+- бэкенд (pytest): **121** тест-функций
+- фронтенд (vitest): **57** тестов
 - сценарные (подменяется только сеть, остальное настоящее):
   - `frontend/src/features/auth/login-flow.test.tsx`
   - `frontend/src/features/crm/kanban-flow.test.tsx`

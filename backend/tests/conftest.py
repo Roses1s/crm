@@ -50,7 +50,6 @@ from app.core.security import hash_password
 from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
-from app.models.carrier import Carrier
 from app.models.crm import Lead, LossReason, Stage, Tag
 from app.models.user import Role, User
 
@@ -108,7 +107,7 @@ async def session(engine) -> AsyncGenerator[AsyncSession, None]:
 
 @pytest.fixture
 async def seeded(session: AsyncSession) -> dict[str, object]:
-    """Минимальный набор данных: админ, менеджер, этапы, тег, лид, перевозчик."""
+    """Минимальный набор данных: админ, менеджер, этапы, тег, лид."""
     admin = User(
         email="admin@crmdetroid.ru",
         hashed_password=hash_password(TEST_PASSWORD),
@@ -130,9 +129,8 @@ async def seeded(session: AsyncSession) -> dict[str, object]:
     new_stage = Stage(name="Новый", sequence=1, color="slate", owner_id=admin.id)
     talks_stage = Stage(name="Переговоры", sequence=2, color="blue", owner_id=admin.id)
     tag = Tag(name="Крупный клиент", color="#1e8449")
-    carrier = Carrier(name="ООО «АвтоТрансЛайн»", inn="7447112236")
     loss_reason = LossReason(name="Перестал возить")
-    session.add_all([new_stage, talks_stage, tag, carrier, loss_reason])
+    session.add_all([new_stage, talks_stage, tag, loss_reason])
     await session.flush()
 
     lead = Lead(
@@ -154,7 +152,6 @@ async def seeded(session: AsyncSession) -> dict[str, object]:
         "stage_talks": talks_stage,
         "tag": tag,
         "lead": lead,
-        "carrier": carrier,
         "loss_reason": loss_reason,
     }
 

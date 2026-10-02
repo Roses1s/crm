@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
 import { ApiError } from "@/shared/api/client";
-import { useCarriers, useSaveShipment } from "@/shared/api/hooks";
+import { useSaveShipment } from "@/shared/api/hooks";
 import { TokenField } from "./TokenField";
 
 const inputCls =
@@ -24,7 +24,6 @@ export function QuickCreateShipmentDialog({
   onClose: () => void;
 }) {
   const navigate = useNavigate();
-  const { data: carriers = [] } = useCarriers();
   // id=undefined → хук всегда шлёт POST /shipments, не PATCH.
   const createShipment = useSaveShipment(undefined);
 
@@ -32,7 +31,10 @@ export function QuickCreateShipmentDialog({
   const [unloadingCities, setUnloadingCities] = useState<string[]>([]);
   const [loadingDate, setLoadingDate] = useState("");
   const [unloadingDate, setUnloadingDate] = useState("");
-  const [carrierId, setCarrierId] = useState<number | "">("");
+  // Перевозчика просто вписывают текстом — любого, без справочника.
+  const [carrierName, setCarrierName] = useState("");
+  const [carrierInn, setCarrierInn] = useState("");
+  const [carrierContact, setCarrierContact] = useState("");
   const [error, setError] = useState("");
 
   function describe(err: unknown): string {
@@ -47,7 +49,7 @@ export function QuickCreateShipmentDialog({
       unloadingCities.length === 0 ||
       !loadingDate ||
       !unloadingDate ||
-      !carrierId
+      !carrierName.trim()
     ) {
       setError("Заполните все поля — они обязательны");
       return;
@@ -55,7 +57,9 @@ export function QuickCreateShipmentDialog({
     createShipment.mutate(
       {
         lead_id: leadId,
-        carrier_id: Number(carrierId),
+        carrier_name: carrierName.trim(),
+        carrier_inn: carrierInn.trim(),
+        carrier_contact: carrierContact.trim(),
         loading_cities: loadingCities,
         loading_date_from: loadingDate,
         unloading_cities: unloadingCities,
@@ -134,28 +138,43 @@ export function QuickCreateShipmentDialog({
             </div>
           </div>
           <div>
-            <label htmlFor="quick-ship-carrier" className={labelCls}>
+            <label htmlFor="quick-ship-carrier-name" className={labelCls}>
               Перевозчик
             </label>
-            <select
-              id="quick-ship-carrier"
+            <input
+              id="quick-ship-carrier-name"
               required
+              placeholder="Название компании"
               className={inputCls}
-              value={carrierId}
-              onChange={(e) => setCarrierId(e.target.value ? Number(e.target.value) : "")}
-            >
-              <option value="">Выберите перевозчика</option>
-              {carriers.map((c) => (
-                <option key={c.id} value={c.id}>
-                  {c.name}
-                </option>
-              ))}
-            </select>
-            {carriers.length === 0 && (
-              <p className="mt-1 text-[12px] text-odoo-text-muted">
-                Перевозчиков пока нет — добавьте в «Администрирование → Перевозчики».
-              </p>
-            )}
+              value={carrierName}
+              onChange={(e) => setCarrierName(e.target.value)}
+            />
+          </div>
+          <div className="grid grid-cols-2 gap-3">
+            <div>
+              <label htmlFor="quick-ship-carrier-inn" className={labelCls}>
+                ИНН перевозчика
+              </label>
+              <input
+                id="quick-ship-carrier-inn"
+                inputMode="numeric"
+                placeholder="10 или 12 цифр"
+                className={inputCls}
+                value={carrierInn}
+                onChange={(e) => setCarrierInn(e.target.value)}
+              />
+            </div>
+            <div>
+              <label htmlFor="quick-ship-carrier-contact" className={labelCls}>
+                Контакт перевозчика
+              </label>
+              <input
+                id="quick-ship-carrier-contact"
+                className={inputCls}
+                value={carrierContact}
+                onChange={(e) => setCarrierContact(e.target.value)}
+              />
+            </div>
           </div>
         </div>
 

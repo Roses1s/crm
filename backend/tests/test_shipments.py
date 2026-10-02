@@ -17,13 +17,14 @@ async def manager_headers(client: AsyncClient) -> dict[str, str]:
 
 async def test_create_and_read_shipment(auth_client: AsyncClient, seeded: dict) -> None:
     lead_id = seeded["lead"].id  # type: ignore[attr-defined]
-    carrier_id = seeded["carrier"].id  # type: ignore[attr-defined]
 
     created = await auth_client.post(
         "/api/v1/shipments",
         json={
             "lead_id": lead_id,
-            "carrier_id": carrier_id,
+            "carrier_name": "ООО «АвтоТрансЛайн»",
+            "carrier_inn": "7447112236",
+            "carrier_contact": "Логист Иванов",
             "loading_cities": ["Челябинск"],
             "unloading_cities": ["Новосибирск"],
         },
@@ -34,6 +35,8 @@ async def test_create_and_read_shipment(auth_client: AsyncClient, seeded: dict) 
     assert body["status"] == "new"
     assert body["lead_name"] == "ООО «Уралпромснаб»"
     assert body["carrier_name"] == "ООО «АвтоТрансЛайн»"
+    assert body["carrier_inn"] == "7447112236"
+    assert body["carrier_contact"] == "Логист Иванов"
     # Номер заявки по умолчанию = её id, но его можно свободно переименовать.
     assert body["number"] == str(body["id"])
 
@@ -109,9 +112,9 @@ async def test_shipment_number_cannot_be_blanked(auth_client: AsyncClient, seede
 
 async def test_shipments_search(auth_client: AsyncClient, seeded: dict) -> None:
     lead_id = seeded["lead"].id  # type: ignore[attr-defined]
-    carrier_id = seeded["carrier"].id  # type: ignore[attr-defined]
     created = await auth_client.post(
-        "/api/v1/shipments", json={"lead_id": lead_id, "carrier_id": carrier_id}
+        "/api/v1/shipments",
+        json={"lead_id": lead_id, "carrier_name": "ООО «АвтоТрансЛайн»"},
     )
     shipment = created.json()
     await auth_client.patch(f"/api/v1/shipments/{shipment['id']}", json={"number": "ЗНТ-777"})
@@ -208,23 +211,64 @@ async def test_shipment_note_crud(auth_client: AsyncClient, seeded: dict) -> Non
     assert after.json() == []
 
 
-async def test_carriers_list(auth_client: AsyncClient, seeded: dict) -> None:
-    carriers = await auth_client.get("/api/v1/carriers")
-    assert [c["name"] for c in carriers.json()] == ["ООО «АвтоТрансЛайн»"]
+async def test_shipment_carrier_is_free_text_without_directory(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    """Перевозчика больше нет как отдельной сущности — просто текст в заявке,
+    любой, без справочника и без проверки на пересечение с другими записями."""
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+
+    created = await auth_client.post(
+        "/api/v1/shipments",
+        json={
+            "lead_id": lead_id,
+            "carrier_name": "ИП Новиков",
+            "carrier_contact": "+7 900 111-22-33",
+        },
+    )
+    assert created.status_code == 201, created.text
+    shipment_id = created.json()["id"]
+    assert created.json()["carrier_name"] == "ИП Новиков"
+    assert created.json()["carrier_inn"] == ""
+
+    # Можно взять точно такое же название/ИНН ещё раз — никакого конфликта.
+    again = await auth_client.post(
+        "/api/v1/shipments", json={"lead_id": lead_id, "carrier_name": "ИП Новиков"}
+    )
+    assert again.status_code == 201, again.text
+
+    # Перевозчика можно поменять и на самой заявке.
+    patched = await auth_client.patch(
+        f"/api/v1/shipments/{shipment_id}", json={"carrier_name": "ООО «Другой перевозчик»"}
+    )
+    assert patched.status_code == 200, patched.text
+    assert patched.json()["carrier_name"] == "ООО «Другой перевозчик»"
 
 
-async def test_create_carrier_validates_inn_checksum(auth_client: AsyncClient) -> None:
-    """У перевозчика та же проверка контрольной суммы ИНН, что и у лида."""
+async def test_shipment_carrier_inn_validates_checksum_when_provided(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    """ИНН перевозчика в заявке необязателен, но если его ввели — проверяем
+    контрольную сумму (как у лида), без сверки с другими записями."""
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+
+    blank = await auth_client.post(
+        "/api/v1/shipments", json={"lead_id": lead_id, "carrier_name": "ИП Петров"}
+    )
+    assert blank.status_code == 201, blank.text
+    assert blank.json()["carrier_inn"] == ""
+
     bad = await auth_client.post(
-        "/api/v1/carriers", json={"name": "ООО «Плохой ИНН»", "inn": "7700000001"}
+        "/api/v1/shipments", json={"lead_id": lead_id, "carrier_inn": "7700000001"}
     )
     assert bad.status_code == 422
     assert bad.json()["code"] == "validation_error"
 
     ok = await auth_client.post(
-        "/api/v1/carriers", json={"name": "ООО «Хороший ИНН»", "inn": "7707083893"}
+        "/api/v1/shipments", json={"lead_id": lead_id, "carrier_inn": "7707083893"}
     )
     assert ok.status_code == 201, ok.text
+    assert ok.json()["carrier_inn"] == "7707083893"
 
 
 async def test_shipment_rejects_negative_price_and_weight(

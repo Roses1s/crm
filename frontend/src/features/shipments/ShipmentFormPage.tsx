@@ -12,7 +12,6 @@ import { AppShell, ControlPanel } from "@/app/layout/AppShell";
 import { ApiError } from "@/shared/api/client";
 import {
   useAddShipmentNote,
-  useCarriers,
   useDeleteShipmentAttachment,
   useDeleteShipmentTimelineEntry,
   useEditShipmentNote,
@@ -269,7 +268,6 @@ function OrderLinesTab({
 const emptyForm = {
   number: "",
   lead_id: 0,
-  carrier_id: null as number | null,
   // Дата создания — по умолчанию «сейчас» (проставляется эффектом при
   // открытии формы новой заявки, см. ниже), но её можно поправить задним
   // числом прямо при заведении (см. toDatetimeLocal/fromDatetimeLocal).
@@ -306,7 +304,9 @@ const emptyForm = {
   unloading_date_to: "",
   unloading_time_from: "",
 
-  // Перевозчик.
+  // Перевозчик — свободный текст прямо в заявке, без справочника.
+  carrier_name: "",
+  carrier_inn: "",
   carrier_contact: "",
   vehicle: "",
   vehicle_number: "",
@@ -343,7 +343,6 @@ function ShipmentForm({ id }: { id?: string }) {
 
   const { data: currentUser } = useMe();
   const { data: shipment, isLoading } = useShipment(id);
-  const { data: carriers = [] } = useCarriers();
   const { data: leads = [] } = useLeads();
   const { data: allTags = [] } = useTags();
   const { data: timeline = [] } = useShipmentTimeline(id);
@@ -384,7 +383,6 @@ function ShipmentForm({ id }: { id?: string }) {
         number: shipment.number ?? "",
         created_at: toDatetimeLocal(shipment.created_at),
         lead_id: shipment.lead_id,
-        carrier_id: shipment.carrier_id,
         address_loading: shipment.address_loading ?? "",
         address_unloading: shipment.address_unloading ?? "",
         contact_loading_name: shipment.contact_loading_name ?? "",
@@ -413,6 +411,8 @@ function ShipmentForm({ id }: { id?: string }) {
         unloading_date_to: shipment.unloading_date_to ?? "",
         unloading_time_from: shipment.unloading_time_from ?? "",
 
+        carrier_name: shipment.carrier_name ?? "",
+        carrier_inn: shipment.carrier_inn ?? "",
         carrier_contact: shipment.carrier_contact ?? "",
         vehicle: shipment.vehicle ?? "",
         vehicle_number: shipment.vehicle_number ?? "",
@@ -774,22 +774,24 @@ function ShipmentForm({ id }: { id?: string }) {
                   <FormGroup>
                     <div>
                       <InnerGroup title="Сведения о перевозчике">
-                        <Field label="Перевозчик" htmlFor="ship-carrier">
-                          <select
-                            id="ship-carrier"
-                            className={fieldStateCls(form.carrier_id != null)}
-                            value={form.carrier_id ?? ""}
-                            onChange={(e) =>
-                              set("carrier_id", e.target.value ? Number(e.target.value) : null)
-                            }
-                          >
-                            <option value="">—</option>
-                            {carriers.map((c) => (
-                              <option key={c.id} value={c.id}>
-                                {c.name}
-                              </option>
-                            ))}
-                          </select>
+                        <Field label="Перевозчик" htmlFor="ship-carrier-name">
+                          {/* Перевозчика просто вписывают текстом — любого,
+                          без выбора из справочника (справочника больше нет). */}
+                          <SInput
+                            id="ship-carrier-name"
+                            placeholder="Название компании"
+                            value={form.carrier_name}
+                            onChange={(e) => set("carrier_name", e.target.value)}
+                          />
+                        </Field>
+                        <Field label="ИНН перевозчика" htmlFor="ship-carrier-inn">
+                          <SInput
+                            id="ship-carrier-inn"
+                            inputMode="numeric"
+                            placeholder="10 или 12 цифр"
+                            value={form.carrier_inn}
+                            onChange={(e) => set("carrier_inn", e.target.value)}
+                          />
                         </Field>
                         <Field label="Контакт перевозчика" htmlFor="ship-carr-contact">
                           <SInput

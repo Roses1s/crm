@@ -34,3 +34,19 @@ def validate_inn(value: str) -> str:
     if not inn_checksum_ok(digits):
         raise ValueError("Некорректный ИНН: не сходится контрольная сумма")
     return digits
+
+
+def validate_inn_optional(value: str) -> str:
+    """Как `validate_inn`, но пустая строка разрешена.
+
+    Перевозчик в заявке теперь просто текстовое поле (см.
+    `app.schemas.shipment.carrier_inn`), а не запись в справочнике — его ИНН
+    не всегда известен в момент заведения заявки. Если что-то введено,
+    контрольную сумму по-прежнему проверяем, но ни на какие другие записи
+    (лиды, другие заявки) это поле не сверяем — пересечений/дублей здесь
+    сознательно нет.
+    """
+    digits = "".join(ch for ch in value if ch.isdigit())
+    if not digits:
+        return ""
+    return validate_inn(digits)

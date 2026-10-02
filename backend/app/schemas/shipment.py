@@ -3,11 +3,12 @@ from __future__ import annotations
 from datetime import date, datetime
 from decimal import Decimal
 
-from pydantic import BaseModel, Field
+from pydantic import BaseModel, Field, field_validator
 
 from app.models.shipment import ShipmentStatus, TaxRate, TransportType
 from app.schemas.common import ORMModel
 from app.schemas.crm import TagRead
+from app.schemas.validators import validate_inn_optional
 
 
 class ShipmentBase(BaseModel):
@@ -51,7 +52,13 @@ class ShipmentBase(BaseModel):
     unloading_time_from: str = ""
     unloading_time_to: str = ""
 
-    # Перевозчик.
+    # Перевозчик — свободный текст прямо в заявке, а не выбор из справочника:
+    # его можно вписать любого, с любой компанией/ИНН/контактом. ИНН (если
+    # указан) проверяется контрольной суммой, но ни с какими другими
+    # записями (лидами, другими заявками) не сверяется — пересечений и
+    # дублей по перевозчику в системе больше нет.
+    carrier_name: str = Field(default="", max_length=255)
+    carrier_inn: str = ""
     carrier_contact: str = ""
     vehicle: str = ""
     vehicle_number: str = ""
@@ -71,10 +78,11 @@ class ShipmentBase(BaseModel):
 
     tag_ids: list[int] = Field(default_factory=list)
 
+    _validate_carrier_inn = field_validator("carrier_inn")(staticmethod(validate_inn_optional))
+
 
 class ShipmentCreate(ShipmentBase):
     lead_id: int
-    carrier_id: int | None = None
     # Дата создания редактируема: заявку часто заводят в системе позже, чем
     # она реально возникла (задним числом), и нужно видеть её в списке по
     # настоящей дате, а не по дате ввода в CRM. Не передано — ставит сама БД
@@ -88,7 +96,6 @@ class ShipmentUpdate(BaseModel):
     # свой единственный видимый идентификатор без возможности откатить.
     number: str | None = Field(default=None, min_length=1, max_length=40)
     lead_id: int | None = None
-    carrier_id: int | None = None
     status: ShipmentStatus | None = None
     # См. ShipmentCreate.created_at — здесь это просто обычное поле: раз
     # передано явно (exclude_unset), значит его и меняем.
@@ -125,6 +132,8 @@ class ShipmentUpdate(BaseModel):
     unloading_time_from: str | None = None
     unloading_time_to: str | None = None
 
+    carrier_name: str | None = Field(default=None, max_length=255)
+    carrier_inn: str | None = None
     carrier_contact: str | None = None
     vehicle: str | None = None
     vehicle_number: str | None = None
@@ -142,6 +151,8 @@ class ShipmentUpdate(BaseModel):
     loading_method: list[str] | None = None
 
     tag_ids: list[int] | None = None
+
+    _validate_carrier_inn = field_validator("carrier_inn")(staticmethod(validate_inn_optional))
 
 
 class ShipmentStatusUpdate(BaseModel):
@@ -164,8 +175,6 @@ class ShipmentRead(ORMModel):
     contact_loading_phone: str
     contact_unloading_name: str
     contact_unloading_phone: str
-    carrier_id: int | None
-    carrier_name: str | None
     cargo_weight: Decimal | None
     cargo_volume: Decimal | None
     comment: str
@@ -191,6 +200,8 @@ class ShipmentRead(ORMModel):
     unloading_time_from: str
     unloading_time_to: str
 
+    carrier_name: str
+    carrier_inn: str
     carrier_contact: str
     vehicle: str
     vehicle_number: str
@@ -223,8 +234,7 @@ class ShipmentListItem(ORMModel):
     seller_name: str | None
     status: ShipmentStatus
     route: str
-    carrier_id: int | None
-    carrier_name: str | None
+    carrier_name: str
     created_at: datetime
 
 

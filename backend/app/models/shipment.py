@@ -12,7 +12,6 @@ from app.db.base import Base, TimestampMixin
 from app.models.crm import Tag
 
 if TYPE_CHECKING:
-    from app.models.carrier import Carrier
     from app.models.crm import Lead
 
 
@@ -65,9 +64,6 @@ class Shipment(Base, TimestampMixin):
     lead_id: Mapped[int] = mapped_column(
         ForeignKey("leads.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    carrier_id: Mapped[int | None] = mapped_column(
-        ForeignKey("carriers.id", ondelete="SET NULL"), index=True
-    )
 
     status: Mapped[ShipmentStatus] = mapped_column(
         _enum(ShipmentStatus), default=ShipmentStatus.new, nullable=False, index=True
@@ -118,7 +114,12 @@ class Shipment(Base, TimestampMixin):
     unloading_time_from: Mapped[str] = mapped_column(String(40), default="", nullable=False)
     unloading_time_to: Mapped[str] = mapped_column(String(40), default="", nullable=False)
 
-    # --- Перевозчик ---
+    # --- Перевозчик: никакого справочника — перевозчика просто вписывают
+    # текстом прямо в заявку (компания, ИНН, контакт). Пересечений/проверок
+    # на дубли между заявками сознательно нет — это не бизнес-сущность
+    # системы, а текст, который вводит продавец. ---
+    carrier_name: Mapped[str] = mapped_column(String(255), default="", nullable=False)
+    carrier_inn: Mapped[str] = mapped_column(String(12), default="", nullable=False)
     carrier_contact: Mapped[str] = mapped_column(String(255), default="", nullable=False)
     vehicle: Mapped[str] = mapped_column(String(120), default="", nullable=False)
     vehicle_number: Mapped[str] = mapped_column(String(40), default="", nullable=False)
@@ -137,16 +138,11 @@ class Shipment(Base, TimestampMixin):
     loading_method: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
 
     lead: Mapped[Lead] = relationship(back_populates="shipments", lazy="joined")
-    carrier: Mapped[Carrier | None] = relationship(back_populates="shipments", lazy="joined")
     tags: Mapped[list[Tag]] = relationship(secondary=shipment_tags, lazy="selectin")
 
     @property
     def lead_name(self) -> str:
         return self.lead.name if self.lead else ""
-
-    @property
-    def carrier_name(self) -> str | None:
-        return self.carrier.name if self.carrier else None
 
     @property
     def seller_name(self) -> str | None:

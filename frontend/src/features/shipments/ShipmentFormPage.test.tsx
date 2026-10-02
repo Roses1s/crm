@@ -31,8 +31,8 @@ const SHIPMENT = {
   status: "new",
   transport_type: "tent",
   route: "Москва — Казань",
-  carrier_id: null,
-  carrier_name: null,
+  carrier_name: "",
+  carrier_inn: "",
   created_at: "2026-01-15T09:30:00+00:00",
   loading_cities: [],
   unloading_cities: [],
@@ -55,7 +55,6 @@ function commonRoutes() {
     { path: "/shipments/101/timeline", response: [] },
     { path: "/shipments/101", response: SHIPMENT },
     { path: "/crm/leads", response: page([]) },
-    { path: "/carriers", response: [] },
     { path: "/crm/tags", response: [] },
   ];
 }

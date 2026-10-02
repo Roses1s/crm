@@ -114,8 +114,7 @@ export interface Shipment {
   seller_name?: string | null;
   status: string;
   route: string;
-  carrier_id: number | null;
-  carrier_name?: string | null;
+  carrier_name?: string;
   created_at: string;
   address_loading?: string;
   address_unloading?: string;
@@ -153,7 +152,8 @@ export interface Shipment {
   unloading_time_from?: string;
   unloading_time_to?: string;
 
-  // Перевозчик.
+  // Перевозчик — свободный текст прямо в заявке, без справочника.
+  carrier_inn?: string;
   carrier_contact?: string;
   vehicle?: string;
   vehicle_number?: string;
@@ -172,14 +172,6 @@ export interface Shipment {
   loading_method?: string[];
 
   tags?: Tag[];
-}
-
-export interface Carrier {
-  id: number;
-  name: string;
-  inn: string;
-  is_active: boolean;
-  tags: Tag[];
 }
 
 export interface Pager {

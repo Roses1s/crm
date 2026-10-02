@@ -11,7 +11,6 @@ from sqlalchemy.orm import selectinload
 from app.core.errors import AppError, NotFoundError
 from app.core.logging import get_logger
 from app.core.pagination import PageParams, build_page, paginate
-from app.models.carrier import Carrier
 from app.models.crm import Lead
 from app.models.shipment import Shipment, ShipmentStatus
 from app.models.timeline import EntryType, TimelineEntry
@@ -92,14 +91,12 @@ async def list_shipments(
         # «50%» молча вёл бы себя как маска «50» + что угодно.
         escaped = search.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
         pattern = f"%{escaped}%"
-        stmt = stmt.join(Lead, Shipment.lead_id == Lead.id).outerjoin(
-            Carrier, Shipment.carrier_id == Carrier.id
-        )
+        stmt = stmt.join(Lead, Shipment.lead_id == Lead.id)
         stmt = stmt.where(
             or_(
                 Shipment.number.ilike(pattern, escape="\\"),
                 Lead.name.ilike(pattern, escape="\\"),
-                Carrier.name.ilike(pattern, escape="\\"),
+                Shipment.carrier_name.ilike(pattern, escape="\\"),
             )
         )
     items, total = await paginate(session, stmt, params)

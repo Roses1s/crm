@@ -12,11 +12,6 @@ const AdminLayout = lazy(() =>
     default: m.AdminLayout,
   })),
 );
-const CarriersPage = lazy(() =>
-  import("@/features/admin/CarriersPage").then((m) => ({
-    default: m.CarriersPage,
-  })),
-);
 const SecurityPage = lazy(() =>
   import("@/features/admin/SecurityPage").then((m) => ({
     default: m.SecurityPage,
@@ -132,7 +127,6 @@ export function AppRouter() {
         >
           <Route index element={<Navigate to="users" replace />} />
           <Route path="users" element={<UsersPage />} />
-          <Route path="carriers" element={<CarriersPage />} />
           <Route path="security" element={<SecurityPage />} />
         </Route>
         <Route path="*" element={<Navigate to="/" replace />} />

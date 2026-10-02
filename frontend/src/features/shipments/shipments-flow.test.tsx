@@ -33,7 +33,6 @@ const SHIPMENTS = [
     seller_name: "Мария Петрова",
     status: "new",
     route: "Москва — Казань",
-    carrier_id: null,
     carrier_name: "ИП Сидоров",
     created_at: "2026-09-30T10:00:00+03:00",
   },
