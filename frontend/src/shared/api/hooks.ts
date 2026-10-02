@@ -769,7 +769,10 @@ export function useSaveShipment(id: string | undefined) {
     onSuccess: (data) => {
       void qc.invalidateQueries({ queryKey: ["shipments"] });
       void qc.invalidateQueries({ queryKey: keys.shipment(data.id) });
-      void qc.invalidateQueries({ queryKey: keys.leadShipments(data.lead_id) });
+      // При переносе заявки меняются сразу списки старого и нового лида.
+      // Старый lead_id после ответа уже неизвестен, поэтому инвалидируем весь
+      // небольшой namespace вкладок заявок, а не только новую карточку.
+      void qc.invalidateQueries({ queryKey: ["lead-shipments"] });
     },
   });
 }

@@ -3,7 +3,7 @@ from __future__ import annotations
 import enum
 from typing import TYPE_CHECKING
 
-from sqlalchemy import BigInteger, Enum, ForeignKey, String, Text
+from sqlalchemy import BigInteger, Enum, ForeignKey, ForeignKeyConstraint, String, Text
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
@@ -23,6 +23,16 @@ class TimelineEntry(Base, TimestampMixin):
     """Запись ленты чаттера: примечание или изменение поля."""
 
     __tablename__ = "timeline_entries"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["shipment_id", "lead_id"],
+            ["shipments.id", "shipments.lead_id"],
+            name="fk_timeline_entries_shipment_lead_shipments",
+            ondelete="CASCADE",
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     lead_id: Mapped[int] = mapped_column(
@@ -31,9 +41,7 @@ class TimelineEntry(Base, TimestampMixin):
     # Лента заявки: запись принадлежит и заявке (shipment_id), и её лиду
     # (lead_id остаётся заполненным для каскадного удаления). У записей лида
     # shipment_id пуст — так две ленты не смешиваются.
-    shipment_id: Mapped[int | None] = mapped_column(
-        ForeignKey("shipments.id", ondelete="CASCADE"), index=True
-    )
+    shipment_id: Mapped[int | None] = mapped_column(index=True)
     author_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
 
     type: Mapped[EntryType] = mapped_column(
@@ -73,6 +81,16 @@ class Attachment(Base, TimestampMixin):
     """Файл, приложенный к лиду, к записи ленты или к заявке на перевозку."""
 
     __tablename__ = "attachments"
+    __table_args__ = (
+        ForeignKeyConstraint(
+            ["shipment_id", "lead_id"],
+            ["shipments.id", "shipments.lead_id"],
+            name="fk_attachments_shipment_lead_shipments",
+            ondelete="CASCADE",
+            deferrable=True,
+            initially="DEFERRED",
+        ),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     lead_id: Mapped[int] = mapped_column(
@@ -83,9 +101,7 @@ class Attachment(Base, TimestampMixin):
     )
     # Заявка всегда принадлежит лиду, поэтому lead_id остаётся заполненным и у
     # файлов заявки: так работает и подсчёт объёма по лиду, и каскадное удаление.
-    shipment_id: Mapped[int | None] = mapped_column(
-        ForeignKey("shipments.id", ondelete="CASCADE"), index=True
-    )
+    shipment_id: Mapped[int | None] = mapped_column(index=True)
 
     uploaded_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
 

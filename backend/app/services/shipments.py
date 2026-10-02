@@ -4,7 +4,7 @@ from __future__ import annotations
 
 from typing import Any
 
-from sqlalchemy import or_, select
+from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
@@ -13,7 +13,7 @@ from app.core.logging import get_logger
 from app.core.pagination import PageParams, build_page, paginate
 from app.models.crm import Lead
 from app.models.shipment import Shipment, ShipmentStatus
-from app.models.timeline import EntryType, TimelineEntry
+from app.models.timeline import Attachment, EntryType, TimelineEntry
 from app.models.user import Role, User
 from app.schemas.crm import NoteCreate, NoteUpdate
 from app.schemas.shipment import ShipmentCreate, ShipmentStatusUpdate, ShipmentUpdate
@@ -35,7 +35,12 @@ STAGE_LABELS: dict[ShipmentStatus, str] = {
 
 
 async def get_shipment_or_404(
-    session: AsyncSession, shipment_id: int, user: User | None = None, *, allow_lost: bool = False
+    session: AsyncSession,
+    shipment_id: int,
+    user: User | None = None,
+    *,
+    allow_lost: bool = False,
+    for_update: bool = False,
 ) -> Shipment:
     """`allow_lost=True` — только для чтения: заявка проигранного лида тоже
     становится видна всем, как и сам лид (см. `get_lead_or_404`).
@@ -52,6 +57,10 @@ async def get_shipment_or_404(
         .options(selectinload(Shipment.tags))
         .execution_options(populate_existing=True)
     )
+    if for_update:
+        # Перенос заявки меняет сразу три таблицы; блокировка не даёт двум
+        # одновременным PATCH разнести их по разным лидам.
+        stmt = stmt.with_for_update()
     shipment = (await session.execute(stmt)).unique().scalar_one_or_none()
     if shipment is None:
         raise NotFoundError(f"Заявка {shipment_id} не найдена")
@@ -129,14 +138,41 @@ async def create_shipment(session: AsyncSession, user: User, payload: ShipmentCr
 async def update_shipment(
     session: AsyncSession, user: User, shipment_id: int, payload: ShipmentUpdate
 ) -> Shipment:
-    shipment = await get_shipment_or_404(session, shipment_id, user)
+    shipment = await get_shipment_or_404(session, shipment_id, user, for_update=True)
     data = payload.model_dump(exclude_unset=True)
     tag_ids = data.pop("tag_ids", None)
+
+    new_lead_id = data.get("lead_id")
+    if new_lead_id is not None and new_lead_id != shipment.lead_id:
+        # Проверяем новый лид теми же строгими правами, что и при создании
+        # заявки: менеджер не может записать свою заявку в карточку коллеги.
+        await get_lead_or_404(session, new_lead_id, user)
+
+        # lead_id у timeline и attachments денормализован для авторизации,
+        # подсчёта места и каскадного удаления. Поэтому переносим весь агрегат
+        # одной транзакцией, а не только строку shipments.
+        await session.execute(
+            update(TimelineEntry)
+            .where(TimelineEntry.shipment_id == shipment.id)
+            .values(lead_id=new_lead_id)
+        )
+        await session.execute(
+            update(Attachment)
+            .where(Attachment.shipment_id == shipment.id)
+            .values(lead_id=new_lead_id)
+        )
+
     for key, value in data.items():
         setattr(shipment, key, value)
     if tag_ids is not None:
         shipment.tags = await fetch_tags(session, tag_ids)
     await session.commit()
+    log.info(
+        "shipment.updated",
+        shipment_id=shipment_id,
+        fields=sorted(data),
+        by=user.id,
+    )
     return await _reload_shipment(session, shipment_id)
 
 

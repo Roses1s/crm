@@ -5,7 +5,19 @@ from datetime import date
 from decimal import Decimal
 from typing import TYPE_CHECKING
 
-from sqlalchemy import JSON, Boolean, Column, Date, Enum, ForeignKey, Numeric, String, Table, Text
+from sqlalchemy import (
+    JSON,
+    Boolean,
+    Column,
+    Date,
+    Enum,
+    ForeignKey,
+    Numeric,
+    String,
+    Table,
+    Text,
+    UniqueConstraint,
+)
 from sqlalchemy.orm import Mapped, mapped_column, relationship
 
 from app.db.base import Base, TimestampMixin
@@ -55,6 +67,10 @@ class Shipment(Base, TimestampMixin):
     """Заявка на перевозку."""
 
     __tablename__ = "shipments"
+    # Составной ключ нужен дочерним строкам заявки: timeline/attachments
+    # обязаны ссылаться не просто на существующую заявку, а на ту же пару
+    # «заявка + лид». Так БД сама не допускает рассинхронизацию lead_id.
+    __table_args__ = (UniqueConstraint("id", "lead_id", name="uq_shipments_id_lead_id"),)
 
     id: Mapped[int] = mapped_column(primary_key=True)
     # Номер заявки — видимый пользователю идентификатор, который можно

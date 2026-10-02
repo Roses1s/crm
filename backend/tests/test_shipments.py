@@ -235,6 +235,146 @@ async def test_shipment_note_crud(auth_client: AsyncClient, seeded: dict) -> Non
     assert after.json() == []
 
 
+async def test_reassign_shipment_moves_history_and_attachments_atomically(
+    auth_client: AsyncClient, seeded: dict, session
+) -> None:
+    """Перенос заявки меняет lead_id всего агрегата, поэтому удаление старого
+    лида больше не уничтожает историю и файлы перенесённой заявки."""
+    from sqlalchemy import select
+
+    from app.models.timeline import Attachment, TimelineEntry
+
+    old_lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    stage_id = seeded["stage_new"].id  # type: ignore[attr-defined]
+    new_lead = (
+        await auth_client.post(
+            "/api/v1/crm/leads",
+            json={"name": "ООО «Новый клиент»", "inn": "5404123455", "stage_id": stage_id},
+        )
+    ).json()
+    shipment = (await auth_client.post("/api/v1/shipments", json={"lead_id": old_lead_id})).json()
+    shipment_id = shipment["id"]
+
+    await auth_client.post(
+        f"/api/v1/shipments/{shipment_id}/notes", json={"body": "важная заметка"}
+    )
+    await auth_client.patch(f"/api/v1/shipments/{shipment_id}/status", json={"status": "loaded"})
+    uploaded = await auth_client.post(
+        f"/api/v1/shipments/{shipment_id}/attachments",
+        files={"file": ("Накладная.pdf", b"%PDF-1.4 important", "application/pdf")},
+    )
+    assert uploaded.status_code == 201, uploaded.text
+    attachment_id = uploaded.json()["id"]
+
+    moved = await auth_client.patch(
+        f"/api/v1/shipments/{shipment_id}", json={"lead_id": new_lead["id"]}
+    )
+    assert moved.status_code == 200, moved.text
+    assert moved.json()["lead_id"] == new_lead["id"]
+
+    timeline_lead_ids = list(
+        (
+            await session.execute(
+                select(TimelineEntry.lead_id).where(TimelineEntry.shipment_id == shipment_id)
+            )
+        ).scalars()
+    )
+    attachment_lead_ids = list(
+        (
+            await session.execute(
+                select(Attachment.lead_id).where(Attachment.shipment_id == shipment_id)
+            )
+        ).scalars()
+    )
+    assert timeline_lead_ids == [new_lead["id"], new_lead["id"]]
+    assert attachment_lead_ids == [new_lead["id"]]
+
+    deleted_old = await auth_client.delete(f"/api/v1/crm/leads/{old_lead_id}/permanent")
+    assert deleted_old.status_code == 204
+    assert (await auth_client.get(f"/api/v1/shipments/{shipment_id}")).status_code == 200
+    assert (await auth_client.get(f"/api/v1/crm/attachments/{attachment_id}")).status_code == 200
+    timeline = await auth_client.get(f"/api/v1/shipments/{shipment_id}/timeline")
+    assert len(timeline.json()) == 2
+
+
+async def test_reassignment_enforces_target_access_and_removes_old_owner_access(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    admin_lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    headers = await manager_headers(auth_client)
+    stages = await auth_client.get("/api/v1/crm/stages", headers=headers)
+    manager_stage_id = stages.json()[0]["id"]
+    manager_lead = (
+        await auth_client.post(
+            "/api/v1/crm/leads",
+            json={
+                "name": "ООО «Свой клиент менеджера»",
+                "inn": "5404123455",
+                "stage_id": manager_stage_id,
+            },
+            headers=headers,
+        )
+    ).json()
+    shipment = (
+        await auth_client.post(
+            "/api/v1/shipments", json={"lead_id": manager_lead["id"]}, headers=headers
+        )
+    ).json()
+
+    forbidden = await auth_client.patch(
+        f"/api/v1/shipments/{shipment['id']}",
+        json={"lead_id": admin_lead_id},
+        headers=headers,
+    )
+    assert forbidden.status_code == 404
+
+    unchanged = await auth_client.get(f"/api/v1/shipments/{shipment['id']}", headers=headers)
+    assert unchanged.status_code == 200
+    assert unchanged.json()["lead_id"] == manager_lead["id"]
+
+    # Администратор вправе перенести заявку к своему лиду. После переноса
+    # прежний владелец не должен видеть её ни по прямому URL, ни в своём списке.
+    moved_by_admin = await auth_client.patch(
+        f"/api/v1/shipments/{shipment['id']}", json={"lead_id": admin_lead_id}
+    )
+    assert moved_by_admin.status_code == 200, moved_by_admin.text
+    assert moved_by_admin.json()["lead_id"] == admin_lead_id
+    assert (
+        await auth_client.get(f"/api/v1/shipments/{shipment['id']}", headers=headers)
+    ).status_code == 404
+    manager_shipments = await auth_client.get("/api/v1/shipments", headers=headers)
+    assert manager_shipments.json()["count"] == 0
+
+
+async def test_database_rejects_mismatched_shipment_lead(
+    auth_client: AsyncClient, seeded: dict, session
+) -> None:
+    """Составной FK — последний рубеж, если будущий код забудет перенести
+    дочерние строки. SQLite не включает FK в тестах, проверка идёт в CI/Postgres."""
+    import pytest
+    from sqlalchemy.exc import IntegrityError
+
+    from app.models.timeline import TimelineEntry
+
+    if session.get_bind().dialect.name == "sqlite":
+        pytest.skip("Составные внешние ключи проверяет PostgreSQL job")
+
+    old_lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    stage_id = seeded["stage_new"].id  # type: ignore[attr-defined]
+    new_lead = (
+        await auth_client.post(
+            "/api/v1/crm/leads",
+            json={"name": "ООО «Другой клиент»", "inn": "5404123455", "stage_id": stage_id},
+        )
+    ).json()
+    shipment = (await auth_client.post("/api/v1/shipments", json={"lead_id": old_lead_id})).json()
+
+    session.add(TimelineEntry(shipment_id=shipment["id"], lead_id=new_lead["id"], body="ошибка"))
+    with pytest.raises(IntegrityError):
+        await session.commit()
+    await session.rollback()
+
+
 async def test_shipment_carrier_is_free_text_without_directory(
     auth_client: AsyncClient, seeded: dict
 ) -> None:
