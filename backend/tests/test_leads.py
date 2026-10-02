@@ -69,6 +69,34 @@ async def test_stage_change_is_written_to_timeline(auth_client: AsyncClient, see
     assert entries[0]["new_value"] == "Переговоры"
 
 
+async def test_cannot_move_lead_to_stage_of_another_board(
+    auth_client: AsyncClient, seeded: dict, session
+) -> None:
+    """PATCH лида не должен принимать stage_id с чужой личной доски.
+
+    Иначе лид получает stage_id, которого нет среди колонок доски своего
+    владельца, и карточка пропадает из любого канбана (см. docs/CODE_REVIEW.md).
+    """
+    from app.models.crm import Stage
+
+    lead = seeded["lead"]  # type: ignore[index]
+    manager = seeded["manager"]  # type: ignore[index]
+
+    foreign_stage = Stage(name="Чужой этап", sequence=1, color="red", owner_id=manager.id)
+    session.add(foreign_stage)
+    await session.commit()
+    await session.refresh(foreign_stage)
+
+    patch = await auth_client.patch(
+        f"/api/v1/crm/leads/{lead.id}", json={"stage_id": foreign_stage.id}
+    )
+    assert patch.status_code == 404
+
+    # Лид остался на прежнем, своём этапе.
+    check = await auth_client.get(f"/api/v1/crm/leads/{lead.id}")
+    assert check.json()["stage_id"] == seeded["stage_new"].id  # type: ignore[index]
+
+
 async def test_note_appears_in_timeline(auth_client: AsyncClient, seeded: dict) -> None:
     lead_id = seeded["lead"].id  # type: ignore[attr-defined]
     created = await auth_client.post(

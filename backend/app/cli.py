@@ -18,6 +18,7 @@ from app.models.carrier import Carrier
 from app.models.crm import Lead, Stage, Tag
 from app.models.shipment import Shipment, ShipmentStatus
 from app.models.user import Role, User
+from app.services.stages import DEFAULT_STAGES as BOARD_STAGES
 
 DEFAULT_STAGES = [
     ("Новый", 1, False, "slate"),
@@ -26,15 +27,9 @@ DEFAULT_STAGES = [
     ("Договор", 4, False, "orange"),
     ("Выиграно", 5, True, "green"),
 ]
-# Стандартная воронка менеджера — та же, что создаётся при первом входе
-# (см. DEFAULT_STAGES в app/api/v1/stages.py).
-BOARD_STAGES = [
-    ("Новый", "slate"),
-    ("Перезвонить", "orange"),
-    ("Вышел на ЛПР", "blue"),
-    ("Потенциальный клиент", "purple"),
-    ("Уехали, ждём заявку", "green"),
-]
+# Стандартная воронка менеджера — та же, что создаётся при первом входе,
+# импортирована из app.services.stages, чтобы не держать два списка в
+# разных местах, которые легко рассинхронизировать правкой только одного.
 DEFAULT_TAGS = [
     ("Крупный клиент", "green"),
     ("Рефрижератор", "blue"),

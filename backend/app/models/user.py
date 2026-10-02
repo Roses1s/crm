@@ -36,7 +36,15 @@ class User(Base, TimestampMixin):
     )
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
-    leads: Mapped[list[Lead]] = relationship(back_populates="assigned_to", lazy="selectin")
+    # lazy="raise": обратная сторона Lead.assigned_to нужна только ORM для
+    # back_populates, в коде к ней никто не обращается (UserRead её не отдаёт).
+    # С lazy="selectin" SQLAlchemy тянула бы ВСЕ лиды пользователя (с джойнами
+    # на stage/assigned_to/loss_reason и отдельным запросом тегов) при каждой
+    # загрузке User — а User грузится в get_current_user на каждый запрос с
+    # токеном. "raise" вместо обычного "select" — чтобы случайное обращение
+    # к user.leads в будущем упало сразу понятной ошибкой, а не тихо вернуло
+    # лишний SELECT на каждый HTTP-вызов.
+    leads: Mapped[list[Lead]] = relationship(back_populates="assigned_to", lazy="raise")
 
     @property
     def full_name(self) -> str:

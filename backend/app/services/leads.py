@@ -14,7 +14,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from starlette.concurrency import run_in_threadpool
 
-from app.api.v1.stages import board_stage_for
 from app.core.errors import AppError, NotFoundError, PermissionDeniedError
 from app.core.logging import get_logger
 from app.core.pagination import PageParams, build_page, paginate
@@ -22,6 +21,7 @@ from app.models.crm import Lead, LossReason, lead_tags
 from app.models.timeline import Attachment, EntryType, TimelineEntry
 from app.models.user import Role, User
 from app.schemas.crm import LeadCreate, LeadLose, LeadTransfer, LeadUpdate, NoteCreate, NoteUpdate
+from app.services.stages import board_stage_for, stage_on_board
 from app.services.tags import fetch_tags
 
 log = get_logger(__name__)
@@ -152,8 +152,17 @@ async def update_lead(session: AsyncSession, user: User, lead_id: int, payload: 
     # Смена этапа попадает в ленту — так в чаттере видно историю движения.
     new_stage = data.get("stage_id")
     if new_stage is not None and new_stage != lead.stage_id:
+        # Этапы личные: нельзя переставить лид на колонку чужой доски — она
+        # не относится к доске владельца лида, и карточка просто пропала бы
+        # из любого канбана (та же защита, что у fallback_stage_id в
+        # DELETE /crm/stages/{id} и у board_stage_for при передаче лида).
+        if lead.assigned_to_id is None:
+            raise AppError(
+                "У лида нет ответственного — сначала назначьте продавца",
+                code="lead_without_owner",
+            )
+        new_stage_obj = await stage_on_board(session, new_stage, lead.assigned_to_id)
         old_name = lead.stage.name if lead.stage else "—"
-        new_stage_obj = await session.get(type(lead.stage), new_stage)
         session.add(
             TimelineEntry(
                 lead_id=lead.id,
@@ -161,7 +170,7 @@ async def update_lead(session: AsyncSession, user: User, lead_id: int, payload: 
                 type=EntryType.history,
                 field_label="Этапы лидов",
                 old_value=old_name,
-                new_value=new_stage_obj.name if new_stage_obj else str(new_stage),
+                new_value=new_stage_obj.name,
             )
         )
 

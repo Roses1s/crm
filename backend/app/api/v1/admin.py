@@ -12,7 +12,6 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
 from app.api.deps import AdminUser, SessionDep
-from app.api.v1.stages import ensure_default_stages
 from app.core.config import settings
 from app.core.errors import AppError, NotFoundError
 from app.core.logging import get_logger
@@ -21,6 +20,7 @@ from app.models.crm import Lead, Stage
 from app.models.security import LoginAttempt
 from app.models.user import User
 from app.schemas.user import UserCreate, UserRead, UserUpdate
+from app.services.stages import ensure_default_stages
 
 log = get_logger(__name__)
 
