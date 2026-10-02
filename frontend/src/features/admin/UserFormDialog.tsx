@@ -30,13 +30,7 @@ const emptyForm: FormState = {
  * `UsersPage`. Без `user` — создание (пароль обязателен), с `user` —
  * редактирование (пароль меняется, только если его вписали заново).
  */
-export function UserFormDialog({
-  user,
-  onClose,
-}: {
-  user?: User;
-  onClose: () => void;
-}) {
+export function UserFormDialog({ user, onClose }: { user?: User; onClose: () => void }) {
   const isEditing = !!user;
   const create = useCreateUser();
   const update = useUpdateUser();
@@ -193,9 +187,7 @@ export function UserFormDialog({
           </Button>
           <Button
             type="submit"
-            disabled={
-              pending || nameIsEmail || !form.email || (!isEditing && !form.password)
-            }
+            disabled={pending || nameIsEmail || !form.email || (!isEditing && !form.password)}
           >
             {pending ? "Сохранение…" : isEditing ? "Сохранить" : "Создать"}
           </Button>

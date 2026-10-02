@@ -59,7 +59,10 @@ export function UsersPage() {
         </thead>
         <tbody>
           {rows.map((user, index) => (
-            <tr key={user.id} className="h-10 border-b border-odoo-border-light bg-odoo-surface hover:bg-odoo-bg">
+            <tr
+              key={user.id}
+              className="h-10 border-b border-odoo-border-light bg-odoo-surface hover:bg-odoo-bg"
+            >
               <td className="p-2 text-odoo-text-muted">{index + 1}</td>
               <td className="p-2">{user.email}</td>
               <td className="p-2">

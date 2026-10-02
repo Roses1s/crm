@@ -118,7 +118,9 @@ export function QuickCreateLeadDialog({ onClose }: { onClose: () => void }) {
               className="rounded-[4px] bg-odoo-tag-yellow-bg px-2.5 py-2 text-[12px] leading-5 text-odoo-tag-yellow-text"
             >
               Лид с таким ИНН уже есть: «{sameInn[0].name}»
-              {sameInn[0].assigned_to_name ? `, ответственный — ${sameInn[0].assigned_to_name}` : ""}
+              {sameInn[0].assigned_to_name
+                ? `, ответственный — ${sameInn[0].assigned_to_name}`
+                : ""}
               . Можно продолжить — это просто предупреждение.
             </p>
           )}
