@@ -51,6 +51,10 @@ services:
       - "-c"
       - "maintenance_work_mem=128MB"
       - "-c"
+      # Бюджет посчитан в backend/app/core/config.py (комментарий у
+      # db_pool_size/db_max_overflow): GUNICORN_WORKERS * (pool_size +
+      # max_overflow) + запас под Celery/ручные подключения. Меняете
+      # GUNICORN_WORKERS или пул на бэкенде — пересчитайте и это число.
       - "max_connections=120"
     volumes:
       # ВАЖНО: в Postgres 18 данные лежат в /var/lib/postgresql/18/docker,

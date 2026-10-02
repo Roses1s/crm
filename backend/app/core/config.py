@@ -10,10 +10,15 @@ from __future__ import annotations
 from functools import lru_cache
 from typing import Literal
 
-from pydantic import Field, PostgresDsn, computed_field
+from pydantic import Field, PostgresDsn, computed_field, model_validator
 from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Environment = Literal["local", "staging", "production"]
+
+# Значение из примера .env и дефолт в коде — если дошло до production as is,
+# значит кто-то забыл переопределить переменную окружения.
+_INSECURE_DEFAULT_SECRET_KEYS = {"dev-secret-change-me", "test-secret", "ЗАМЕНИТЕ_МЕНЯ"}
+_MIN_SECRET_KEY_LENGTH = 32  # см. рекомендацию PyJWT/RFC 7518 §3.2 для HS256
 
 
 class Settings(BaseSettings):
@@ -47,6 +52,14 @@ class Settings(BaseSettings):
     postgres_db: str = "crm"
     # Прямой DSN перекрывает разобранные по частям настройки (нужно тестам и CI).
     database_url: str | None = None
+    # Бюджет соединений с Postgres считается так:
+    #   GUNICORN_WORKERS * (db_pool_size + db_max_overflow)
+    #   + запас на Celery worker/beat и ручные psql/alembic-сессии
+    #   <= max_connections из команды postgres в docker-compose.yml.
+    # Сейчас: 3 воркера * (10 + 20) = 90, + ~15 от Celery (свой движок с
+    # дефолтным QueuePool) + запас — против max_connections=120. Если меняете
+    # GUNICORN_WORKERS или эти два числа, пересчитайте max_connections заодно,
+    # иначе под нагрузкой можно упереться в лимит соединений Postgres.
     db_pool_size: int = 10
     db_max_overflow: int = 20
     db_echo: bool = False
@@ -129,6 +142,37 @@ class Settings(BaseSettings):
     def _valkey_db(self, db: int) -> str:
         base, _, _ = self.valkey_url.rpartition("/")
         return f"{base or self.valkey_url}/{db}"
+
+    @model_validator(mode="after")
+    def _fail_fast_on_insecure_production_config(self) -> Settings:
+        """Не даёт приложению тихо стартовать в проде с «забытыми» настройками.
+
+        Раньше эти две ошибки конфигурации ничем не отличались от штатного
+        запуска: сервер поднимался и работал, просто подписывал токены
+        публично известным ключом из репозитория или принимал запросы с
+        dev-адреса. Обе ошибки обнаружились бы не при деплое, а гораздо позже
+        и далеко не сразу. Здесь — явный отказ стартовать, с понятным текстом
+        прямо в `docker compose logs`.
+        """
+        if not self.is_production:
+            return self
+
+        if (
+            self.secret_key in _INSECURE_DEFAULT_SECRET_KEYS
+            or len(self.secret_key) < _MIN_SECRET_KEY_LENGTH
+        ):
+            raise ValueError(
+                "SECRET_KEY не задан или короче 32 байт при ENVIRONMENT=production. "
+                "Сгенерировать: openssl rand -hex 32 (см. .env.example)."
+            )
+
+        if any("localhost" in origin or "127.0.0.1" in origin for origin in self.cors_origins):
+            raise ValueError(
+                "CORS_ORIGINS содержит localhost/127.0.0.1 при ENVIRONMENT=production — "
+                "похоже, переменная окружения не переопределена (см. .env.example)."
+            )
+
+        return self
 
 
 @lru_cache
