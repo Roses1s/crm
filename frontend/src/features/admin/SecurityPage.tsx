@@ -1,6 +1,6 @@
 import { useBackups, useLoginAttempts, useRunBackup } from "@/shared/api/hooks";
 import { Button } from "@/shared/ui/button";
-import { formatSize } from "@/shared/ui/file-preview";
+import { formatSize } from "@/shared/ui/file-preview-utils";
 
 function staleMessage(ageHours: number | null): string {
   if (ageHours === null) return "Резервных копий нет. Проверьте, работает ли celery.";

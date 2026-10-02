@@ -61,7 +61,7 @@ import {
   OdooInput,
 } from "@/shared/ui/odoo-form";
 import { FormSkeleton } from "@/shared/ui/skeleton";
-import { useToast } from "@/shared/ui/toast";
+import { useToast } from "@/shared/ui/toast-context";
 
 export function LeadFormPage() {
   const { id } = useParams();

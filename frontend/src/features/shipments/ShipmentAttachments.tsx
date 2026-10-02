@@ -8,7 +8,8 @@ import {
   useUploadShipmentAttachment,
 } from "@/shared/api/hooks";
 import type { Attachment } from "@/shared/types";
-import { FilePreview, formatSize, previewKind } from "@/shared/ui/file-preview";
+import { FilePreview } from "@/shared/ui/file-preview";
+import { formatSize, previewKind } from "@/shared/ui/file-preview-utils";
 
 /**
  * Документы заявки: накладные, договоры, фотографии груза.

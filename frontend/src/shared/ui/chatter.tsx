@@ -5,7 +5,7 @@ import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { downloadAttachment } from "@/shared/api/hooks";
 import type { Attachment, TimelineEntry } from "@/shared/types";
-import { formatSize, previewKind, useObjectUrl } from "@/shared/ui/file-preview";
+import { formatSize, previewKind, useObjectUrl } from "@/shared/ui/file-preview-utils";
 
 /**
  * Чаттер (правая колонка карточки): лента событий, примечания и вложения.

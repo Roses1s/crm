@@ -1,17 +1,12 @@
 import { Check } from "lucide-react";
-import { createContext, useCallback, useContext, useRef, useState, type ReactNode } from "react";
+import { useCallback, useRef, useState, type ReactNode } from "react";
+
+import { ToastContext } from "@/shared/ui/toast-context";
 
 interface ToastItem {
   id: number;
   message: string;
 }
-
-interface ToastContextValue {
-  /** Показать зелёную плашку в углу экрана; исчезает сама через 2.5 сек. */
-  show: (message: string) => void;
-}
-
-const ToastContext = createContext<ToastContextValue | null>(null);
 
 const AUTO_DISMISS_MS = 2500;
 
@@ -47,10 +42,4 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       </div>
     </ToastContext.Provider>
   );
-}
-
-export function useToast(): ToastContextValue {
-  const ctx = useContext(ToastContext);
-  if (!ctx) throw new Error("useToast должен вызываться внутри ToastProvider");
-  return ctx;
 }

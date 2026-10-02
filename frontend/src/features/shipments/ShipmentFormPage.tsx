@@ -46,7 +46,7 @@ import {
   OdooInput,
 } from "@/shared/ui/odoo-form";
 import { FormSkeleton } from "@/shared/ui/skeleton";
-import { useToast } from "@/shared/ui/toast";
+import { useToast } from "@/shared/ui/toast-context";
 import { TokenField } from "./TokenField";
 
 // Наша компания — статичная шапка бланка.
