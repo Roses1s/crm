@@ -60,7 +60,10 @@ async def get_shipment_or_404(
     if for_update:
         # Перенос заявки меняет сразу три таблицы; блокировка не даёт двум
         # одновременным PATCH разнести их по разным лидам.
-        stmt = stmt.with_for_update()
+        # `Shipment.lead` тянет nullable joined-связи этапа/ответственного.
+        # PostgreSQL запрещает FOR UPDATE всей такой выборки, поэтому явно
+        # блокируем только базовую строку shipments.
+        stmt = stmt.with_for_update(of=Shipment)
     shipment = (await session.execute(stmt)).unique().scalar_one_or_none()
     if shipment is None:
         raise NotFoundError(f"Заявка {shipment_id} не найдена")
