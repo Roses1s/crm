@@ -153,16 +153,21 @@ export function Navbar() {
 
       {sheet && (
         <div
-          className="fixed inset-0 z-[60] bg-odoo-overlay/20 md:hidden"
-          onClick={() => setSheet(false)}
+          role="dialog"
+          aria-modal="true"
+          aria-label="Навигационное меню"
+          className="fixed inset-0 z-[60] md:hidden"
         >
-          <div
-            className="h-full w-64 bg-odoo-surface p-4 shadow-lg"
-            onClick={(e) => e.stopPropagation()}
-          >
+          <button
+            type="button"
+            aria-label="Закрыть меню нажатием на фон"
+            className="absolute inset-0 bg-odoo-overlay/20"
+            onClick={() => setSheet(false)}
+          />
+          <div className="relative h-full w-64 bg-odoo-surface p-4 shadow-lg">
             <div className="mb-4 flex items-center justify-between">
               <span className="font-semibold">CRM</span>
-              <button type="button" onClick={() => setSheet(false)}>
+              <button type="button" aria-label="Закрыть меню" onClick={() => setSheet(false)}>
                 <X className="h-5 w-5" />
               </button>
             </div>

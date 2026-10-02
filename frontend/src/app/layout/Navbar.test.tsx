@@ -46,4 +46,15 @@ describe("меню профиля", () => {
     await user.keyboard("{Escape}");
     expect(screen.queryByRole("menu")).not.toBeInTheDocument();
   });
+
+  it("закрывает мобильное меню отдельной кнопкой-фоном", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<Navbar />);
+
+    await user.click(screen.getByRole("button", { name: "Меню" }));
+    expect(screen.getByRole("dialog", { name: "Навигационное меню" })).toBeInTheDocument();
+
+    await user.click(screen.getByRole("button", { name: "Закрыть меню нажатием на фон" }));
+    expect(screen.queryByRole("dialog", { name: "Навигационное меню" })).not.toBeInTheDocument();
+  });
 });

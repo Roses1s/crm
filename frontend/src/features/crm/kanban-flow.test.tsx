@@ -133,7 +133,8 @@ describe("Сценарий: доска лидов", () => {
     // У каждой карточки своя кнопка меню; берём первую (лид 10).
     await user.click(screen.getAllByRole("button", { name: "Меню карточки" })[0]);
 
-    const open = await screen.findByRole("link", { name: "Открыть" });
+    expect(screen.getByRole("menu")).toBeInTheDocument();
+    const open = await screen.findByRole("menuitem", { name: "Открыть" });
     expect(open).toHaveAttribute("href", "/crm/leads/10");
   });
 

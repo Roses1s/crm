@@ -64,13 +64,18 @@ export function FilePreview({ file, onClose }: { file: Attachment; onClose: () =
 
   return (
     <div
+      role="dialog"
+      aria-modal="true"
+      aria-label={`Просмотр файла ${file.name}`}
       className="fixed inset-0 z-[70] flex items-center justify-center bg-odoo-overlay/60 p-4"
-      onClick={onClose}
     >
-      <div
-        className="flex max-h-full w-full max-w-4xl flex-col overflow-hidden rounded-[4px] border border-odoo-border bg-odoo-surface shadow-lg"
-        onClick={(e) => e.stopPropagation()}
-      >
+      <button
+        type="button"
+        aria-label="Закрыть просмотр файла"
+        className="absolute inset-0 cursor-default"
+        onClick={onClose}
+      />
+      <div className="relative flex max-h-full w-full max-w-4xl flex-col overflow-hidden rounded-[4px] border border-odoo-border bg-odoo-surface shadow-lg">
         <div className="flex items-center gap-2 border-b border-odoo-border-light px-3 py-2">
           <span className="min-w-0 flex-1 truncate text-[13px] font-medium text-odoo-text">
             {file.name}

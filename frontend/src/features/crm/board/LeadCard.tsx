@@ -128,6 +128,9 @@ export function LeadCard({ lead, isOverlay }: { lead: Lead; isOverlay?: boolean 
           <button
             type="button"
             aria-label="Меню карточки"
+            aria-haspopup="menu"
+            aria-expanded={menuOpen}
+            aria-controls={`lead-card-menu-${lead.id}`}
             title="Меню"
             className="rounded-[4px] p-1 text-odoo-text-light opacity-0 hover:bg-odoo-bg hover:text-odoo-text focus:opacity-100 group-hover:opacity-100"
             onPointerDown={(e) => e.stopPropagation()}
@@ -141,11 +144,13 @@ export function LeadCard({ lead, isOverlay }: { lead: Lead; isOverlay?: boolean 
           </button>
           {menuOpen && (
             <div
+              id={`lead-card-menu-${lead.id}`}
+              role="menu"
               className="absolute right-0 top-7 min-w-[110px] rounded-[4px] border border-odoo-border bg-odoo-surface py-1 shadow-lg"
               onPointerDown={(e) => e.stopPropagation()}
-              onClick={(e) => e.stopPropagation()}
             >
               <Link
+                role="menuitem"
                 to={`/crm/leads/${lead.id}`}
                 className="block px-3 py-1.5 text-left text-xs text-odoo-text hover:bg-odoo-bg"
               >

@@ -32,10 +32,10 @@ export default tseslint.config(
       "react-refresh/only-export-components": ["warn", { allowConstantExport: true }],
       // Автофокус в модальных окнах и полях ввода здесь намеренный и улучшает UX.
       "jsx-a11y/no-autofocus": "off",
-      // Полная клавиатурная доступность интерактивных div-ов — отдельная задача
-      // (клавиатурная навигация канбана). Пока предупреждаем, не блокируя сборку.
-      "jsx-a11y/click-events-have-key-events": "warn",
-      "jsx-a11y/no-static-element-interactions": "warn",
+      // Интерактивные элементы обязаны работать с клавиатуры: ошибка линтера
+      // не даст незаметно вернуть кликабельный div без кнопки или ссылки.
+      "jsx-a11y/click-events-have-key-events": "error",
+      "jsx-a11y/no-static-element-interactions": "error",
     },
   },
   // Тестовые файлы: доступны глобали vitest/jsdom.
