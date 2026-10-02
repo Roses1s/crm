@@ -13,7 +13,6 @@ from fastapi import APIRouter, Depends, Query, status
 from app.api.deps import CurrentUser, SessionDep
 from app.core.pagination import Page, PageParams, page_params
 from app.models.timeline import TimelineEntry
-from app.models.user import User
 from app.schemas.crm import (
     LeadCreate,
     LeadLose,
@@ -25,7 +24,6 @@ from app.schemas.crm import (
     TimelineEntryRead,
 )
 from app.services import leads as service
-from app.services.leads import get_lead_or_404, visible_only
 
 router = APIRouter(prefix="/crm/leads", tags=["crm: лиды"])
 
@@ -169,8 +167,3 @@ async def transfer_lead(
 @router.get("/{lead_id}/pager", summary="Позиция записи и соседи")
 async def lead_pager(lead_id: int, session: SessionDep, user: CurrentUser) -> dict[str, int | None]:
     return await service.lead_pager(session, user, lead_id)
-
-
-# get_lead_or_404/visible_only переэкспортируем: ими пользуются соседние
-# роутеры (заявки, вложения) для проверки доступа к лиду.
-__all__ = ["User", "get_lead_or_404", "router", "visible_only"]

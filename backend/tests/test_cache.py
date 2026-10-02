@@ -44,7 +44,7 @@ async def test_carriers_list_is_cached_then_invalidated(
     assert second.headers.get(CACHE_HEADER) == "HIT"
 
     created = await auth_client.post(
-        "/api/v1/carriers", json={"name": "ООО «Новый Перевозчик»", "inn": "7700000001"}
+        "/api/v1/carriers", json={"name": "ООО «Новый Перевозчик»", "inn": "7707083893"}
     )
     assert created.status_code == 201, created.text
 

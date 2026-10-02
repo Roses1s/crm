@@ -7,6 +7,7 @@ from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.models.timeline import EntryType
 from app.schemas.common import ORMModel
+from app.schemas.validators import validate_inn
 
 
 # --- этапы -------------------------------------------------------------------
@@ -103,16 +104,7 @@ class LeadBase(BaseModel):
     logist_email: EmailStr | None = None
     priority: int = Field(default=0, ge=0, le=3)
 
-    @field_validator("inn")
-    @classmethod
-    def validate_inn(cls, value: str) -> str:
-        """ИНН: 10 или 12 цифр плюс контрольная сумма ФНС."""
-        digits = "".join(ch for ch in value if ch.isdigit())
-        if len(digits) not in (10, 12):
-            raise ValueError("ИНН должен содержать 10 или 12 цифр")
-        if not _inn_checksum_ok(digits):
-            raise ValueError("Некорректный ИНН: не сходится контрольная сумма")
-        return digits
+    _validate_inn = field_validator("inn")(staticmethod(validate_inn))
 
 
 class LeadCreate(LeadBase):
@@ -140,7 +132,7 @@ class LeadUpdate(BaseModel):
     # только через POST /lose (там же обязательна причина и запись в ленту),
     # обычным сохранением формы это не делается — как и передача продавцу.
 
-    _validate_inn = field_validator("inn")(LeadBase.validate_inn.__func__)  # type: ignore[attr-defined]
+    _validate_inn = field_validator("inn")(staticmethod(validate_inn))
 
 
 class LeadLose(BaseModel):
@@ -225,16 +217,3 @@ class NoteCreate(BaseModel):
 
 class NoteUpdate(BaseModel):
     body: str = Field(min_length=1, max_length=5000)
-
-
-def _inn_checksum_ok(inn: str) -> bool:
-    """Контрольная сумма ИНН по алгоритму ФНС."""
-
-    def weighted(weights: list[int]) -> int:
-        return sum(w * int(d) for w, d in zip(weights, inn, strict=False)) % 11 % 10
-
-    if len(inn) == 10:
-        return weighted([2, 4, 10, 3, 5, 9, 4, 6, 8]) == int(inn[9])
-    first = weighted([7, 2, 4, 10, 3, 5, 9, 4, 6, 8])
-    second = weighted([3, 7, 2, 4, 10, 3, 5, 9, 4, 6, 8])
-    return first == int(inn[10]) and second == int(inn[11])

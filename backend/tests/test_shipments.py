@@ -177,6 +177,36 @@ async def test_carriers_list(auth_client: AsyncClient, seeded: dict) -> None:
     assert [c["name"] for c in carriers.json()] == ["ООО «АвтоТрансЛайн»"]
 
 
+async def test_create_carrier_validates_inn_checksum(auth_client: AsyncClient) -> None:
+    """У перевозчика та же проверка контрольной суммы ИНН, что и у лида."""
+    bad = await auth_client.post(
+        "/api/v1/carriers", json={"name": "ООО «Плохой ИНН»", "inn": "7700000001"}
+    )
+    assert bad.status_code == 422
+    assert bad.json()["code"] == "validation_error"
+
+    ok = await auth_client.post(
+        "/api/v1/carriers", json={"name": "ООО «Хороший ИНН»", "inn": "7707083893"}
+    )
+    assert ok.status_code == 201, ok.text
+
+
+async def test_shipment_rejects_negative_price_and_weight(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+
+    bad_price = await auth_client.post(
+        "/api/v1/shipments", json={"lead_id": lead_id, "customer_price": "-100"}
+    )
+    assert bad_price.status_code == 422
+
+    bad_weight = await auth_client.post(
+        "/api/v1/shipments", json={"lead_id": lead_id, "cargo_weight": "-1"}
+    )
+    assert bad_weight.status_code == 422
+
+
 async def test_launcher_apps_depend_on_role(auth_client: AsyncClient) -> None:
     apps = await auth_client.get("/api/v1/launcher/apps")
     slugs = [a["slug"] for a in apps.json()]

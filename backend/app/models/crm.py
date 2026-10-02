@@ -54,7 +54,10 @@ class Tag(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
-    color: Mapped[str] = mapped_column(String(20), default="blue", nullable=False)
+    # HEX, не именованный цвет (см. миграцию 20261001_1600_generic_tags и
+    # TagCreate.color в schemas/crm.py) — это чисто python-default ORM, в базе
+    # он ни на что не влияет, пока цвет передаётся явно через API.
+    color: Mapped[str] = mapped_column(String(20), default="#3B82F6", nullable=False)
 
     leads: Mapped[list[Lead]] = relationship(secondary=lead_tags, back_populates="tags")
 

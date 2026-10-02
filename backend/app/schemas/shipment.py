@@ -22,14 +22,14 @@ class ShipmentBase(BaseModel):
     contact_unloading_name: str = ""
     contact_unloading_phone: str = ""
     transport_type: TransportType = TransportType.tent
-    cargo_weight: Decimal | None = None
-    cargo_volume: Decimal | None = None
+    cargo_weight: Decimal | None = Field(default=None, ge=0)
+    cargo_volume: Decimal | None = Field(default=None, ge=0)
     comment: str = ""
 
     # Позиция заказа: цена заказчика/перевозчика, каждая со своей ставкой НДС.
-    customer_price: Decimal | None = None
+    customer_price: Decimal | None = Field(default=None, ge=0)
     customer_tax: TaxRate = TaxRate.vat_22
-    carrier_price: Decimal | None = None
+    carrier_price: Decimal | None = Field(default=None, ge=0)
     carrier_tax: TaxRate = TaxRate.vat_22
 
     # Заказчик (шапка).
@@ -65,7 +65,7 @@ class ShipmentBase(BaseModel):
     # Груз.
     cargo_type: str = ""
     cargo_packaging: str = ""
-    capacity: Decimal | None = None
+    capacity: Decimal | None = Field(default=None, ge=0)
     body_type: list[str] = Field(default_factory=list)
     loading_method: list[str] = Field(default_factory=list)
 
@@ -92,13 +92,13 @@ class ShipmentUpdate(BaseModel):
     contact_loading_phone: str | None = None
     contact_unloading_name: str | None = None
     contact_unloading_phone: str | None = None
-    cargo_weight: Decimal | None = None
-    cargo_volume: Decimal | None = None
+    cargo_weight: Decimal | None = Field(default=None, ge=0)
+    cargo_volume: Decimal | None = Field(default=None, ge=0)
     comment: str | None = None
 
-    customer_price: Decimal | None = None
+    customer_price: Decimal | None = Field(default=None, ge=0)
     customer_tax: TaxRate | None = None
-    carrier_price: Decimal | None = None
+    carrier_price: Decimal | None = Field(default=None, ge=0)
     carrier_tax: TaxRate | None = None
 
     customer_address: str | None = None
@@ -129,7 +129,7 @@ class ShipmentUpdate(BaseModel):
 
     cargo_type: str | None = None
     cargo_packaging: str | None = None
-    capacity: Decimal | None = None
+    capacity: Decimal | None = Field(default=None, ge=0)
     body_type: list[str] | None = None
     loading_method: list[str] | None = None
 
