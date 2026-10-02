@@ -19,14 +19,14 @@ on:
 jobs:
   backend:
     name: Бэкенд — ruff, mypy, pytest
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: backend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           # Быстрые статические проверки (ruff/mypy) и юнит-тесты идут на
           # стабильной 3.11: mypy и так закреплён на цель 3.11 (см. pyproject),
@@ -89,7 +89,7 @@ jobs:
 
   backend-postgres:
     name: Бэкенд на PostgreSQL — миграции и тесты
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: backend
@@ -110,9 +110,9 @@ jobs:
           --health-timeout 5s
           --health-retries 10
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-python@v5
+      - uses: actions/setup-python@v7
         with:
           # Версия как в проде (backend/Dockerfile: python:3.13-slim).
           python-version: "3.13"
@@ -138,14 +138,14 @@ jobs:
 
   frontend:
     name: Фронтенд — типы, тесты, сборка
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     defaults:
       run:
         working-directory: frontend
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
-      - uses: actions/setup-node@v4
+      - uses: actions/setup-node@v7
         with:
           node-version: "22"
           cache: npm
@@ -177,9 +177,9 @@ jobs:
 
   docker-build:
     name: Docker — сборка образов и docker compose config
-    runs-on: ubuntu-latest
+    runs-on: ubuntu-24.04
     steps:
-      - uses: actions/checkout@v4
+      - uses: actions/checkout@v7
 
       - name: docker compose config проверяет весь стек разом
         # Распознаёт опечатки в docker-compose.yml и .env.example (например,
@@ -189,16 +189,16 @@ jobs:
           cp .env.example .env
           docker compose config --quiet
 
-      - uses: docker/setup-buildx-action@v3
+      - uses: docker/setup-buildx-action@v4
 
       - name: Сборка backend-образа
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: backend
           push: false
 
       - name: Сборка frontend-образа
-        uses: docker/build-push-action@v6
+        uses: docker/build-push-action@v7
         with:
           context: frontend
           push: false
