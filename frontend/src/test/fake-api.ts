@@ -13,7 +13,7 @@
 
 import { vi } from "vitest";
 
-export interface FakeRoute {
+interface FakeRoute {
   /** Метод запроса; по умолчанию GET. */
   method?: string;
   /** Начало адреса без префикса /api/v1, например "/crm/leads". */

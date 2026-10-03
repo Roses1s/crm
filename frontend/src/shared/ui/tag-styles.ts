@@ -7,7 +7,7 @@ import { useTheme } from "@/shared/lib/theme";
  * на лету из HSL той же палитры — так пилюля остаётся читаемой в обеих
  * темах без двух хранимых значений на сервере.
  */
-export const DEFAULT_TAG_COLOR = "#7c7bad";
+const DEFAULT_TAG_COLOR = "#7c7bad";
 
 const HEX_RE = /^#([0-9a-fA-F]{6})$/;
 

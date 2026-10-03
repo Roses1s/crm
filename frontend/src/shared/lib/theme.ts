@@ -1,8 +1,8 @@
 import { useSyncExternalStore } from "react";
 
-export type Theme = "light" | "dark";
+type Theme = "light" | "dark";
 
-export const THEME_KEY = "crm-theme";
+const THEME_KEY = "crm-theme";
 
 /**
  * Переключатель темы: явный тумблер в меню пользователя, запоминается между
@@ -28,17 +28,17 @@ const listeners = new Set<() => void>();
 
 /** Применяет тему к документу. Тот же код выполняется в public/theme.js
  *  до первой отрисовки, иначе тёмный пользователь увидит белую вспышку. */
-export function applyTheme(next: Theme) {
+function applyTheme(next: Theme) {
   const root = document.documentElement;
   root.classList.toggle("dark", next === "dark");
   root.style.colorScheme = next;
 }
 
-export function getTheme(): Theme {
+function getTheme(): Theme {
   return theme;
 }
 
-export function setTheme(next: Theme) {
+function setTheme(next: Theme) {
   theme = next;
   applyTheme(next);
   try {

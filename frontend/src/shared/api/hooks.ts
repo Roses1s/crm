@@ -28,8 +28,8 @@ import { api, apiBlob, apiUpload, type Page } from "./client";
  * в интерфейсе нет, поэтому списки показывают первую «страницу» — но теперь
  * честно сообщают об этом: см. ListResult.total и ListLimitNotice.
  */
-export const LIST_LIMIT = 200;
-export const CUSTOMERS_LIMIT = 500;
+const LIST_LIMIT = 200;
+const CUSTOMERS_LIMIT = 500;
 
 /** Список с сервера вместе с общим количеством записей. */
 export interface ListResult<T> {
@@ -44,7 +44,7 @@ function toListResult<T>(page: Page<T>, limit: number): ListResult<T> {
   return { items: page.results, total: page.count, limit };
 }
 
-export interface LeadFilters {
+interface LeadFilters {
   search?: string;
   stage?: number | null;
   tag?: number | null;
@@ -64,7 +64,7 @@ function leadsQueryString(filters: LeadFilters): string {
   return params.toString();
 }
 
-export const keys = {
+const keys = {
   me: ["me"] as const,
   apps: ["launcher"] as const,
   stages: ["stages"] as const,
@@ -823,7 +823,7 @@ export function useUsers() {
   });
 }
 
-export interface UserPayload {
+interface UserPayload {
   email: string;
   first_name?: string;
   last_name?: string;

@@ -1,6 +1,6 @@
 import { createContext, useContext } from "react";
 
-export interface ToastContextValue {
+interface ToastContextValue {
   /** Показать зелёную плашку в углу экрана; исчезает сама через 2.5 сек. */
   show: (message: string) => void;
 }
