@@ -46,7 +46,7 @@ pip-compile --generate-hashes --extra dev --output-file requirements-dev.lock py
 .venv/bin/ruff check .        # линтер
 .venv/bin/ruff format .       # форматирование
 .venv/bin/mypy app            # типы (strict)
-.venv/bin/python -m pytest    # тесты (131 функция, 138 прогонов, SQLite в памяти)
+.venv/bin/python -m pytest    # тесты (148 функций, SQLite в памяти)
 .venv/bin/alembic check       # модели и миграции совпадают
 .venv/bin/pip-audit           # уязвимости в зависимостях
 ```
@@ -76,9 +76,9 @@ backend/
 │   │                      auth · launcher · stages · tags · loss_reasons · leads ·
 │   │                      customers · attachments · shipments · users · admin · health
 │   ├── services/          бизнес-логика, отделённая от HTTP: leads · shipments ·
-│   │                      attachments · customers · stages · tags
+│   │                      attachments · customers · stages · tags · search
 │   └── worker/            Celery: приложение и задачи (бэкапы, уборка)
-├── alembic/               миграции: 21 шт., первая создаёт всю схему
+├── alembic/               миграции: 22 шт., первая создаёт всю схему
 ├── tests/                 pytest + httpx ASGITransport
 ├── requirements.lock      версии для production-образа (с хешами)
 ├── requirements-dev.lock  те же плюс инструменты разработки (для CI)
@@ -159,7 +159,28 @@ backend/
 владельцу, а удаление старого лида уносило бы историю новой заявки.
 
 **Валидация ИНН.** Контрольная сумма ФНС проверяется в схеме (10 и 12 цифр),
-в базе дополнительно стоит CHECK на длину.
+в базе дополнительно стоит CHECK на длину. Явный `null` в обязательном поле
+отвергается с понятным текстом, а не доходит до базы.
+
+**Схемы правки (PATCH) строгие.** Все `*Update` наследуют `PatchModel`
+(`app/schemas/common.py`): неизвестное поле — ошибка 422 (опечатка в имени
+больше не даёт ложного «сохранено»), явный `null` разрешён только для полей,
+которые в базе действительно необязательные (перечислены в `nullable_fields`
+каждой схемы).
+
+**Поиск.** Шаблон для ILIKE собирает `app/services/search.py`: служебные
+символы `%` и `_` экранируются, иначе запрос «50%» вёл бы себя как маска и
+возвращал вообще всё.
+
+**Теги.** Неизвестный `tag_id` — ошибка 404, а не молчаливая очистка всех
+тегов записи (так было, если тег успел удалить коллега).
+
+**Последний администратор защищён.** Нельзя снять роль, отключить или удалить
+учётную запись, если это единственный действующий администратор, — иначе
+управление системой оказалось бы недоступно никому.
+
+**Длина пароля.** Не больше 72 байт: bcrypt всё равно учитывает только их,
+и два разных длинных пароля оказались бы для системы одинаковыми.
 
 **Enum'ы.** Хранятся как VARCHAR + CHECK (`native_enum=False`): добавить новый
 статус можно обычной миграцией, без `ALTER TYPE`, и схема работает в SQLite.
@@ -202,7 +223,7 @@ celery -A app.worker.celery_app.celery beat   -l info
 ```
 
 Первая миграция (`initial schema`) создаёт базовую схему, остальные двадцать
-меняют её по ходу работы. Сейчас в базе десять таблиц: `users`, `stages`,
+одна меняют её по ходу работы. Сейчас в базе десять таблиц: `users`, `stages`,
 `tags`, `leads`, `loss_reasons`, `shipments`, `timeline_entries`,
 `attachments`, `login_attempts`, `revoked_tokens`.
 

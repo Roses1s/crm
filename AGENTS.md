@@ -88,7 +88,10 @@ git fetch origin "$(git rev-parse --abbrev-ref HEAD)" && git reset FETCH_HEAD &&
 | Выдуманные ИНН в тестах | Проверяется контрольная сумма ФНС — пересчитывайте последнюю цифру |
 | Логика прямо в роутере | Роутеры в `app/api/v1/` — только HTTP; логика идёт в `app/services/` |
 | Поменяли модель — CI красный | Создайте миграцию: `alembic check` в CI падает, если схема разошлась с моделями |
-| Добавили зависимость в pyproject | Пересоберите lock: `pip-compile --generate-hashes --extra dev --output-file requirements-dev.lock pyproject.toml` |
+| Добавили зависимость в pyproject | Пересоберите **оба** lock-файла: `pip-compile --generate-hashes --output-file requirements.lock pyproject.toml` и тот же вызов с `--extra dev --output-file requirements-dev.lock` (по первому собирается production-образ) |
+| Удаляете строку-родителя, у детей обязательный внешний ключ | Сначала `await session.flush()` после переноса детей, потом `session.delete(parent)`: иначе SQLAlchemy обнулит их внешний ключ и база отвергнет запись |
+| Новое поле в схеме правки (`*Update`) | Наследуйте `PatchModel`: неизвестные поля запрещены, явный `null` разрешён только через `nullable_fields` |
+| Поиск по тексту | Шаблон только через `app/services/search.py` — `%` и `_` обязаны экранироваться |
 | CI падает на «Паспорт проекта не протух» | Выполните `python scripts/snapshot.py` и закоммитьте `docs/SNAPSHOT.md` — файл руками не правят |
 
 Полный список — раздел «Подводные камни» в [`docs/PROJECT.md`](docs/PROJECT.md).
