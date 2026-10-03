@@ -3,7 +3,10 @@
 from __future__ import annotations
 
 from httpx import AsyncClient
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.models.security import LoginAttempt
 from tests.conftest import TEST_PASSWORD
 
 
@@ -127,3 +130,67 @@ async def test_manager_cannot_list_users(client: AsyncClient, seeded: dict[str, 
     token = login.json()["access_token"]
     response = await client.get("/api/v1/admin/users", headers={"Authorization": f"Bearer {token}"})
     assert response.status_code == 403
+
+
+async def test_refresh_rotates_and_old_token_stops_working(
+    client: AsyncClient, seeded: dict[str, object]
+) -> None:
+    """Прежний обновляющий токен перестаёт работать после ротации.
+
+    Регрессия: раньше старая кука оставалась действительной все 14 дней,
+    сколько бы раз пользователь ни продлевал сессию.
+    """
+    login = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "admin@crmdetroid.ru", "password": TEST_PASSWORD},
+    )
+    old_cookie = login.cookies["crm_refresh"]
+
+    first = await client.post("/api/v1/auth/refresh", cookies={"crm_refresh": old_cookie})
+    assert first.status_code == 200
+
+    # Сразу после ротации прежний токен ещё принимается — это защита от гонки
+    # параллельных вкладок (REFRESH_GRACE_SECONDS).
+    from app.api.v1 import auth as auth_module
+
+    original_grace = auth_module.REFRESH_GRACE_SECONDS
+    auth_module.REFRESH_GRACE_SECONDS = -1
+    try:
+        replay = await client.post("/api/v1/auth/refresh", cookies={"crm_refresh": old_cookie})
+    finally:
+        auth_module.REFRESH_GRACE_SECONDS = original_grace
+
+    assert replay.status_code == 401, replay.text
+
+
+async def test_login_of_disabled_user_is_logged_as_failure(
+    client: AsyncClient, session: AsyncSession, seeded: dict[str, object]
+) -> None:
+    """Отключённая учётная запись: отказ и запись в журнале как неудача."""
+    manager = seeded["manager"]
+    manager.is_active = False  # type: ignore[attr-defined]
+    await session.commit()
+
+    response = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "manager@crmdetroid.ru", "password": TEST_PASSWORD},
+    )
+    assert response.status_code == 403
+
+    attempts = (await session.execute(select(LoginAttempt))).scalars().all()
+    assert [a.successful for a in attempts] == [False]
+
+
+async def test_long_password_is_rejected(auth_client: AsyncClient) -> None:
+    """Пароль длиннее 72 байт не принимается: bcrypt всё равно его обрежет."""
+    response = await auth_client.post(
+        "/api/v1/admin/users",
+        json={
+            "email": "long@crmdetroid.ru",
+            "password": "я" * 40,  # 80 байт в UTF-8
+            "first_name": "Длинный",
+            "last_name": "Пароль",
+            "role": "manager",
+        },
+    )
+    assert response.status_code == 422, response.text

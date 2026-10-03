@@ -134,3 +134,31 @@ describe("кеш справочников (tags и т.п.) не должен о�
     },
   );
 });
+
+it("несколько запросов с 401 продлевают сессию одним общим запросом", async () => {
+  // Сервер отзывает прежний токен при выдаче нового, поэтому пачка
+  // одновременных продлений выбрасывала бы человека на страницу входа.
+  let refreshCalls = 0;
+  setAccessToken("старый");
+
+  vi.stubGlobal(
+    "fetch",
+    vi.fn(async (input: RequestInfo | URL, init?: RequestInit) => {
+      const url = String(input);
+      if (url.endsWith("/auth/refresh")) {
+        refreshCalls += 1;
+        await new Promise((resolve) => setTimeout(resolve, 10));
+        return new Response(JSON.stringify({ access_token: "новый" }), { status: 200 });
+      }
+      const token = (init?.headers as Record<string, string>)?.Authorization;
+      if (token !== "Bearer новый") {
+        return new Response(JSON.stringify({ detail: "нет доступа" }), { status: 401 });
+      }
+      return new Response(JSON.stringify({ ok: true }), { status: 200 });
+    }),
+  );
+
+  await Promise.all([api("/crm/leads"), api("/crm/tags"), api("/crm/stages")]);
+
+  expect(refreshCalls).toBe(1);
+});

@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from tests.conftest import TEST_PASSWORD
 
@@ -103,3 +104,56 @@ async def test_deleting_user_moves_leads_to_admin(
 
     admin_stages = (await auth_client.get("/api/v1/crm/stages")).json()
     assert moved["stage_id"] in [s["id"] for s in admin_stages]
+
+
+async def test_last_admin_cannot_demote_himself(
+    auth_client: AsyncClient, seeded: dict[str, object]
+) -> None:
+    """Единственный администратор не может снять с себя роль.
+
+    Регрессия: раньше запрос проходил, и в системе не оставалось никого, кто
+    может заводить сотрудников и смотреть бэкапы.
+    """
+    admin = seeded["admin"]
+    response = await auth_client.patch(
+        f"/api/v1/admin/users/{admin.id}",  # type: ignore[attr-defined]
+        json={"role": "manager"},
+    )
+    assert response.status_code == 400, response.text
+    assert response.json()["code"] == "last_admin"
+
+
+async def test_last_admin_cannot_disable_himself(
+    auth_client: AsyncClient, seeded: dict[str, object]
+) -> None:
+    admin = seeded["admin"]
+    response = await auth_client.patch(
+        f"/api/v1/admin/users/{admin.id}",  # type: ignore[attr-defined]
+        json={"is_active": False},
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "last_admin"
+
+
+async def test_admin_can_step_down_when_there_is_another_admin(
+    auth_client: AsyncClient, session: AsyncSession, seeded: dict[str, object]
+) -> None:
+    """Если администраторов двое — роль снять можно."""
+    created = await auth_client.post(
+        "/api/v1/admin/users",
+        json={
+            "email": "second-admin@crmdetroid.ru",
+            "password": "SuperSecret123",
+            "first_name": "Второй",
+            "last_name": "Админ",
+            "role": "admin",
+        },
+    )
+    assert created.status_code == 201, created.text
+
+    admin = seeded["admin"]
+    response = await auth_client.patch(
+        f"/api/v1/admin/users/{admin.id}",  # type: ignore[attr-defined]
+        json={"role": "manager"},
+    )
+    assert response.status_code == 200, response.text

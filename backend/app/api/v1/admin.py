@@ -18,7 +18,7 @@ from app.core.logging import get_logger
 from app.core.security import hash_password
 from app.models.crm import Lead, Stage
 from app.models.security import LoginAttempt
-from app.models.user import User
+from app.models.user import Role, User
 from app.schemas.user import UserCreate, UserRead, UserUpdate
 from app.services.stages import ensure_default_stages
 
@@ -71,6 +71,33 @@ async def transfer_leads(session: AsyncSession, *, from_user_id: int, to_user: U
     return len(leads)
 
 
+async def _other_active_admins(session: AsyncSession, user_id: int) -> int:
+    """Сколько в системе ДРУГИХ действующих администраторов."""
+    stmt = select(func.count()).where(
+        User.role == Role.admin,
+        User.is_active.is_(True),
+        User.id != user_id,
+    )
+    return int((await session.execute(stmt)).scalar_one())
+
+
+async def _ensure_not_last_admin(session: AsyncSession, user: User) -> None:
+    """Не даёт убрать последнего администратора.
+
+    Без этой проверки администратор мог снять с себя роль или отключить
+    собственную учётную запись — и в системе не оставалось никого, кто может
+    заводить сотрудников, смотреть бэкапы и удалять лиды. Вернуть доступ можно
+    было бы только руками через базу на сервере.
+    """
+    if user.role != Role.admin or not user.is_active:
+        return
+    if await _other_active_admins(session, user.id) == 0:
+        raise AppError(
+            "Это последний действующий администратор — сначала назначьте другого",
+            code="last_admin",
+        )
+
+
 @router.get("/users", response_model=list[UserRead], summary="Пользователи")
 async def list_users(session: SessionDep, _: AdminUser) -> list[User]:
     stmt = select(User).order_by(User.role, User.id)
@@ -100,6 +127,12 @@ async def update_user(user_id: int, payload: UserUpdate, session: SessionDep, _:
     if user is None:
         raise NotFoundError(f"Пользователь {user_id} не найден")
     data = payload.model_dump(exclude_unset=True)
+    # Снятие роли администратора или отключение учётной записи проверяем до
+    # изменения: последний администратор должен остаться.
+    loses_admin = data.get("role") is not None and data["role"] != Role.admin
+    gets_disabled = data.get("is_active") is False
+    if loses_admin or gets_disabled:
+        await _ensure_not_last_admin(session, user)
     if password := data.pop("password", None):
         user.hashed_password = hash_password(password)
     if email := data.pop("email", None):
@@ -125,6 +158,7 @@ async def delete_user(user_id: int, session: SessionDep, current: AdminUser) -> 
     user = await session.get(User, user_id)
     if user is None:
         raise NotFoundError(f"Пользователь {user_id} не найден")
+    await _ensure_not_last_admin(session, user)
 
     moved = await transfer_leads(session, from_user_id=user_id, to_user=current)
 

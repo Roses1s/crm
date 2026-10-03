@@ -19,6 +19,9 @@ let sessionGeneration = 0;
 // Пока не спросили сервер, мы не знаем, есть ли сессия: пускать на страницу
 // входа рано, иначе при каждом обновлении F5 мелькал бы логин.
 let restored = false;
+// Текущее продление сессии: пока оно не завершилось, все желающие ждут его,
+// а не запускают своё (см. refreshSession).
+let refreshInFlight: Promise<boolean> | null = null;
 
 const listeners = new Set<() => void>();
 
@@ -88,16 +91,29 @@ export function useSessionRestored(): boolean {
  * короткого токена. Кука уходит автоматически, тело запроса не нужно.
  */
 export async function refreshSession(): Promise<boolean> {
+  // Один общий «полёт» на всю вкладку. Когда токен истёк, 401 прилетает сразу
+  // нескольким запросам, и раньше каждый из них слал своё продление. Сервер
+  // теперь отзывает прежний токен при выдаче нового (ротация), поэтому пачка
+  // одновременных продлений привела бы к тому, что часть запросов получает
+  // «Сессия завершена» и человека выбрасывает на страницу входа.
+  if (refreshInFlight) return refreshInFlight;
+
   const generationAtStart = sessionGeneration;
-  try {
-    const response = await fetch("/api/v1/auth/refresh", { method: "POST" });
-    if (!response.ok || generationAtStart !== sessionGeneration) return false;
-    const data = (await response.json()) as { access_token: string };
-    // Это продление той же сессии, поэтому кеш сбрасывать не нужно. Если пока
-    // ждали ответ случился logout/login, проверка поколения выше его отбросит.
-    setAccessToken(data.access_token);
-    return true;
-  } catch {
-    return false;
-  }
+  refreshInFlight = (async () => {
+    try {
+      const response = await fetch("/api/v1/auth/refresh", { method: "POST" });
+      if (!response.ok || generationAtStart !== sessionGeneration) return false;
+      const data = (await response.json()) as { access_token: string };
+      // Это продление той же сессии, поэтому кеш сбрасывать не нужно. Если пока
+      // ждали ответ случился logout/login, проверка поколения выше его отбросит.
+      setAccessToken(data.access_token);
+      return true;
+    } catch {
+      return false;
+    } finally {
+      refreshInFlight = null;
+    }
+  })();
+
+  return refreshInFlight;
 }

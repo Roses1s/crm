@@ -1,5 +1,7 @@
 from __future__ import annotations
 
+from datetime import datetime
+
 from sqlalchemy import Boolean, DateTime, String, func
 from sqlalchemy.orm import Mapped, mapped_column
 
@@ -16,7 +18,7 @@ class LoginAttempt(Base):
     ip_address: Mapped[str] = mapped_column(String(45), default="", nullable=False)
     user_agent: Mapped[str] = mapped_column(String(255), default="", nullable=False)
     successful: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
-    created_at: Mapped[object] = mapped_column(
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False, index=True
     )
 
@@ -37,8 +39,15 @@ class RevokedToken(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     jti: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
+    # Почему токен отозван: "logout" — человек вышел сам (действует сразу),
+    # "rotation" — заменён новым при продлении сессии. У второго есть короткое
+    # окно снисхождения: параллельные вкладки могут продлить сессию почти
+    # одновременно, и второй запрос не должен выбрасывать человека на вход.
+    reason: Mapped[str] = mapped_column(String(20), default="logout", nullable=False)
     # Когда истекает сам токен: после этой даты запись бесполезна.
-    expires_at: Mapped[object] = mapped_column(DateTime(timezone=True), nullable=False, index=True)
-    created_at: Mapped[object] = mapped_column(
+    expires_at: Mapped[datetime] = mapped_column(
+        DateTime(timezone=True), nullable=False, index=True
+    )
+    created_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), server_default=func.now(), nullable=False
     )

@@ -7,8 +7,9 @@ HttpOnly. При выходе обновляющий токен попадает
 
 from __future__ import annotations
 
+import contextlib
 from datetime import UTC, datetime
-from typing import Annotated
+from typing import Annotated, Any
 
 import jwt
 from fastapi import APIRouter, Cookie, HTTPException, Request, Response, status
@@ -22,6 +23,7 @@ from app.core.security import (
     create_access_token,
     create_refresh_token,
     decode_token,
+    hash_password,
     verify_password,
 )
 from app.models.security import LoginAttempt, RevokedToken
@@ -37,6 +39,16 @@ log = get_logger(__name__)
 # а чем уже путь, тем меньше шансов утечь.
 REFRESH_COOKIE = "crm_refresh"
 COOKIE_PATH = "/api/v1/auth"
+
+# Сколько секунд прежний обновляющий токен ещё принимается после ротации.
+# Нужно из-за гонки: вкладка может послать несколько запросов продления почти
+# одновременно (разные запросы получили 401 в одну секунду). Без окна второй
+# из них увидел бы «Сессия завершена» и выбросил человека на страницу входа.
+REFRESH_GRACE_SECONDS = 15
+
+# Заведомо несовпадающий хеш: сверяем пароль с ним, когда пользователя нет,
+# чтобы время ответа не выдавало существование учётной записи.
+_DUMMY_HASH = hash_password("несуществующий-пароль-для-постоянного-времени")
 
 
 def _issue(user: User, response: Response) -> AccessToken:
@@ -68,7 +80,14 @@ async def login(
         await session.execute(select(User).where(User.email == payload.email.lower()))
     ).scalar_one_or_none()
 
-    ok = user is not None and verify_password(payload.password, user.hashed_password)
+    # Пароль сверяем всегда — даже когда такого пользователя нет. Иначе ответ
+    # на несуществующий email приходил заметно быстрее, и по времени ответа
+    # можно было собрать список настоящих учётных записей.
+    password_ok = verify_password(payload.password, user.hashed_password if user else _DUMMY_HASH)
+    # В журнале «успехом» считается только вход, который реально состоялся:
+    # отключённой учётной записи сервер отвечает отказом, значит и в журнале
+    # это неудачная попытка (иначе она не попадала в раздел «Безопасность»).
+    ok = user is not None and password_ok and user.is_active
     # Каждая попытка попадает в журнал — из него строится раздел «Безопасность».
     session.add(
         LoginAttempt(
@@ -80,7 +99,7 @@ async def login(
     )
     await session.commit()
 
-    if not ok or user is None:
+    if user is None or not password_ok:
         log.warning(
             "auth.login_failed",
             email=payload.email,
@@ -91,6 +110,7 @@ async def login(
             detail="Неверный email или пароль",
         )
     if not user.is_active:
+        log.warning("auth.login_disabled", user_id=user.id)
         raise HTTPException(
             status_code=status.HTTP_403_FORBIDDEN, detail="Учётная запись отключена"
         )
@@ -118,7 +138,7 @@ async def refresh(
 
     # Токен, по которому уже вышли из системы, продлевать нельзя — даже если
     # срок его жизни ещё не истёк и кто-то успел его перехватить.
-    if await _is_revoked(session, data.get("jti")):
+    if await _is_revoked_beyond_grace(session, data.get("jti")):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Сессия завершена")
 
     user = await session.get(User, user_id)
@@ -126,15 +146,56 @@ async def refresh(
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Пользователь недоступен"
         )
+
+    # Ротация: выдавая новый обновляющий токен, прежний сразу отзываем. Без
+    # этого один раз перехваченная кука оставалась рабочей все 14 дней, сколько
+    # бы раз настоящий пользователь ни продлевал сессию.
+    await _revoke(session, data, reason="rotation")
     return _issue(user, response)
+
+
+async def _revoked_entry(session: SessionDep, jti: str | None) -> RevokedToken | None:
+    if not jti:
+        return None
+    found = await session.execute(select(RevokedToken).where(RevokedToken.jti == jti))
+    return found.scalar_one_or_none()
 
 
 async def _is_revoked(session: SessionDep, jti: str | None) -> bool:
     """Проверяет, не отозван ли токен с таким идентификатором."""
-    if not jti:
+    return await _revoked_entry(session, jti) is not None
+
+
+async def _is_revoked_beyond_grace(session: SessionDep, jti: str | None) -> bool:
+    """Отозван ли токен настолько давно, что продлевать по нему уже нельзя.
+
+    Свежий отзыв (меньше `REFRESH_GRACE_SECONDS` назад) — это почти наверняка
+    собственная параллельная вкладка, а не перехват: такой запрос пропускаем.
+    """
+    entry = await _revoked_entry(session, jti)
+    if entry is None:
         return False
-    found = await session.execute(select(RevokedToken.id).where(RevokedToken.jti == jti))
-    return found.scalar_one_or_none() is not None
+    # Выход из системы действует сразу: окно снисхождения — только для замены
+    # токена при продлении сессии.
+    if entry.reason != "rotation":
+        return True
+    revoked_at = entry.created_at
+    if revoked_at.tzinfo is None:  # SQLite хранит время без часового пояса
+        revoked_at = revoked_at.replace(tzinfo=UTC)
+    return (datetime.now(tz=UTC) - revoked_at).total_seconds() > REFRESH_GRACE_SECONDS
+
+
+async def _revoke(session: SessionDep, payload: dict[str, Any], reason: str) -> None:
+    """Заносит обновляющий токен в чёрный список (до его собственного срока)."""
+    jti = str(payload.get("jti") or "")
+    if not jti or await _is_revoked(session, jti):
+        return
+    try:
+        expires_at = datetime.fromtimestamp(int(payload["exp"]), tz=UTC)
+    except (KeyError, ValueError, TypeError, OSError):
+        expires_at = datetime.now(tz=UTC)
+    session.add(RevokedToken(jti=jti, expires_at=expires_at, reason=reason))
+    await session.commit()
 
 
 @router.post("/logout", status_code=status.HTTP_204_NO_CONTENT, summary="Выход")
@@ -150,17 +211,9 @@ async def logout(
     Поэтому идентификатор токена попадает в чёрный список.
     """
     if crm_refresh:
-        try:
-            data = decode_token(crm_refresh, "refresh")
-            jti = str(data.get("jti") or "")
-            expires_at = datetime.fromtimestamp(int(data["exp"]), tz=UTC)
-        except (jwt.PyJWTError, KeyError, ValueError, TypeError, OSError):
-            # Негодный токен отзывать нечего — просто стираем куку.
-            jti = ""
-            expires_at = datetime.now(tz=UTC)
-        if jti and not await _is_revoked(session, jti):
-            session.add(RevokedToken(jti=jti, expires_at=expires_at))
-            await session.commit()
+        # Негодный токен отзывать нечего — просто стираем куку.
+        with contextlib.suppress(jwt.PyJWTError):
+            await _revoke(session, decode_token(crm_refresh, "refresh"), reason="logout")
 
     response.delete_cookie(REFRESH_COOKIE, path=COOKIE_PATH)
 
