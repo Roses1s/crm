@@ -1,10 +1,5 @@
 import { CloudUpload, Undo2 } from "lucide-react";
-import {
-  useState,
-  type InputHTMLAttributes,
-  type ReactNode,
-  type TextareaHTMLAttributes,
-} from "react";
+import { useState, type InputHTMLAttributes, type ReactNode } from "react";
 
 /**
  * Примитивы формы в стиле Odoo 17.
@@ -314,19 +309,6 @@ export function OdooInput({ className = "", ...props }: InputHTMLAttributes<HTML
     <input
       {...props}
       className={`w-full rounded-[3px] border border-transparent bg-transparent px-1 py-[2px] text-[13px] leading-[19px] text-odoo-text outline-none transition-colors placeholder:text-odoo-text-light hover:border-odoo-border focus:border-odoo-focus/40 ${className}`}
-    />
-  );
-}
-
-/** Многострочный o_input (текстовое поле Odoo). */
-export function OdooTextarea({
-  className = "",
-  ...props
-}: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  return (
-    <textarea
-      {...props}
-      className={`w-full resize-y rounded-[3px] border border-transparent bg-transparent px-1 py-[2px] text-[13px] leading-[19px] text-odoo-text outline-none transition-colors placeholder:text-odoo-text-light hover:border-odoo-border focus:border-odoo-focus ${className}`}
     />
   );
 }

@@ -33,7 +33,6 @@ class Settings(BaseSettings):
     app_name: str = "CRM Детроид API"
     api_prefix: str = "/api/v1"
     environment: Environment = "local"
-    debug: bool = False
     log_level: str = "INFO"
     log_json: bool = True
 

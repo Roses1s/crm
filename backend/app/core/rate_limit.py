@@ -11,8 +11,6 @@
 
 from __future__ import annotations
 
-from collections.abc import Callable
-
 from slowapi import Limiter
 from slowapi.util import get_remote_address
 
@@ -26,8 +24,3 @@ limiter = Limiter(
     strategy="fixed-window",
     in_memory_fallback_enabled=True,
 )
-
-
-def login_limit() -> Callable[..., object]:
-    """Декоратор лимита для ручки логина."""
-    return limiter.limit(settings.rate_limit_login)

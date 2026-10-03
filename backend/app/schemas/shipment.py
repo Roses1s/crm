@@ -257,8 +257,3 @@ class ShipmentListItem(ORMModel):
     route: str
     carrier_name: str
     created_at: datetime
-
-
-class StatusCount(BaseModel):
-    status: ShipmentStatus
-    count: int = Field(ge=0)

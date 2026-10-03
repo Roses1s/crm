@@ -31,9 +31,7 @@
   --color-odoo-surface-hover: rgb(var(--odoo-surface-hover));
   --color-odoo-surface-sunken: rgb(var(--odoo-surface-sunken));
   --color-odoo-skeleton: rgb(var(--odoo-skeleton));
-  --color-odoo-column-head: rgb(var(--odoo-column-head));
   --color-odoo-board-canvas: rgb(var(--odoo-board-canvas));
-  --color-odoo-board-column: rgb(var(--odoo-board-column));
   --color-odoo-board-card: rgb(var(--odoo-board-card));
   --color-odoo-board-card-hover: rgb(var(--odoo-board-card-hover));
   --color-odoo-track: rgb(var(--odoo-track));
@@ -51,7 +49,6 @@
   --color-odoo-danger: rgb(var(--odoo-danger));
   --color-odoo-info: rgb(var(--odoo-info));
 
-  --color-odoo-title-band: rgb(var(--odoo-title-band));
   --color-odoo-drop: rgb(var(--odoo-drop));
   --color-odoo-accent-soft: rgb(var(--odoo-accent-soft));
   --color-odoo-accent-line: rgb(var(--odoo-accent-line));
@@ -63,7 +60,6 @@
   --color-odoo-chip: rgb(var(--odoo-chip));
   --color-odoo-chip-text: rgb(var(--odoo-chip-text));
   --color-odoo-avatar: rgb(var(--odoo-avatar));
-  --color-odoo-link: rgb(var(--odoo-link));
   --color-odoo-action: rgb(var(--odoo-action));
   --color-odoo-nav: rgb(var(--odoo-nav));
   --color-odoo-focus: rgb(var(--odoo-focus));
@@ -75,14 +71,8 @@
   --color-odoo-tag-blue-text: rgb(var(--odoo-tag-blue-text));
   --color-odoo-tag-green-bg: rgb(var(--odoo-tag-green-bg));
   --color-odoo-tag-green-text: rgb(var(--odoo-tag-green-text));
-  --color-odoo-tag-red-bg: rgb(var(--odoo-tag-red-bg));
-  --color-odoo-tag-red-text: rgb(var(--odoo-tag-red-text));
   --color-odoo-tag-yellow-bg: rgb(var(--odoo-tag-yellow-bg));
   --color-odoo-tag-yellow-text: rgb(var(--odoo-tag-yellow-text));
-  --color-odoo-tag-purple-bg: rgb(var(--odoo-tag-purple-bg));
-  --color-odoo-tag-purple-text: rgb(var(--odoo-tag-purple-text));
-  --color-odoo-tag-orange-bg: rgb(var(--odoo-tag-orange-bg));
-  --color-odoo-tag-orange-text: rgb(var(--odoo-tag-orange-text));
 
   /* Цвет рамки по умолчанию для всех элементов (см. @layer base ниже). */
   --color-border: hsl(var(--border));
@@ -113,9 +103,7 @@
   --odoo-surface-hover: 248 243 247; /* #F8F3F7 */
   --odoo-surface-sunken: 240 238 241; /* #F0EEF1 */
   --odoo-skeleton: 229 225 231;
-  --odoo-column-head: 240 238 241; /* #F0EEF1 */
   --odoo-board-canvas: 247 246 248;
-  --odoo-board-column: 240 238 241;
   --odoo-board-card: 255 255 255;
   --odoo-board-card-hover: 248 243 247;
   --odoo-track: 221 217 223; /* #DDD9DF */
@@ -137,7 +125,6 @@
   --odoo-nav: 255 255 255;
   --odoo-focus: 107 62 102;
   --odoo-overlay: 42 32 42;
-  --odoo-title-band: 249 241 247; /* #F9F1F7 — светло-сиреневая плашка заголовка, как в Odoo */
   --odoo-statusbar: 221 217 223;
   --odoo-statusbar-segment: 247 246 248;
   --odoo-statusbar-text: 98 91 99;
@@ -155,20 +142,13 @@
   --odoo-chip: 240 235 239;
   --odoo-chip-text: 105 91 103;
   --odoo-avatar: 81 75 84;
-  --odoo-link: 0 125 115;
   --odoo-action: 0 125 115;
   --odoo-tag-blue-bg: 212 230 249;
   --odoo-tag-blue-text: 26 82 118;
   --odoo-tag-green-bg: 213 245 227;
   --odoo-tag-green-text: 30 132 73;
-  --odoo-tag-red-bg: 250 219 216;
-  --odoo-tag-red-text: 146 43 33;
   --odoo-tag-yellow-bg: 252 243 207;
   --odoo-tag-yellow-text: 125 102 8;
-  --odoo-tag-purple-bg: 232 218 239;
-  --odoo-tag-purple-text: 108 52 131;
-  --odoo-tag-orange-bg: 253 235 208;
-  --odoo-tag-orange-text: 147 81 22;
 
   /* Чаттер: единая геометрия автора, отступов и мягких разделителей ленты. */
   --odoo-chatter-avatar-size: 36px;
@@ -209,9 +189,7 @@
   --odoo-surface-hover: 48 52 66; /* #303442 */
   --odoo-surface-sunken: 32 35 44; /* #20232C */
   --odoo-skeleton: 61 65 80;
-  --odoo-column-head: 30 33 43; /* #1E212B */
   --odoo-board-canvas: 27 29 38;
-  --odoo-board-column: 30 33 43;
   --odoo-board-card: 36 39 51;
   --odoo-board-card-hover: 43 47 61;
   --odoo-track: 60 62 75; /* #3C3E4B */
@@ -232,7 +210,6 @@
   --odoo-nav: 38 42 54;
   --odoo-focus: 31 166 160;
   --odoo-overlay: 5 7 12;
-  --odoo-title-band: 48 36 48; /* #302430 — сиреневая плашка заголовка, как в Odoo */
   --odoo-statusbar: 60 62 75;
   --odoo-statusbar-segment: 48 52 66;
   --odoo-statusbar-text: 228 228 230;
@@ -250,20 +227,13 @@
   --odoo-chip: 61 48 62;
   --odoo-chip-text: 211 198 211;
   --odoo-avatar: 66 70 82;
-  --odoo-link: 31 166 160;
   --odoo-action: 31 166 160;
   --odoo-tag-blue-bg: 40 71 92;
   --odoo-tag-blue-text: 142 207 240;
   --odoo-tag-green-bg: 34 82 58;
   --odoo-tag-green-text: 145 224 169;
-  --odoo-tag-red-bg: 95 44 55;
-  --odoo-tag-red-text: 255 174 181;
   --odoo-tag-yellow-bg: 88 69 25;
   --odoo-tag-yellow-text: 255 221 121;
-  --odoo-tag-purple-bg: 76 54 79;
-  --odoo-tag-purple-text: 228 187 231;
-  --odoo-tag-orange-bg: 90 59 34;
-  --odoo-tag-orange-text: 247 190 133;
   --odoo-chatter-divider: 52 55 68;
   --border: 230 10% 24%;
 }

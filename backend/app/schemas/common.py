@@ -45,7 +45,3 @@ class PatchModel(BaseModel):
         if forbidden:
             raise ValueError("Эти поля нельзя очистить (передан null): " + ", ".join(forbidden))
         return data
-
-
-class Message(BaseModel):
-    detail: str

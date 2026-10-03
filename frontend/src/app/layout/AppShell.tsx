@@ -4,7 +4,7 @@ import { Link } from "react-router-dom";
 import { Navbar } from "@/app/layout/Navbar";
 
 /**
- * Каркас приложения: Navbar + ControlPanel + Toolbar.
+ * Каркас приложения: Navbar + ControlPanel.
  *
  * ControlPanel — общая шапка страницы: заголовок, поиск, кнопка «Новый»,
  * переключатель «канбан/список» и необязательный выпадающий список под
@@ -20,14 +20,6 @@ export function Breadcrumb({ items }: { items: string[] }) {
           <span className={i === items.length - 1 ? "font-medium text-odoo-text" : ""}>{item}</span>
         </span>
       ))}
-    </div>
-  );
-}
-
-export function Toolbar({ children }: { children: ReactNode }) {
-  return (
-    <div className="flex min-h-11 flex-wrap items-center gap-2 border-b border-odoo-border-light bg-odoo-surface px-3 py-1">
-      {children}
     </div>
   );
 }
