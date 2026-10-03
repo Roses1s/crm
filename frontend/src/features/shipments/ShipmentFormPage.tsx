@@ -22,11 +22,9 @@ import {
   useShipment,
   useShipmentAttachments,
   useShipmentTimeline,
-  useTags,
   useUploadShipmentAttachment,
   type ShipmentPayload,
 } from "@/shared/api/hooks";
-import { TagsField } from "@/features/crm/lead-form/TagsField";
 import type { Attachment } from "@/shared/types";
 import { Chatter } from "@/shared/ui/chatter";
 import { FilePreview } from "@/shared/ui/file-preview";
@@ -181,10 +179,10 @@ function OrderLinesTab({
                 Продукт
               </th>
               <th colSpan={3} className={`${th} border-l border-odoo-border text-center`}>
-                Цена Заказчик
+                Заказчик
               </th>
               <th colSpan={3} className={`${th} border-l border-odoo-border text-center`}>
-                Цена Перевозчик
+                Перевозчик
               </th>
             </tr>
             <tr className="border-b border-odoo-border">
@@ -345,7 +343,6 @@ function ShipmentForm({ id }: { id?: string }) {
   const { data: shipment, isLoading } = useShipment(id);
   const { data: leadsPage } = useLeads();
   const leads = leadsPage?.items ?? [];
-  const { data: allTags = [] } = useTags();
   const { data: timeline = [] } = useShipmentTimeline(id);
   const { data: attachments = [] } = useShipmentAttachments(shipment?.id);
 
@@ -657,17 +654,6 @@ function ShipmentForm({ id }: { id?: string }) {
                             id="ship-cust-contact"
                             value={form.customer_contact}
                             onChange={(e) => set("customer_contact", e.target.value)}
-                          />
-                        </Field>
-                      </InnerGroup>
-                    </div>
-                    <div>
-                      <InnerGroup>
-                        <Field label="Теги" help="Рабочие пометки заявки — видны в списке заявок">
-                          <TagsField
-                            all={allTags}
-                            value={form.tag_ids}
-                            onChange={(ids) => set("tag_ids", ids)}
                           />
                         </Field>
                       </InnerGroup>
