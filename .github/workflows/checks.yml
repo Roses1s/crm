@@ -1,0 +1,258 @@
+# Автопроверки кода.
+#
+# Запускаются при каждой отправке в рабочую ветку и при открытии pull request.
+# Повторяют то, что агент делает вручную: линтеры, типы, тесты, сборка.
+#
+# Быстрый прогон бэкенда идёт на SQLite (секунды). Дополнительно есть отдельная
+# джоба на настоящем PostgreSQL той же версии, что и в проде: она гоняет
+# миграции и тесты на реальной базе, чтобы ловить несовместимости, которых
+# на SQLite не видно (например, SQLite-only функции в миграциях).
+
+name: Проверки
+
+on:
+  push:
+    branches: ["arena/**"]
+  pull_request:
+  workflow_dispatch:
+
+jobs:
+  backend:
+    name: Бэкенд — ruff, mypy, pytest
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          # Быстрые статические проверки (ruff/mypy) и юнит-тесты идут на
+          # стабильной 3.11: mypy и так закреплён на цель 3.11 (см. pyproject),
+          # прогон воспроизводим. Прод-паритет среды выполнения (Python 3.13 +
+          # PostgreSQL) обеспечивает отдельная джоба backend-postgres ниже.
+          python-version: "3.11"
+          cache: pip
+
+      - name: Установка зависимостей
+        # Строго по lock-файлу и с проверкой хешей: прогон полностью
+        # воспроизводим, свежий релиз библиотеки не может внезапно уронить
+        # сборку. Сам пакет ставим без зависимостей — они уже из lock.
+        # Обновление: cd backend && pip-compile --generate-hashes --extra dev
+        #             --output-file requirements-dev.lock pyproject.toml
+        run: |
+          pip install --require-hashes -r requirements-dev.lock
+          pip install -e . --no-deps
+
+      - name: Стиль и формат
+        run: |
+          ruff check .
+          ruff format --check .
+
+      - name: Типы
+        run: mypy app
+
+      - name: Тесты
+        run: python -m pytest -q
+
+      - name: Миграции проходят на пустой базе
+        env:
+          DATABASE_URL: sqlite+aiosqlite:////tmp/checks.db
+        run: alembic upgrade head
+
+      - name: Модели и миграции совпадают
+        # `alembic check` сравнивает модели в коде со схемой базы после всех
+        # миграций. Падает, если кто-то изменил модель и забыл создать
+        # миграцию — иначе такая ошибка всплыла бы только на проде.
+        env:
+          DATABASE_URL: sqlite+aiosqlite:////tmp/checks.db
+        run: alembic check
+
+      - name: Паспорт проекта не протух
+        # docs/SNAPSHOT.md собирается из кода скриптом и нужен новому агенту,
+        # чтобы сразу понимать устройство проекта. Если код изменился, а файл
+        # не пересобрали — сборка падает с подсказкой. Пересобрать:
+        #   python scripts/snapshot.py
+        working-directory: .
+        run: python scripts/snapshot.py --check
+
+      - name: Аудит зависимостей на уязвимости
+        # Проверяем ровно тот набор, который ставится в production-образ
+        # (requirements.lock), и отдельно — набор для разработки.
+        # Шаг БЛОКИРУЮЩИЙ: уязвимость в зависимости не должна тихо уезжать на
+        # сервер. Если исправления ещё нет, а работу нужно продолжить —
+        # добавьте сюда `--ignore-vuln GHSA-xxxx` с комментарием и датой,
+        # чтобы исключение было видно в истории, а не забыто навсегда.
+        run: |
+          pip install pip-audit
+          pip-audit -r requirements.lock
+          pip-audit -r requirements-dev.lock
+
+  backend-postgres:
+    name: Бэкенд на PostgreSQL — миграции и тесты
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: backend
+    # PostgreSQL той же версии, что и в проде (docker-compose: postgres:18-alpine).
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: crm
+          POSTGRES_PASSWORD: crm
+          POSTGRES_DB: crm_test
+        ports:
+          - 5432:5432
+        # Джоба стартует только когда база готова принимать соединения.
+        options: >-
+          --health-cmd "pg_isready -U crm"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          # Версия как в проде (backend/Dockerfile: python:3.13-slim).
+          python-version: "3.13"
+          cache: pip
+
+      - name: Установка зависимостей
+        # Тот же lock-файл, что и в быстрой джобе: иначе «зелёный PostgreSQL»
+        # не гарантировал бы тот же набор версий, что уже проверен выше.
+        run: |
+          pip install --require-hashes -r requirements-dev.lock
+          pip install -e . --no-deps
+
+      - name: Миграции на настоящем PostgreSQL
+        env:
+          DATABASE_URL: postgresql+asyncpg://crm:crm@localhost:5432/crm_test
+        run: alembic upgrade head
+
+      - name: Модели и миграции совпадают (PostgreSQL)
+        env:
+          DATABASE_URL: postgresql+asyncpg://crm:crm@localhost:5432/crm_test
+        run: alembic check
+
+      - name: Тесты на PostgreSQL
+        env:
+          TEST_DATABASE_URL: postgresql+asyncpg://crm:crm@localhost:5432/crm_test
+        run: |
+          set -o pipefail
+          python -m pytest -q 2>&1 | tee /tmp/postgres-pytest.log
+
+      - name: Причина падения PostgreSQL-тестов
+        if: failure()
+        run: |
+          {
+            echo '### Последние строки PostgreSQL-тестов'
+            echo '```text'
+            tail -120 /tmp/postgres-pytest.log
+            echo '```'
+          } >> "$GITHUB_STEP_SUMMARY"
+          python - <<'PY'
+          from pathlib import Path
+
+          text = "\n".join(Path("/tmp/postgres-pytest.log").read_text().splitlines()[-80:])
+          escaped = text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
+          print(f"::error title=PostgreSQL pytest::{escaped}")
+          PY
+
+  frontend:
+    name: Фронтенд — типы, тесты, сборка
+    runs-on: ubuntu-24.04
+    defaults:
+      run:
+        working-directory: frontend
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Установка зависимостей
+        run: npm ci
+
+      - name: Линтер
+        run: npm run lint
+
+      - name: Формат
+        run: npm run format:check
+
+      - name: Типы
+        run: npx tsc -b
+
+      - name: Тесты
+        run: npm test
+
+      - name: Сборка
+        run: npm run build
+
+      - name: Аудит зависимостей на уязвимости
+        # Как и pip-audit у бэкенда — блокирующий шаг.
+        # audit-level=high: низкоприоритетные советы npm в основном шумят,
+        # а серьёзную уязвимость сборка пропустить не должна.
+        run: npm audit --audit-level=high
+
+  nginx-config:
+    name: Nginx — проверка конфигурации
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Самоподписанные сертификаты (настоящие лежат только на сервере)
+        run: |
+          mkdir -p certs/live/crmdetroid.ru certbot/www
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+            -keyout certs/live/crmdetroid.ru/privkey.pem \
+            -out certs/live/crmdetroid.ru/fullchain.pem \
+            -subj "/CN=crmdetroid.ru" 2>/dev/null
+
+      - name: nginx -t на боевых конфигах
+        # Опечатка в конфиге раньше обнаруживалась только на сервере при
+        # перезагрузке nginx. Здесь тот же образ, те же файлы — но в CI.
+        # --add-host: при проверке nginx резолвит имена из proxy_pass, а
+        # контейнеров backend/frontend в CI нет.
+        run: |
+          docker run --rm \
+            --add-host backend:127.0.0.1 \
+            --add-host frontend:127.0.0.1 \
+            -v "$PWD/deploy/nginx/conf.d:/etc/nginx/conf.d:ro" \
+            -v "$PWD/deploy/nginx/snippets:/etc/nginx/snippets:ro" \
+            -v "$PWD/certs:/etc/letsencrypt:ro" \
+            -v "$PWD/certbot/www:/var/www/certbot:ro" \
+            nginx:1.27-alpine nginx -t
+
+  docker-build:
+    name: Docker — сборка образов и docker compose config
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: docker compose config проверяет весь стек разом
+        # Распознаёт опечатки в docker-compose.yml и .env.example (например,
+        # отсутствие переменной, на которую ссылается compose) ещё в CI,
+        # а не при первом разворачивании на сервере.
+        run: |
+          cp .env.example .env
+          docker compose config --quiet
+
+      - uses: docker/setup-buildx-action@v4
+
+      - name: Сборка backend-образа
+        uses: docker/build-push-action@v7
+        with:
+          context: backend
+          push: false
+
+      - name: Сборка frontend-образа
+        uses: docker/build-push-action@v7
+        with:
+          context: frontend
+          push: false
