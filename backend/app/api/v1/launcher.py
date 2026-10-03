@@ -43,7 +43,7 @@ APPS: list[dict[str, Any]] = [
         "id": 3,
         "slug": "admin",
         "name": "Администрирование",
-        "description": "Пользователи, перевозчики, безопасность",
+        "description": "Пользователи, бэкапы, безопасность",
         "icon": "Settings",
         "route": "/admin",
         "min_role": Role.admin,

@@ -38,7 +38,7 @@ export DATABASE_URL="sqlite+aiosqlite:///./crm.db"
 .venv/bin/ruff check .        # линтер
 .venv/bin/ruff format .       # форматирование
 .venv/bin/mypy app            # типы (strict)
-.venv/bin/python -m pytest    # тесты (77 шт., идут на SQLite в памяти)
+.venv/bin/python -m pytest    # тесты (131 функция, 138 прогонов, SQLite в памяти)
 .venv/bin/alembic check       # модели и миграции совпадают
 .venv/bin/pip-audit           # уязвимости в зависимостях
 ```
@@ -59,17 +59,18 @@ backend/
 │   │   ├── errors.py      единый формат ошибок {detail, code, request_id}
 │   │   └── pagination.py  {count, next, previous, results}
 │   ├── db/                Base с naming_convention, async engine, сессия-зависимость
-│   ├── models/            User · Stage · Tag · Lead · Carrier · Shipment · TimelineEntry ·
+│   ├── models/            User · Stage · Tag · Lead · LossReason · Shipment · TimelineEntry ·
 │   │                      Attachment · LoginAttempt · RevokedToken
 │   ├── schemas/           Pydantic v2: запросы и ответы
 │   ├── api/
 │   │   ├── deps.py        сессия, текущий пользователь, проверка ролей
 │   │   └── v1/            ТОЛЬКО HTTP: маршруты, параметры, коды ответов
-│   │                      auth · launcher · stages · tags · leads · shipments ·
-│   │                      attachments · carriers · users · admin · health
-│   ├── services/          бизнес-логика, отделённая от HTTP: leads · shipments · attachments
+│   │                      auth · launcher · stages · tags · loss_reasons · leads ·
+│   │                      customers · attachments · shipments · users · admin · health
+│   ├── services/          бизнес-логика, отделённая от HTTP: leads · shipments ·
+│   │                      attachments · customers · stages · tags
 │   └── worker/            Celery: приложение и задачи (бэкапы, уборка)
-├── alembic/               миграции (первая создаёт всю схему)
+├── alembic/               миграции: 21 шт., первая создаёт всю схему
 ├── tests/                 pytest + httpx ASGITransport
 ├── requirements-dev.lock  точные версии зависимостей с хешами (для CI)
 ├── Dockerfile             многоступенчатая сборка на Python 3.13
@@ -86,23 +87,31 @@ backend/
 | GET | `/api/v1/auth/me` | авторизованные |
 | GET | `/api/v1/launcher/apps` | авторизованные (фильтр по роли) |
 | GET/POST/PATCH/DELETE | `/api/v1/crm/stages` | своя доска; `?owner_id=` — доска сотрудника (админ) |
-| GET/POST/DELETE | `/api/v1/crm/tags` | чтение — все, изменение — админ |
+| POST | `/api/v1/crm/stages/reorder` | новый порядок этапов целиком, одной транзакцией |
+| GET/POST/PATCH/DELETE | `/api/v1/crm/tags` | все авторизованные (теги — рабочий инструмент, не настройка) |
+| GET | `/api/v1/crm/loss-reasons` | авторизованные; создание и удаление — admin |
 | GET/POST | `/api/v1/crm/leads` | свои лиды; админ видит все |
 | GET/PATCH | `/api/v1/crm/leads/{id}` | свой лид; чужой — 404 |
 | DELETE | `/api/v1/crm/leads/{id}` | свой лид (архивация) |
+| DELETE | `/api/v1/crm/leads/{id}/permanent` | admin: стирает лид, заявки, историю и файлы безвозвратно |
+| POST | `/api/v1/crm/leads/{id}/lose` · `/restore` | проигрыш с причиной и возврат в работу |
 | GET | `/api/v1/crm/leads/{id}/timeline` | авторизованные |
 | POST | `/api/v1/crm/leads/{id}/notes` | авторизованные |
-| GET | `/api/v1/crm/leads/{id}/pager` | считает только видимые лиды |
+| PATCH/DELETE | `/api/v1/crm/leads/{id}/timeline/{entry_id}` | только свои примечания; системные записи неизменяемы |
+| GET | `/api/v1/crm/leads/{id}/pager` | считает только видимые лиды одной доски |
 | POST | `/api/v1/crm/leads/{id}/transfer` | передать лид коллеге (свой лид) |
+| GET | `/api/v1/crm/customers` | все лиды компании; чужой активный — только название, ИНН и продавец |
+| GET | `/api/v1/crm/customers/by-inn` | предупреждение о дубле ИНН (`?inn=`, `?exclude_id=`) |
 | GET | `/api/v1/users/colleagues` | список активных сотрудников (имя и фамилия) |
 | GET/POST | `/api/v1/crm/leads/{id}/attachments` | авторизованные (до 25 МБ) |
 | GET/DELETE | `/api/v1/crm/attachments/{id}` | по доступу к лиду; удалить — автор или админ |
 | GET/POST | `/api/v1/shipments/{id}/attachments` | документы заявки |
-| GET/POST | `/api/v1/shipments` | авторизованные |
-| GET/PATCH | `/api/v1/shipments/{id}` | авторизованные |
-| PATCH | `/api/v1/shipments/{id}/status` | авторизованные |
-| GET | `/api/v1/leads/{id}/shipments` | авторизованные |
-| GET/POST/PATCH | `/api/v1/carriers` | чтение и создание — все, правка — админ |
+| GET/POST | `/api/v1/shipments` | авторизованные; `?search=` по номеру, клиенту и перевозчику |
+| GET/PATCH | `/api/v1/shipments/{id}` | авторизованные; поле `status` через общий PATCH не меняется |
+| PATCH | `/api/v1/shipments/{id}/status` | единственный способ сменить статус — пишет запись в историю |
+| GET | `/api/v1/shipments/{id}/timeline` · POST `/notes` | лента и примечания заявки |
+| PATCH/DELETE | `/api/v1/shipments/{id}/timeline/{entry_id}` | только свои примечания |
+| GET | `/api/v1/leads/{id}/shipments` | заявки лида (вкладка в карточке) |
 | GET | `/api/v1/admin/backups` · POST `/api/v1/admin/backup` | admin |
 | GET | `/api/v1/admin/login-attempts` | admin |
 | GET/POST/PATCH/DELETE | `/api/v1/admin/users` | admin |
@@ -127,8 +136,18 @@ backend/
 **Формат ответов.** Списки отдаются как `{count, next, previous, results}` —
 ровно то, что уже умеет читать фронтенд. Ошибки всегда `{detail, code, request_id}`.
 
-**История изменений.** Смена этапа лида автоматически пишет запись в
-`timeline_entries` — из неё строится лента чаттера в карточке.
+**История изменений — доказательство, а не заметки.** Смена этапа лида и
+смена статуса заявки автоматически пишут запись в `timeline_entries` — из неё
+строится лента чаттера. Системные записи нельзя ни отредактировать, ни
+удалить: API разрешает это только для собственных примечаний. Статус заявки
+меняется исключительно через `PATCH /shipments/{id}/status`; в общей схеме
+`ShipmentUpdate` поля `status` нет, а неизвестные поля PATCH получают 422.
+
+**Перенос заявки к другому лиду целостен.** Сервис проверяет доступ к новому
+лиду и одной транзакцией переносит саму заявку, её историю и вложения; на
+уровне базы это закреплено составными внешними ключами
+(`uq_shipments_id_lead_id`). Иначе файлы оставались бы доступны прежнему
+владельцу, а удаление старого лида уносило бы историю новой заявки.
 
 **Валидация ИНН.** Контрольная сумма ФНС проверяется в схеме (10 и 12 цифр),
 в базе дополнительно стоит CHECK на длину.
@@ -161,6 +180,7 @@ celery -A app.worker.celery_app.celery beat   -l info
 | `backup_database` | 03:00 ежедневно | `pg_dump` в `/var/backups/crm`, хранит 14 дней |
 | `backup_attachments` | воскресенье 04:00 | архив файлов (`files-*.tar.gz`), хранит 4 копии |
 | `cleanup_orphan_attachments` | воскресенье 04:30 | чистит записи о пропавших файлах |
+| `cleanup_revoked_tokens` | воскресенье 04:45 | убирает истёкшие записи из `revoked_tokens` |
 
 ## Миграции
 
@@ -170,5 +190,11 @@ celery -A app.worker.celery_app.celery beat   -l info
 .venv/bin/alembic downgrade -1
 ```
 
-Первая миграция (`initial schema`) создаёт все девять таблиц, индексы,
-внешние ключи и CHECK-ограничения.
+Первая миграция (`initial schema`) создаёт базовую схему, остальные двадцать
+меняют её по ходу работы. Сейчас в базе десять таблиц: `users`, `stages`,
+`tags`, `leads`, `loss_reasons`, `shipments`, `timeline_entries`,
+`attachments`, `login_attempts`, `revoked_tokens`.
+
+Контейнер `backend` миграции при старте **не** применяет — схему обновляет
+только `deploy.sh` отдельным шагом (см. корневой `README.md`). Это сделано,
+чтобы случайный перезапуск контейнера не накатил миграцию вне окна деплоя.

@@ -2,8 +2,9 @@
 
 Раньше контрольная сумма ИНН проверялась только у лида (`LeadBase`), а
 `LeadUpdate` подключал тот же валидатор хаком через `.__func__`
-(`field_validator("inn")(LeadBase.validate_inn.__func__)`), и у перевозчика
-(`Carrier`) чек-суммы не было вообще. Здесь — одна функция на всех.
+(`field_validator("inn")(LeadBase.validate_inn.__func__)`); у перевозчика,
+который тогда был отдельным справочником, чек-суммы не было вообще. Здесь —
+одна функция на всех.
 """
 
 from __future__ import annotations
@@ -25,8 +26,9 @@ def inn_checksum_ok(inn: str) -> bool:
 def validate_inn(value: str) -> str:
     """ИНН: 10 или 12 цифр плюс контрольная сумма ФНС.
 
-    Используется как тело `field_validator("inn")` в схемах лида и
-    перевозчика — задаём его один раз здесь, а не копируем в каждой схеме.
+    Используется как тело `field_validator("inn")` в схемах лида, а в варианте
+    `validate_inn_optional` — у ИНН перевозчика в заявке. Задаём проверку один
+    раз здесь, а не копируем в каждой схеме.
     """
     digits = "".join(ch for ch in value if ch.isdigit())
     if len(digits) not in (10, 12):
