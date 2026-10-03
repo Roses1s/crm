@@ -63,6 +63,13 @@ function fieldStateCls(filled: boolean) {
   return `${fieldBaseCls} ${filled ? fieldFilledCls : fieldEmptyCls}`;
 }
 
+// У <select> браузер рисует собственную стрелку поверх правого края поля.
+// С одинаковыми отступами слева и справа она наезжала на текст («НДС 22%»
+// превращалось в «НДС 22⌄»), поэтому справа резервируем под неё место.
+function selectStateCls(filled: boolean) {
+  return `${fieldStateCls(filled)} pr-6`;
+}
+
 function SInput({ className = "", ...props }: InputHTMLAttributes<HTMLInputElement>) {
   const filled = Boolean(props.value);
   return <input {...props} className={`${fieldStateCls(filled)} ${className}`} />;
@@ -208,7 +215,7 @@ function OrderLinesTab({
               </td>
               <td className={td}>
                 <select
-                  className={fieldStateCls(true)}
+                  className={`${selectStateCls(true)} min-w-[92px]`}
                   value={customerTax}
                   onChange={(e) => onCustomerTaxChange(e.target.value)}
                 >
@@ -233,7 +240,7 @@ function OrderLinesTab({
               </td>
               <td className={td}>
                 <select
-                  className={fieldStateCls(true)}
+                  className={`${selectStateCls(true)} min-w-[92px]`}
                   value={carrierTax}
                   onChange={(e) => onCarrierTaxChange(e.target.value)}
                 >
@@ -925,7 +932,7 @@ function ShipmentForm({ id }: { id?: string }) {
                         <Field label="Тип транспорта" htmlFor="ship-transport">
                           <select
                             id="ship-transport"
-                            className={fieldStateCls(Boolean(form.transport_type))}
+                            className={selectStateCls(Boolean(form.transport_type))}
                             value={form.transport_type}
                             onChange={(e) => set("transport_type", e.target.value)}
                           >
