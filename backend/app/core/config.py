@@ -79,6 +79,10 @@ class Settings(BaseSettings):
     attachments_dir: str = "/var/lib/crm/attachments"
     # Должно совпадать с client_max_body_size в конфиге nginx.
     max_upload_mb: int = 25
+    # Предохранитель по месту: если на диске останется меньше, загрузка файлов
+    # перестаёт приниматься. Нужен, чтобы заполненный диск не остановил
+    # PostgreSQL — на сервере всего 15 ГБ и общий раздел с базой.
+    min_free_disk_mb: int = 1024
 
     # --- резервные копии ---------------------------------------------------
     backup_dir: str = "/var/backups/crm"
@@ -87,6 +91,9 @@ class Settings(BaseSettings):
     backup_stale_hours: int = 36
     # Файлы вложений архивируются отдельно и реже: дамп базы их не содержит.
     backup_files_keep: int = 4
+    # Сколько дней хранить журнал попыток входа (раздел «Безопасность»).
+    # Без срока таблица росла бы вечно.
+    login_attempts_keep_days: int = 90
 
     # --- наблюдаемость ----------------------------------------------------
     sentry_dsn: str | None = None

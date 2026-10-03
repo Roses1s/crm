@@ -23,6 +23,27 @@ import type {
 import { clearTokens, startSession } from "./auth";
 import { api, apiBlob, apiUpload, type Page } from "./client";
 
+/**
+ * Сколько записей запрашиваем у сервера за раз. Постраничного перелистывания
+ * в интерфейсе нет, поэтому списки показывают первую «страницу» — но теперь
+ * честно сообщают об этом: см. ListResult.total и ListLimitNotice.
+ */
+export const LIST_LIMIT = 200;
+export const CUSTOMERS_LIMIT = 500;
+
+/** Список с сервера вместе с общим количеством записей. */
+export interface ListResult<T> {
+  items: T[];
+  /** Сколько записей всего подходит под запрос (а не сколько показано). */
+  total: number;
+  /** Сколько записей максимум попало в ответ. */
+  limit: number;
+}
+
+function toListResult<T>(page: Page<T>, limit: number): ListResult<T> {
+  return { items: page.results, total: page.count, limit };
+}
+
 export interface LeadFilters {
   search?: string;
   stage?: number | null;
@@ -33,7 +54,7 @@ export interface LeadFilters {
 }
 
 function leadsQueryString(filters: LeadFilters): string {
-  const params = new URLSearchParams({ page_size: "200" });
+  const params = new URLSearchParams({ page_size: String(LIST_LIMIT) });
   params.set("is_archived", filters.archived ? "true" : "false");
   if (filters.search) params.set("search", filters.search);
   if (filters.stage) params.set("stage", String(filters.stage));
@@ -251,25 +272,26 @@ export function useLeads(filters: LeadFilters = {}) {
   return useQuery({
     queryKey: keys.leads(filters),
     queryFn: () => api<Page<Lead>>(`/crm/leads?${leadsQueryString(filters)}`),
-    select: (page) => page.results,
+    select: (page) => toListResult(page, LIST_LIMIT),
   });
 }
 
 /**
  * Модуль «Клиенты»: ВСЕ лиды компании. Поиск — только по названию/ИНН (так же
  * ограничен и на бэкенде — это единственные поля, видимые на чужом активном
- * лиде). page_size на максимум: отдельной пагинации в интерфейсе пока нет,
- * список подгружается целиком и режется на клиенте кнопкой «Показать ещё».
+ * лиде). Запрашиваем первые CUSTOMERS_LIMIT записей и показываем их пачками
+ * кнопкой «Показать ещё»; если на сервере их больше — об этом честно
+ * сообщает ListLimitNotice.
  */
 export function useCustomers(search: string) {
   return useQuery({
     queryKey: keys.customers(search),
     queryFn: () => {
-      const params = new URLSearchParams({ page_size: "500" });
+      const params = new URLSearchParams({ page_size: String(CUSTOMERS_LIMIT) });
       if (search) params.set("search", search);
       return api<Page<Customer>>(`/crm/customers?${params.toString()}`);
     },
-    select: (page) => page.results,
+    select: (page) => toListResult(page, CUSTOMERS_LIMIT),
   });
 }
 
@@ -666,12 +688,12 @@ export function useShipments(status = "", search = "") {
   return useQuery({
     queryKey: keys.shipments(status, search),
     queryFn: () => {
-      const params = new URLSearchParams({ page_size: "200" });
+      const params = new URLSearchParams({ page_size: String(LIST_LIMIT) });
       if (status) params.set("status", status);
       if (search) params.set("search", search);
       return api<Page<Shipment>>(`/shipments?${params.toString()}`);
     },
-    select: (page) => page.results,
+    select: (page) => toListResult(page, LIST_LIMIT),
   });
 }
 

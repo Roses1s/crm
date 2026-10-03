@@ -135,4 +135,26 @@ describe("Сценарий: список заявок", () => {
       { timeout: 3000 },
     );
   });
+
+  it("предупреждает, когда показаны не все заявки", async () => {
+    // Пагинации в интерфейсе нет: сервер отдаёт первую страницу. Раньше
+    // остальные записи просто исчезали, и об этом никто не знал.
+    setAccessToken("токен");
+    server = startFakeApi([
+      { path: "/auth/me", response: ME },
+      {
+        path: "/shipments",
+        response: { count: 240, next: 2, previous: null, results: SHIPMENTS },
+      },
+    ]);
+
+    renderWithProviders(
+      <Routes>
+        <Route path="/shipments" element={<ShipmentsPage />} />
+      </Routes>,
+      { route: "/shipments" },
+    );
+
+    expect(await screen.findByRole("status")).toHaveTextContent(/Показаны первые 1 заявок из 240/);
+  });
 });

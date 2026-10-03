@@ -72,6 +72,8 @@
 | `backup_attachments` | `crontab(hour=4, minute=0, day_of_week="sun")` |
 | `cleanup_orphan_attachments` | `crontab(hour=4, minute=30, day_of_week="sun")` |
 | `cleanup_revoked_tokens` | `crontab(hour=4, minute=45, day_of_week="sun")` |
+| `cleanup_login_attempts` | `crontab(hour=5, minute=0, day_of_week="sun")` |
+| `cleanup_orphan_files` | `crontab(hour=5, minute=15, day_of_week="sun")` |
 
 ## Интерфейс (`frontend/src/features/`)
 
@@ -87,8 +89,8 @@
 
 ## Тесты
 
-- бэкенд (pytest): **145** тест-функций
-- фронтенд (vitest): **65** тестов
+- бэкенд (pytest): **147** тест-функций
+- фронтенд (vitest): **66** тестов
 - сценарные (подменяется только сеть, остальное настоящее):
   - `frontend/src/features/auth/login-flow.test.tsx`
   - `frontend/src/features/crm/kanban-flow.test.tsx`

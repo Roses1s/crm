@@ -72,6 +72,31 @@ def _checked_suffix(original: str) -> str:
     return suffix
 
 
+def _free_disk_mb(path: Path) -> int:
+    """Сколько мегабайт свободно на том же разделе, что и каталог вложений."""
+    probe = path if path.exists() else storage_root()
+    probe.mkdir(parents=True, exist_ok=True)
+    return int(shutil.disk_usage(probe).free // (1024 * 1024))
+
+
+async def _ensure_disk_space(target: Path) -> None:
+    """Не даёт загрузкой файлов добить диск до нуля.
+
+    На сервере база, резервные копии и вложения живут на одном разделе в
+    15 ГБ. Переполнение диска останавливает PostgreSQL — это худшее, что
+    может случиться, поэтому последний гигабайт не отдаём под загрузки.
+    """
+    free_mb = await run_in_threadpool(_free_disk_mb, target.parent)
+    required = settings.min_free_disk_mb + settings.max_upload_mb
+    if free_mb < required:
+        raise AppError(
+            "На сервере заканчивается место на диске — загрузка файлов временно "
+            f"недоступна (свободно {free_mb} МБ). Сообщите администратору.",
+            code="low_disk_space",
+            status_code=status.HTTP_507_INSUFFICIENT_STORAGE,
+        )
+
+
 async def _save_upload(upload: UploadFile, target: Path) -> int:
     """Пишет файл на диск в отдельном потоке, следя за лимитом. Возвращает размер.
 
@@ -83,6 +108,7 @@ async def _save_upload(upload: UploadFile, target: Path) -> int:
     limit = settings.max_upload_mb * 1024 * 1024
     written = 0
     await run_in_threadpool(target.parent.mkdir, parents=True, exist_ok=True)
+    await _ensure_disk_space(target)
     out = await run_in_threadpool(target.open, "wb")
     try:
         while chunk := await upload.read(CHUNK):
@@ -265,9 +291,13 @@ async def delete_attachment(session: AsyncSession, user: User, attachment_id: in
     if attachment.uploaded_by_id != user.id and user.role != Role.admin:
         raise PermissionDeniedError("Удалить чужое вложение может только администратор")
 
-    Path(attachment.storage_path).unlink(missing_ok=True)
+    # Сначала запись, потом файл: если бы транзакция не прошла после удаления
+    # файла, запись осталась бы в базе, а файла уже не было. Удаление с диска
+    # выносим в пул потоков, как и остальную работу с файлами.
+    path = Path(attachment.storage_path)
     await session.delete(attachment)
     await session.commit()
+    await run_in_threadpool(path.unlink, missing_ok=True)
     log.info("attachment.deleted", attachment_id=attachment_id, by=user.id)
 
 

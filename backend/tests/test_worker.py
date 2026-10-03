@@ -8,7 +8,11 @@
 
 from __future__ import annotations
 
+import os
+import time
+from datetime import UTC, datetime, timedelta
 from pathlib import Path
+from unittest import mock
 
 import pytest
 from sqlalchemy import create_engine, select
@@ -16,6 +20,7 @@ from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.db.base import Base
+from app.models.security import LoginAttempt
 from app.models.timeline import Attachment
 from app.worker import tasks as worker_tasks
 from app.worker.tasks import _pg_dump_command
@@ -30,7 +35,9 @@ def test_celery_imports_task_modules() -> None:
     assert registered == {
         "app.worker.tasks.backup_attachments",
         "app.worker.tasks.backup_database",
+        "app.worker.tasks.cleanup_login_attempts",
         "app.worker.tasks.cleanup_orphan_attachments",
+        "app.worker.tasks.cleanup_orphan_files",
         "app.worker.tasks.cleanup_revoked_tokens",
     }
 
@@ -122,3 +129,73 @@ def test_pg_dump_command_keeps_password_out_of_argv(monkeypatch: pytest.MonkeyPa
     assert "--port" in cmd and "5433" in cmd
     assert "--username" in cmd and "crm" in cmd
     assert "--dbname" in cmd and "crmdb" in cmd
+
+
+def test_cleanup_orphan_files_removes_only_unknown_and_old(tmp_path: Path) -> None:
+    """Файлы без записи в базе удаляются; свежие и известные — остаются.
+
+    Такие файлы остаются после прерванной загрузки и после удаления
+    примечания с вложениями (строки уходят каскадом, файлы — нет), и раньше
+    лежали на диске вечно.
+    """
+    engine = create_engine(f"sqlite:///{tmp_path / 'files.db'}")
+    Base.metadata.create_all(engine)
+
+    storage = tmp_path / "attachments"
+    storage.mkdir()
+    known = storage / "известный.txt"
+    orphan_old = storage / "сирота.txt"
+    orphan_fresh = storage / "только-что-загружен.txt"
+    for file in (known, orphan_old, orphan_fresh):
+        file.write_bytes(b"x" * 10)
+
+    # Старым файлам сдвигаем время изменения на сутки назад.
+    day_ago = time.time() - 24 * 3600
+    os.utime(known, (day_ago, day_ago))
+    os.utime(orphan_old, (day_ago, day_ago))
+
+    with Session(engine) as session:
+        session.add(Attachment(lead_id=1, name="известный.txt", size=10, storage_path=str(known)))
+        session.commit()
+
+    with (
+        mock.patch.object(worker_tasks, "_session", lambda: Session(engine)),
+        mock.patch.object(settings, "attachments_dir", str(storage)),
+    ):
+        result = worker_tasks.cleanup_orphan_files()
+
+    assert result["removed"] == 1
+    assert known.exists()
+    assert orphan_fresh.exists()
+    assert not orphan_old.exists()
+
+
+def test_cleanup_login_attempts_keeps_recent(tmp_path: Path) -> None:
+    """Старые записи журнала входов удаляются, свежие остаются."""
+    engine = create_engine(f"sqlite:///{tmp_path / 'attempts.db'}")
+    Base.metadata.create_all(engine)
+
+    with Session(engine) as session:
+        session.add_all(
+            [
+                LoginAttempt(
+                    email="old@crmdetroid.ru",
+                    successful=False,
+                    created_at=datetime.now(tz=UTC) - timedelta(days=400),
+                ),
+                LoginAttempt(
+                    email="fresh@crmdetroid.ru",
+                    successful=False,
+                    created_at=datetime.now(tz=UTC),
+                ),
+            ]
+        )
+        session.commit()
+
+    with mock.patch.object(worker_tasks, "_session", lambda: Session(engine)):
+        result = worker_tasks.cleanup_login_attempts()
+
+    assert result["removed"] == 1
+    with Session(engine) as session:
+        left = session.execute(select(LoginAttempt.email)).scalars().all()
+    assert left == ["fresh@crmdetroid.ru"]

@@ -2,6 +2,7 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { AppShell, ControlPanel } from "@/app/layout/AppShell";
+import { ListLimitNotice } from "@/shared/ui/list-limit-notice";
 import { useShipments } from "@/shared/api/hooks";
 import { formatShipmentDate, SHIPMENT_STATUS } from "./shipment-status";
 
@@ -20,7 +21,8 @@ export function ShipmentsPage() {
   const status = params.get("status") ?? "";
   const search = params.get("search") ?? "";
   const [searchInput, setSearchInput] = useState(search);
-  const { data: shipments = [], isLoading } = useShipments(status, search);
+  const { data: shipmentsPage, isLoading } = useShipments(status, search);
+  const shipments = shipmentsPage?.items ?? [];
 
   // Поиск дебаунсим на 300мс и пишем в адресную строку с replace — как на
   // «Лидах» и «Клиентах» (KanbanPage/CustomersPage): иначе запрос к API
@@ -67,10 +69,12 @@ export function ShipmentsPage() {
       <ControlPanel
         title="Заявки"
         status={statusFilter}
-        count={shipments.length}
+        count={shipmentsPage?.total ?? 0}
         search={searchInput}
         onSearch={setSearchInput}
       />
+
+      <ListLimitNotice data={shipmentsPage} noun="заявок" />
 
       <div className="flex-1 overflow-auto">
         <table className="w-full border-collapse text-[13px]">

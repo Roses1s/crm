@@ -343,7 +343,8 @@ function ShipmentForm({ id }: { id?: string }) {
 
   const { data: currentUser } = useMe();
   const { data: shipment, isLoading } = useShipment(id);
-  const { data: leads = [] } = useLeads();
+  const { data: leadsPage } = useLeads();
+  const leads = leadsPage?.items ?? [];
   const { data: allTags = [] } = useTags();
   const { data: timeline = [] } = useShipmentTimeline(id);
   const { data: attachments = [] } = useShipmentAttachments(shipment?.id);

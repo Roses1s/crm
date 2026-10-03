@@ -54,4 +54,12 @@ celery.conf.beat_schedule = {
         "task": "app.worker.tasks.cleanup_revoked_tokens",
         "schedule": crontab(hour=4, minute=45, day_of_week="sun"),
     },
+    "cleanup-login-attempts": {
+        "task": "app.worker.tasks.cleanup_login_attempts",
+        "schedule": crontab(hour=5, minute=0, day_of_week="sun"),
+    },
+    "cleanup-orphan-files": {
+        "task": "app.worker.tasks.cleanup_orphan_files",
+        "schedule": crontab(hour=5, minute=15, day_of_week="sun"),
+    },
 }

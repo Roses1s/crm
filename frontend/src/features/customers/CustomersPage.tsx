@@ -4,6 +4,7 @@ import { useSearchParams } from "react-router-dom";
 import { AppShell, ControlPanel } from "@/app/layout/AppShell";
 import { useCustomers } from "@/shared/api/hooks";
 import { CustomerTile } from "@/features/customers/CustomerTile";
+import { ListLimitNotice } from "@/shared/ui/list-limit-notice";
 
 const TILES_PER_PAGE = 60;
 
@@ -37,7 +38,8 @@ export function CustomersPage() {
     return () => clearTimeout(timer);
   }, [searchInput, setParams]);
 
-  const { data: customers = [], isLoading } = useCustomers(search);
+  const { data: customersPage, isLoading } = useCustomers(search);
+  const customers = customersPage?.items ?? [];
   const shown = customers.slice(0, visible);
   const hidden = customers.length - shown.length;
 
@@ -47,8 +49,10 @@ export function CustomersPage() {
         title="Клиенты"
         search={searchInput}
         onSearch={setSearchInput}
-        count={customers.length || undefined}
+        count={customersPage?.total || undefined}
       />
+
+      <ListLimitNotice data={customersPage} noun="клиентов" />
 
       <div className="min-h-[calc(100dvh-var(--odoo-record-control-panel-height))] bg-odoo-bg p-4">
         {isLoading ? (

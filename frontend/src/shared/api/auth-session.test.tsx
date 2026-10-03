@@ -12,7 +12,8 @@ let backendUser: "admin" | "manager" = "admin";
 
 function Probe() {
   const { data: me } = useMe();
-  const { data: leads = [] } = useLeads();
+  const { data: leadsPage } = useLeads();
+  const leads = leadsPage?.items ?? [];
   return <div>{`${me?.email ?? "загрузка"}|${leads[0]?.name ?? "загрузка"}`}</div>;
 }
 

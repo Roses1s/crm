@@ -4,7 +4,9 @@
   * `backup_database` — ночной дамп PostgreSQL;
   * `backup_attachments` — еженедельный архив вложений;
   * `cleanup_orphan_attachments` — убирает записи о файлах, которых нет на диске;
-  * `cleanup_revoked_tokens` — чистит чёрный список токенов от истёкших записей.
+  * `cleanup_revoked_tokens` — чистит чёрный список токенов от истёкших записей;
+  * `cleanup_login_attempts` — убирает старые записи журнала попыток входа;
+  * `cleanup_orphan_files` — удаляет файлы на диске, которых нет в базе.
 
 Расписание задано в `app/worker/celery_app.py`.
 
@@ -20,16 +22,16 @@ import subprocess
 import tarfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
-from typing import Any
+from typing import Any, cast
 
 from celery import shared_task
-from sqlalchemy import Engine, create_engine, select
+from sqlalchemy import CursorResult, Engine, create_engine, delete, select
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
 from app.core.config import settings
 from app.core.logging import configure_logging, get_logger
-from app.models.security import RevokedToken
+from app.models.security import LoginAttempt, RevokedToken
 from app.models.timeline import Attachment
 
 configure_logging()
@@ -194,3 +196,61 @@ def cleanup_revoked_tokens() -> dict[str, Any]:
         session.commit()
     log.info("cleanup.revoked_tokens", removed=len(expired))
     return {"removed": len(expired)}
+
+
+@shared_task(name="app.worker.tasks.cleanup_login_attempts")
+def cleanup_login_attempts() -> dict[str, Any]:
+    """Чистит журнал попыток входа от старых записей.
+
+    Таблица пополняется при каждом входе и раньше не чистилась вообще: на
+    диске в 15 ГБ это медленная, но верная утечка места. Срок хранения —
+    `LOGIN_ATTEMPTS_KEEP_DAYS` (по умолчанию 90 дней): этого достаточно, чтобы
+    разобраться в подозрительной активности, и немного для объёма.
+    """
+    cutoff = datetime.now(tz=UTC) - timedelta(days=settings.login_attempts_keep_days)
+    with _session() as session:
+        # CursorResult даёт rowcount; аннотация execute() о нём не знает.
+        result = cast(
+            "CursorResult[Any]",
+            session.execute(delete(LoginAttempt).where(LoginAttempt.created_at < cutoff)),
+        )
+        removed_rows = result.rowcount
+        session.commit()
+    removed = int(removed_rows or 0)
+    log.info("cleanup.login_attempts", removed=removed)
+    return {"removed": removed}
+
+
+@shared_task(name="app.worker.tasks.cleanup_orphan_files")
+def cleanup_orphan_files() -> dict[str, Any]:
+    """Удаляет файлы на диске, которым не соответствует запись в базе.
+
+    Обратная задача к `cleanup_orphan_attachments`. Такие файлы остаются после
+    прерванной загрузки, отката транзакции и удаления примечания вместе с
+    вложениями (строки уходят каскадом, файлы — нет). Ни в одном интерфейсе
+    они не видны и занимают место бесконечно.
+
+    Чтобы не удалить файл, который прямо сейчас дописывается, трогаем только
+    то, что старше часа.
+    """
+    root = Path(settings.attachments_dir)
+    if not root.exists():
+        return {"removed": 0, "freed_bytes": 0}
+
+    cutoff = (datetime.now(tz=UTC) - timedelta(hours=1)).timestamp()
+    with _session() as session:
+        known = {
+            str(path) for (path,) in session.execute(select(Attachment.storage_path)).all() if path
+        }
+
+    removed = 0
+    freed = 0
+    for file in root.rglob("*"):
+        if not file.is_file() or str(file) in known or file.stat().st_mtime > cutoff:
+            continue
+        freed += file.stat().st_size
+        file.unlink(missing_ok=True)
+        removed += 1
+
+    log.info("cleanup.orphan_files", removed=removed, freed_bytes=freed)
+    return {"removed": removed, "freed_bytes": freed}

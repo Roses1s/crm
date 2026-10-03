@@ -27,6 +27,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { AppShell, ControlPanel } from "@/app/layout/AppShell";
+import { ListLimitNotice } from "@/shared/ui/list-limit-notice";
 import { BoardBanner } from "@/features/crm/board/BoardBanner";
 import { BoardSuggestions } from "@/features/crm/board/BoardSuggestions";
 import { Column } from "@/features/crm/board/Column";
@@ -111,7 +112,8 @@ export function KanbanPage() {
   const boardUserId = isAdmin && boardParam ? Number(boardParam) : null;
   // Фильтров в интерфейсе больше нет: доска у каждого своя, а нужную карточку
   // ищут поиском. Из параметров остаётся чужая доска для администратора.
-  const { data: leads = [] } = useLeads({ search, assigned: boardUserId });
+  const { data: leadsPage } = useLeads({ search, assigned: boardUserId });
+  const leads = leadsPage?.items ?? [];
   const { data: stages = [] } = useStages(boardUserId);
   const moveLead = useMoveLead();
   const reorderStages = useReorderStages();
@@ -254,6 +256,8 @@ export function KanbanPage() {
           ) : undefined
         }
       ></ControlPanel>
+
+      <ListLimitNotice data={leadsPage} noun="лидов" />
 
       {boardUserId !== null && (
         <BoardBanner boardUserId={boardUserId} onLeave={() => setFilter("board", "")} />
