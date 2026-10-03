@@ -177,3 +177,41 @@ async def test_reorder_requires_complete_board_order(
 
     assert response.status_code == 400
     assert response.json()["code"] == "incomplete_stage_order"
+
+
+async def test_delete_stage_moves_leads_to_fallback(
+    auth_client: AsyncClient, seeded: dict[str, object]
+) -> None:
+    """Непустую колонку можно удалить, если указано, куда перенести карточки.
+
+    Регрессия: раньше запрос падал с 409 «Запись с такими данными уже
+    существует». SQLAlchemy при удалении этапа сам обнулял `leads.stage_id`
+    у его лидов, потому что перенос ещё не был записан в базу.
+    """
+    stage_from = seeded["stage_new"]
+    stage_to = seeded["stage_talks"]
+    lead = seeded["lead"]
+
+    response = await auth_client.delete(
+        f"/api/v1/crm/stages/{stage_from.id}",  # type: ignore[attr-defined]
+        params={"fallback_stage_id": stage_to.id},  # type: ignore[attr-defined]
+    )
+    assert response.status_code == 204, response.text
+
+    card = await auth_client.get(f"/api/v1/crm/leads/{lead.id}")  # type: ignore[attr-defined]
+    assert card.json()["stage_id"] == stage_to.id  # type: ignore[attr-defined]
+
+    stages = await auth_client.get("/api/v1/crm/stages")
+    assert stage_from.id not in [s["id"] for s in stages.json()]  # type: ignore[attr-defined]
+
+
+async def test_delete_stage_without_fallback_is_rejected(
+    auth_client: AsyncClient, seeded: dict[str, object]
+) -> None:
+    """Без указания запасной колонки непустой этап не удаляется."""
+    stage_from = seeded["stage_new"]
+    response = await auth_client.delete(
+        f"/api/v1/crm/stages/{stage_from.id}"  # type: ignore[attr-defined]
+    )
+    assert response.status_code == 400
+    assert response.json()["code"] == "stage_not_empty"

@@ -23,13 +23,18 @@ def inn_checksum_ok(inn: str) -> bool:
     return first == int(inn[10]) and second == int(inn[11])
 
 
-def validate_inn(value: str) -> str:
+def validate_inn(value: str | None) -> str:
     """ИНН: 10 или 12 цифр плюс контрольная сумма ФНС.
 
     Используется как тело `field_validator("inn")` в схемах лида, а в варианте
     `validate_inn_optional` — у ИНН перевозчика в заявке. Задаём проверку один
     раз здесь, а не копируем в каждой схеме.
     """
+    # Явный null в PATCH («inn»: null) раньше доходил сюда и падал TypeError'ом
+    # уже внутри генератора — Pydantic превращает в 422 только ValueError,
+    # поэтому пользователь получал 500 вместо понятной ошибки.
+    if value is None:
+        raise ValueError("ИНН нельзя очистить: поле обязательно")
     digits = "".join(ch for ch in value if ch.isdigit())
     if len(digits) not in (10, 12):
         raise ValueError("ИНН должен содержать 10 или 12 цифр")
@@ -38,7 +43,7 @@ def validate_inn(value: str) -> str:
     return digits
 
 
-def validate_inn_optional(value: str) -> str:
+def validate_inn_optional(value: str | None) -> str:
     """Как `validate_inn`, но пустая строка разрешена.
 
     Перевозчик в заявке теперь просто текстовое поле (см.
@@ -48,6 +53,8 @@ def validate_inn_optional(value: str) -> str:
     (лиды, другие заявки) это поле не сверяем — пересечений/дублей здесь
     сознательно нет.
     """
+    if value is None:
+        raise ValueError("ИНН перевозчика нельзя очистить значением null — передайте пустую строку")
     digits = "".join(ch for ch in value if ch.isdigit())
     if not digits:
         return ""

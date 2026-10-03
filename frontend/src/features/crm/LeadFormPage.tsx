@@ -115,6 +115,10 @@ function LeadForm({ id }: { id?: string }) {
   // Кнопка «Создать заявку» — простая форма вместо полного бланка заявки.
   const [shipmentCreateOpen, setShipmentCreateOpen] = useState(false);
   const loadedId = useRef<number | null>(null);
+  // Автосохранение выключается после неудачной попытки и включается снова,
+  // когда человек что-то поправил. Без этого форма оставалась «грязной», и
+  // неудачный запрос повторялся каждые 3 секунды, пока открыта вкладка.
+  const autoSaveBlocked = useRef(false);
 
   // Предупреждение о дубле ИНН — некритичное, не блокирует сохранение;
   // проверяется и при создании, и при редактировании (свой же лид исключён
@@ -151,6 +155,9 @@ function LeadForm({ id }: { id?: string }) {
   }, [dirty]);
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
+    // Правка руками снимает запрет автосохранения: прошлая попытка могла
+    // упасть именно из-за того, что сейчас исправляют.
+    autoSaveBlocked.current = false;
     setForm((f) => ({ ...f, [key]: value }));
   }
 
@@ -164,7 +171,8 @@ function LeadForm({ id }: { id?: string }) {
     return fallback;
   }
 
-  function save() {
+  function save(options: { manual?: boolean } = {}) {
+    if (options.manual) autoSaveBlocked.current = false;
     setError("");
     if (!form.name.trim()) {
       setError("Укажите название лида");
@@ -175,7 +183,10 @@ function LeadForm({ id }: { id?: string }) {
     if (isNew) {
       createLead.mutate(payload, {
         onSuccess: (created) => navigate(`/crm/leads/${created.id}`, { replace: true }),
-        onError: (err) => setError(describe(err, "Не удалось создать лид")),
+        onError: (err) => {
+          autoSaveBlocked.current = true;
+          setError(describe(err, "Не удалось создать лид"));
+        },
       });
     } else {
       updateLead.mutate(payload, {
@@ -185,7 +196,10 @@ function LeadForm({ id }: { id?: string }) {
           setPristine(next);
           toast.show("Сохранено");
         },
-        onError: (err) => setError(describe(err, "Не удалось сохранить")),
+        onError: (err) => {
+          autoSaveBlocked.current = true;
+          setError(describe(err, "Не удалось сохранить"));
+        },
       });
     }
   }
@@ -204,7 +218,7 @@ function LeadForm({ id }: { id?: string }) {
   // Новую (ещё не созданную) карточку не трогаем — её создаёт только сам
   // пользователь явным сохранением.
   useEffect(() => {
-    if (isNew || !dirty || saving) return;
+    if (isNew || !dirty || saving || autoSaveBlocked.current) return;
     const timer = setTimeout(() => save(), 3000);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -386,7 +400,12 @@ function LeadForm({ id }: { id?: string }) {
         onNew={() => setQuickCreateOpen(true)}
         crumbs={[{ label: "Лиды", to: "/crm" }, { label: form.name || "Новый лид" }]}
         status={
-          <FormStatusIndicator dirty={dirty} saving={saving} onSave={save} onDiscard={discard} />
+          <FormStatusIndicator
+            dirty={dirty}
+            saving={saving}
+            onSave={() => save({ manual: true })}
+            onDiscard={discard}
+          />
         }
         cog={
           !isNew ? (

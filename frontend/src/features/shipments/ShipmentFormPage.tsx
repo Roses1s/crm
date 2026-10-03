@@ -438,6 +438,10 @@ function ShipmentForm({ id }: { id?: string }) {
 
   const dirty = isNew ? form.lead_id !== 0 : JSON.stringify(form) !== JSON.stringify(pristine);
   const saving = save.isPending;
+  // Автосохранение выключается после неудачной попытки и включается снова,
+  // когда человек что-то поправил. Без этого неудачный запрос повторялся
+  // каждые 3 секунды, пока открыта вкладка.
+  const autoSaveBlocked = useRef(false);
 
   useEffect(() => {
     if (!dirty) return;
@@ -447,6 +451,9 @@ function ShipmentForm({ id }: { id?: string }) {
   }, [dirty]);
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
+    // Правка руками снимает запрет автосохранения: прошлая попытка могла
+    // упасть именно из-за того, что сейчас исправляют.
+    autoSaveBlocked.current = false;
     setForm((f) => ({ ...f, [key]: value }));
   }
 
@@ -455,7 +462,8 @@ function ShipmentForm({ id }: { id?: string }) {
     return fallback;
   }
 
-  function submit() {
+  function submit(options: { manual?: boolean } = {}) {
+    if (options.manual) autoSaveBlocked.current = false;
     setError("");
     if (!form.lead_id) {
       setError("Выберите лид, по которому создаётся заявка");
@@ -495,7 +503,10 @@ function ShipmentForm({ id }: { id?: string }) {
           toast.show("Сохранено");
         }
       },
-      onError: (err) => setError(describe(err, "Не удалось сохранить заявку")),
+      onError: (err) => {
+        autoSaveBlocked.current = true;
+        setError(describe(err, "Не удалось сохранить заявку"));
+      },
     });
   }
 
@@ -513,7 +524,7 @@ function ShipmentForm({ id }: { id?: string }) {
   // Новую (ещё не созданную) заявку не трогаем — её создаёт только сам
   // пользователь явным сохранением.
   useEffect(() => {
-    if (isNew || !dirty || saving) return;
+    if (isNew || !dirty || saving || autoSaveBlocked.current) return;
     const timer = setTimeout(() => submit(), 3000);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -568,7 +579,12 @@ function ShipmentForm({ id }: { id?: string }) {
       <ControlPanel
         crumbs={[{ label: "Заявки", to: "/shipments" }, { label: isNew ? "Новая заявка" : title }]}
         status={
-          <FormStatusIndicator dirty={dirty} saving={saving} onSave={submit} onDiscard={discard} />
+          <FormStatusIndicator
+            dirty={dirty}
+            saving={saving}
+            onSave={() => submit({ manual: true })}
+            onDiscard={discard}
+          />
         }
         stats={
           !isNew && selectedLead ? (

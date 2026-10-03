@@ -410,3 +410,21 @@ async def test_admin_deletes_lead_with_everything_attached(
 async def test_delete_missing_lead_permanently_is_404(auth_client: AsyncClient) -> None:
     response = await auth_client.delete("/api/v1/crm/leads/999/permanent")
     assert response.status_code == 404
+
+
+async def test_null_inn_is_rejected_with_422(
+    auth_client: AsyncClient, seeded: dict[str, object]
+) -> None:
+    """Явный null в обязательном поле — понятная ошибка, а не 500.
+
+    Регрессия: валидатор ИНН получал None и падал TypeError'ом, который
+    Pydantic не превращает в 422, поэтому запрос доходил до обработчика
+    «внутренняя ошибка сервера».
+    """
+    lead = seeded["lead"]
+    response = await auth_client.patch(
+        f"/api/v1/crm/leads/{lead.id}",  # type: ignore[attr-defined]
+        json={"inn": None},
+    )
+    assert response.status_code == 422, response.text
+    assert response.json()["code"] == "validation_error"

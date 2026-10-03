@@ -133,6 +133,13 @@ async def delete_stage(
             raise NotFoundError(f"Этап {fallback_stage_id} не найден на этой доске")
         for lead in leads:
             lead.stage_id = fallback_stage_id
+        # ВАЖНО: записываем перенос в базу ДО удаления этапа. Без этого
+        # SQLAlchemy при удалении родителя сам «отцепляет» его лиды —
+        # выставляет leads.stage_id = NULL, — и база отвергает запись
+        # (колонка обязательная). Снаружи это выглядело как ошибка
+        # «Запись с такими данными уже существует» на обычном удалении
+        # непустой колонки канбана.
+        await session.flush()
 
     await session.delete(stage)
     await session.commit()
