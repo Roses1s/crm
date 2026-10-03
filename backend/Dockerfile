@@ -15,14 +15,27 @@ RUN apt-get update \
     && rm -rf /var/lib/apt/lists/*
 
 WORKDIR /build
-COPY pyproject.toml ./
-# Пустая заглушка пакета: setuptools соберёт метаданные и поставит только
-# зависимости. Благодаря этому слой с зависимостями кешируется и не
-# пересобирается при каждом изменении кода — сам код копируется ниже.
+COPY pyproject.toml requirements.lock ./
+# Зависимости ставятся СТРОГО по lock-файлу с проверкой хешей: две сборки
+# одного коммита дают один и тот же образ, и CI проверяет ровно тот набор
+# версий, который поедет на сервер. Раньше здесь было `pip install .` по
+# диапазонам из pyproject, и свежий релиз библиотеки мог попасть в прод,
+# не пройдя ни одной проверки.
+#
+# Обновление файла (в каталоге backend, в своём окружении):
+#   pip install pip-tools
+#   pip-compile --generate-hashes --output-file requirements.lock pyproject.toml
+#   pip-compile --generate-hashes --extra dev \
+#       --output-file requirements-dev.lock pyproject.toml
+#
+# Пустая заглушка пакета: setuptools соберёт метаданные без исходников.
+# Благодаря этому слой с зависимостями кешируется и не пересобирается при
+# каждом изменении кода — сам код копируется ниже.
 RUN mkdir -p app && touch app/__init__.py \
     && python -m venv /opt/venv \
     && /opt/venv/bin/pip install --upgrade pip setuptools wheel \
-    && /opt/venv/bin/pip install .
+    && /opt/venv/bin/pip install --require-hashes -r requirements.lock \
+    && /opt/venv/bin/pip install . --no-deps
 
 # ---------------------------------------------------------------------------
 FROM python:3.13-slim AS runtime

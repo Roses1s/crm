@@ -255,3 +255,25 @@ async def test_colleague_can_view_but_not_upload_lost_lead_attachments(
         headers=headers,
     )
     assert uploaded.status_code == 404
+
+
+async def test_upload_is_blocked_when_disk_is_almost_full(
+    auth_client: AsyncClient, seeded: dict[str, object], monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Последний запас места не отдаём под загрузки.
+
+    База, резервные копии и вложения живут на одном разделе: если его забить
+    файлами, остановится PostgreSQL. Поэтому при нехватке места загрузка
+    отвечает понятной ошибкой, а не пишет файл «до упора».
+    """
+    lead = seeded["lead"]
+    # Требуем заведомо больше, чем есть на любом диске.
+    monkeypatch.setattr(settings, "min_free_disk_mb", 10_000_000)
+
+    response = await auth_client.post(
+        f"/api/v1/crm/leads/{lead.id}/attachments",  # type: ignore[attr-defined]
+        files={"file": ("doc.txt", "данные".encode(), "text/plain")},
+    )
+
+    assert response.status_code == 507, response.text
+    assert response.json()["code"] == "low_disk_space"

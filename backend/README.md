@@ -34,6 +34,14 @@ export DATABASE_URL="sqlite+aiosqlite:///./crm.db"
 
 ## Проверки
 
+Обновить закреплённые версии (после правки зависимостей в `pyproject.toml`):
+
+```bash
+pip install pip-tools
+pip-compile --generate-hashes --output-file requirements.lock pyproject.toml
+pip-compile --generate-hashes --extra dev --output-file requirements-dev.lock pyproject.toml
+```
+
 ```bash
 .venv/bin/ruff check .        # линтер
 .venv/bin/ruff format .       # форматирование
@@ -72,7 +80,8 @@ backend/
 │   └── worker/            Celery: приложение и задачи (бэкапы, уборка)
 ├── alembic/               миграции: 21 шт., первая создаёт всю схему
 ├── tests/                 pytest + httpx ASGITransport
-├── requirements-dev.lock  точные версии зависимостей с хешами (для CI)
+├── requirements.lock      версии для production-образа (с хешами)
+├── requirements-dev.lock  те же плюс инструменты разработки (для CI)
 ├── Dockerfile             многоступенчатая сборка на Python 3.13
 └── gunicorn.conf.py       Gunicorn 23 + UvicornWorker
 ```
@@ -181,6 +190,8 @@ celery -A app.worker.celery_app.celery beat   -l info
 | `backup_attachments` | воскресенье 04:00 | архив файлов (`files-*.tar.gz`), хранит 4 копии |
 | `cleanup_orphan_attachments` | воскресенье 04:30 | чистит записи о пропавших файлах |
 | `cleanup_revoked_tokens` | воскресенье 04:45 | убирает истёкшие записи из `revoked_tokens` |
+| `cleanup_login_attempts` | воскресенье 05:00 | чистит журнал входов старше 90 дней |
+| `cleanup_orphan_files` | воскресенье 05:15 | удаляет файлы на диске, которых нет в базе |
 
 ## Миграции
 

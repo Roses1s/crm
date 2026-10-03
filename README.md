@@ -80,8 +80,9 @@ deploy/                     инфраструктура сервера
 └── scripts/                deploy-hook Certbot (мягкая перезагрузка nginx)
 
 .github/workflows/          автопроверки: ruff, mypy, pytest, миграции и alembic check,
-                            аудит зависимостей, те же тесты на настоящем PostgreSQL,
-                            tsc, vitest, сборка; dependabot.yml — еженедельные обновления
+                            блокирующий аудит зависимостей, те же тесты на настоящем
+                            PostgreSQL, tsc, vitest, сборка, `nginx -t` на боевых
+                            конфигах; dependabot.yml — еженедельные обновления
 ```
 
 ## Запуск локально

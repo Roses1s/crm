@@ -78,13 +78,15 @@ jobs:
         run: python scripts/snapshot.py --check
 
       - name: Аудит зависимостей на уязвимости
-        # Проверяем именно зафиксированные зависимости приложения. Аудит всего
-        # окружения захватывал служебные pip/setuptools из образа runner и давал
-        # красную аннотацию, не связанную с CRM.
-        # Шаг информационный: свежий advisory без исправления не блокирует работу.
-        continue-on-error: true
+        # Проверяем ровно тот набор, который ставится в production-образ
+        # (requirements.lock), и отдельно — набор для разработки.
+        # Шаг БЛОКИРУЮЩИЙ: уязвимость в зависимости не должна тихо уезжать на
+        # сервер. Если исправления ещё нет, а работу нужно продолжить —
+        # добавьте сюда `--ignore-vuln GHSA-xxxx` с комментарием и датой,
+        # чтобы исключение было видно в истории, а не забыто навсегда.
         run: |
           pip install pip-audit
+          pip-audit -r requirements.lock
           pip-audit -r requirements-dev.lock
 
   backend-postgres:
@@ -119,7 +121,11 @@ jobs:
           cache: pip
 
       - name: Установка зависимостей
-        run: pip install -e ".[dev]"
+        # Тот же lock-файл, что и в быстрой джобе: иначе «зелёный PostgreSQL»
+        # не гарантировал бы тот же набор версий, что уже проверен выше.
+        run: |
+          pip install --require-hashes -r requirements-dev.lock
+          pip install -e . --no-deps
 
       - name: Миграции на настоящем PostgreSQL
         env:
@@ -189,10 +195,39 @@ jobs:
         run: npm run build
 
       - name: Аудит зависимостей на уязвимости
-        # Как и pip-audit у бэкенда — информационный шаг (не роняет сборку).
-        # audit-level=high: низкоприоритетные советы npm в основном шумят.
-        continue-on-error: true
+        # Как и pip-audit у бэкенда — блокирующий шаг.
+        # audit-level=high: низкоприоритетные советы npm в основном шумят,
+        # а серьёзную уязвимость сборка пропустить не должна.
         run: npm audit --audit-level=high
+
+  nginx-config:
+    name: Nginx — проверка конфигурации
+    runs-on: ubuntu-24.04
+    steps:
+      - uses: actions/checkout@v7
+
+      - name: Самоподписанные сертификаты (настоящие лежат только на сервере)
+        run: |
+          mkdir -p certs/live/crmdetroid.ru certbot/www
+          openssl req -x509 -newkey rsa:2048 -nodes -days 1 \
+            -keyout certs/live/crmdetroid.ru/privkey.pem \
+            -out certs/live/crmdetroid.ru/fullchain.pem \
+            -subj "/CN=crmdetroid.ru" 2>/dev/null
+
+      - name: nginx -t на боевых конфигах
+        # Опечатка в конфиге раньше обнаруживалась только на сервере при
+        # перезагрузке nginx. Здесь тот же образ, те же файлы — но в CI.
+        # --add-host: при проверке nginx резолвит имена из proxy_pass, а
+        # контейнеров backend/frontend в CI нет.
+        run: |
+          docker run --rm \
+            --add-host backend:127.0.0.1 \
+            --add-host frontend:127.0.0.1 \
+            -v "$PWD/deploy/nginx/conf.d:/etc/nginx/conf.d:ro" \
+            -v "$PWD/deploy/nginx/snippets:/etc/nginx/snippets:ro" \
+            -v "$PWD/certs:/etc/letsencrypt:ro" \
+            -v "$PWD/certbot/www:/var/www/certbot:ro" \
+            nginx:1.27-alpine nginx -t
 
   docker-build:
     name: Docker — сборка образов и docker compose config
