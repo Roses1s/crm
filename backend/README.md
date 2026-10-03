@@ -78,7 +78,7 @@ backend/
 │   ├── services/          бизнес-логика, отделённая от HTTP: leads · shipments ·
 │   │                      attachments · customers · stages · tags · search
 │   └── worker/            Celery: приложение и задачи (бэкапы, уборка)
-├── alembic/               миграции: 22 шт., первая создаёт всю схему
+├── alembic/               миграции: 23 шт., первая создаёт всю схему
 ├── tests/                 pytest + httpx ASGITransport
 ├── requirements.lock      версии для production-образа (с хешами)
 ├── requirements-dev.lock  те же плюс инструменты разработки (для CI)
@@ -223,7 +223,7 @@ celery -A app.worker.celery_app.celery beat   -l info
 ```
 
 Первая миграция (`initial schema`) создаёт базовую схему, остальные двадцать
-одна меняют её по ходу работы. Сейчас в базе десять таблиц: `users`, `stages`,
+две меняют её по ходу работы. Сейчас в базе десять таблиц: `users`, `stages`,
 `tags`, `leads`, `loss_reasons`, `shipments`, `timeline_entries`,
 `attachments`, `login_attempts`, `revoked_tokens`.
 

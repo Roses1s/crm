@@ -154,6 +154,8 @@ class Shipment(Base, TimestampMixin):
     loading_method: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
 
     lead: Mapped[Lead] = relationship(back_populates="shipments", lazy="joined")
+    # Теги заявки остались в базе, но с 03.10.2026 не показываются в карточке
+    # (решение владельца). Значения сохраняются как есть: форма их не трогает.
     tags: Mapped[list[Tag]] = relationship(secondary=shipment_tags, lazy="selectin")
 
     @property

@@ -77,8 +77,8 @@ src/
     ├── api/              client, auth, hooks, query-client
     ├── lib/              cn, theme, owner
     ├── types/            интерфейсы ответов API
-    └── ui/               button, chatter, odoo-form, form-section, skeleton,
-                          toast, tag-chip, color-picker, file-preview,
+    └── ui/               button, chatter, odoo-form, skeleton, toast,
+                          tag-chip, color-picker, file-preview,
                           list-limit-notice
 test/                     окружение Vitest: setup, renderWithProviders,
                           fake-api (поддельный сервер для сценарных тестов)
@@ -107,7 +107,7 @@ const save = useUpdateLead(id); // сохранение карточки
 переносом карточек, быстрое создание лида), список лидов, карточка лида (поля,
 теги, приоритет, смена этапа, примечания, архивация, проигрыш с причиной,
 безвозвратное удаление у администратора), клиенты, заявки (номер, создание,
-правка, смена статуса, позиции заказа, документы), теги, пользователи,
+правка, смена статуса, позиции заказа, документы), теги лидов, пользователи,
 безопасность (бэкапы и журнал попыток входа).
 
 При выходе и при входе другим пользователем кеш TanStack Query полностью
