@@ -3,7 +3,7 @@ from __future__ import annotations
 from pydantic import BaseModel, EmailStr, Field
 
 from app.models.user import Role
-from app.schemas.common import ORMModel
+from app.schemas.common import ORMModel, PatchModel
 
 
 class UserRead(ORMModel):
@@ -32,7 +32,7 @@ class UserCreate(BaseModel):
     role: Role = Role.manager
 
 
-class UserUpdate(BaseModel):
+class UserUpdate(PatchModel):
     email: EmailStr | None = None
     password: str | None = Field(default=None, min_length=8, max_length=128)
     first_name: str | None = None

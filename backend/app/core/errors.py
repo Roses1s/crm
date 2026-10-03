@@ -53,6 +53,41 @@ def _payload(detail: str, code: str) -> dict[str, Any]:
     }
 
 
+def _classify_integrity_error(exc: IntegrityError) -> tuple[str, str, int]:
+    """Переводит нарушение целостности в понятное сообщение.
+
+    Раньше ЛЮБАЯ такая ошибка отдавалась как «Запись с такими данными уже
+    существует» — даже когда обязательное поле просто осталось пустым. Код
+    ошибки берём у драйвера (`sqlstate`/`pgcode` PostgreSQL), а если его нет
+    (SQLite в тестах) — разбираем текст.
+    """
+    orig = exc.orig
+    sqlstate = str(getattr(orig, "sqlstate", "") or getattr(orig, "pgcode", "") or "")
+    text = str(orig).lower()
+
+    if sqlstate == "23505" or "unique constraint" in text or "duplicate key" in text:
+        return "conflict", "Запись с такими данными уже существует", status.HTTP_409_CONFLICT
+    if sqlstate == "23502" or "not null" in text:
+        return (
+            "not_null_violation",
+            "Обязательное поле осталось пустым",
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+    if sqlstate == "23503" or "foreign key" in text:
+        return (
+            "foreign_key_violation",
+            "Связанная запись не найдена или ещё используется",
+            status.HTTP_409_CONFLICT,
+        )
+    if sqlstate == "23514" or "check constraint" in text:
+        return (
+            "check_violation",
+            "Значение не прошло проверку базы данных",
+            status.HTTP_422_UNPROCESSABLE_ENTITY,
+        )
+    return "conflict", "Не удалось сохранить: данные нарушают ограничения базы", 409
+
+
 def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(AppError)
     async def _app_error(_: Request, exc: AppError) -> JSONResponse:
@@ -89,10 +124,8 @@ def register_exception_handlers(app: FastAPI) -> None:
     @app.exception_handler(IntegrityError)
     async def _integrity_error(_: Request, exc: IntegrityError) -> JSONResponse:
         log.warning("db.integrity_error", error=str(exc.orig))
-        return JSONResponse(
-            status_code=status.HTTP_409_CONFLICT,
-            content=_payload("Запись с такими данными уже существует", "conflict"),
-        )
+        code, detail, http_status = _classify_integrity_error(exc)
+        return JSONResponse(status_code=http_status, content=_payload(detail, code))
 
     @app.exception_handler(Exception)
     async def _unhandled(_: Request, exc: Exception) -> JSONResponse:

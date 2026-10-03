@@ -21,6 +21,7 @@ from app.models.crm import Lead, LossReason, lead_tags
 from app.models.timeline import Attachment, EntryType, TimelineEntry
 from app.models.user import Role, User
 from app.schemas.crm import LeadCreate, LeadLose, LeadTransfer, LeadUpdate, NoteCreate, NoteUpdate
+from app.services.search import LIKE_ESCAPE, like_pattern
 from app.services.stages import board_stage_for, stage_on_board
 from app.services.tags import fetch_tags
 
@@ -78,13 +79,15 @@ def apply_filters(
     assigned_to: int | None,
 ) -> Select[Lead]:
     if search:
-        pattern = f"%{search.strip()}%"
+        # `%` и `_` экранируем: иначе поиск «50%» вёл бы себя как маска и
+        # возвращал вообще все записи (см. app/services/search.py).
+        pattern = like_pattern(search)
         stmt = stmt.where(
             or_(
-                Lead.name.ilike(pattern),
-                Lead.inn.ilike(pattern),
-                Lead.logist_contact.ilike(pattern),
-                Lead.logist_phone.ilike(pattern),
+                Lead.name.ilike(pattern, escape=LIKE_ESCAPE),
+                Lead.inn.ilike(pattern, escape=LIKE_ESCAPE),
+                Lead.logist_contact.ilike(pattern, escape=LIKE_ESCAPE),
+                Lead.logist_phone.ilike(pattern, escape=LIKE_ESCAPE),
             )
         )
     if stage is not None:

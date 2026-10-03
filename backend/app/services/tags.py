@@ -5,15 +5,27 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.errors import NotFoundError
 from app.models.crm import Tag
 
 
 async def fetch_tags(session: AsyncSession, tag_ids: list[int]) -> list[Tag]:
-    """Теги по id, в произвольном порядке (как и пришли из БД)."""
+    """Теги по id, в произвольном порядке (как и пришли из БД).
+
+    Несуществующий id — ошибка, а не повод молча вернуть меньше тегов: раньше
+    устаревший id (тег успел удалить коллега) приводил к тому, что сохранение
+    отвечало 200 и стирало у записи ВСЕ теги.
+    """
     if not tag_ids:
         return []
-    rows = (await session.execute(select(Tag).where(Tag.id.in_(tag_ids)))).scalars().all()
-    return list(rows)
+    rows = list((await session.execute(select(Tag).where(Tag.id.in_(tag_ids)))).scalars().all())
+    missing = sorted(set(tag_ids) - {tag.id for tag in rows})
+    if missing:
+        raise NotFoundError(
+            "Теги не найдены (возможно, их удалил кто-то другой): "
+            + ", ".join(str(tag_id) for tag_id in missing)
+        )
+    return rows
 
 
 async def find_tag_by_name(session: AsyncSession, name: str) -> Tag | None:

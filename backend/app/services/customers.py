@@ -17,6 +17,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.pagination import PageParams, build_page, paginate
 from app.models.crm import Lead
 from app.models.user import Role, User
+from app.services.search import LIKE_ESCAPE, like_pattern
 
 
 def _can_open(lead: Lead, user: User) -> bool:
@@ -67,8 +68,13 @@ async def list_customers(
     # трюк, что и в get_lead_or_404.
     stmt = select(Lead).order_by(Lead.updated_at.desc()).execution_options(populate_existing=True)
     if search:
-        pattern = f"%{search.strip()}%"
-        stmt = stmt.where(or_(Lead.name.ilike(pattern), Lead.inn.ilike(pattern)))
+        pattern = like_pattern(search)
+        stmt = stmt.where(
+            or_(
+                Lead.name.ilike(pattern, escape=LIKE_ESCAPE),
+                Lead.inn.ilike(pattern, escape=LIKE_ESCAPE),
+            )
+        )
 
     items, total = await paginate(session, stmt, params)
     customers = [_to_customer(lead, user) for lead in items]

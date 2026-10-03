@@ -18,6 +18,7 @@ from app.models.user import Role, User
 from app.schemas.crm import NoteCreate, NoteUpdate
 from app.schemas.shipment import ShipmentCreate, ShipmentStatusUpdate, ShipmentUpdate
 from app.services.leads import get_lead_or_404
+from app.services.search import LIKE_ESCAPE, like_pattern
 from app.services.tags import fetch_tags
 
 log = get_logger(__name__)
@@ -99,16 +100,14 @@ async def list_shipments(
     if status_filter is not None:
         stmt = stmt.where(Shipment.status == status_filter)
     if search and search.strip():
-        # Экранируем спецсимволы ILIKE (% и _), иначе поиск, например,
-        # «50%» молча вёл бы себя как маска «50» + что угодно.
-        escaped = search.strip().replace("\\", "\\\\").replace("%", "\\%").replace("_", "\\_")
-        pattern = f"%{escaped}%"
+        # Экранирование служебных символов ILIKE — в app/services/search.py.
+        pattern = like_pattern(search)
         stmt = stmt.join(Lead, Shipment.lead_id == Lead.id)
         stmt = stmt.where(
             or_(
-                Shipment.number.ilike(pattern, escape="\\"),
-                Lead.name.ilike(pattern, escape="\\"),
-                Shipment.carrier_name.ilike(pattern, escape="\\"),
+                Shipment.number.ilike(pattern, escape=LIKE_ESCAPE),
+                Lead.name.ilike(pattern, escape=LIKE_ESCAPE),
+                Shipment.carrier_name.ilike(pattern, escape=LIKE_ESCAPE),
             )
         )
     items, total = await paginate(session, stmt, params)

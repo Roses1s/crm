@@ -428,3 +428,68 @@ async def test_null_inn_is_rejected_with_422(
     )
     assert response.status_code == 422, response.text
     assert response.json()["code"] == "validation_error"
+
+
+async def test_unknown_field_in_patch_is_rejected(
+    auth_client: AsyncClient, seeded: dict[str, object]
+) -> None:
+    """Опечатка в имени поля — ошибка, а не тихий 200 без изменений."""
+    lead = seeded["lead"]
+    response = await auth_client.patch(
+        f"/api/v1/crm/leads/{lead.id}",  # type: ignore[attr-defined]
+        json={"nme": "опечатка"},
+    )
+    assert response.status_code == 422, response.text
+
+
+async def test_explicit_null_in_required_field_is_rejected(
+    auth_client: AsyncClient, seeded: dict[str, object]
+) -> None:
+    """Явный null в обязательном поле — понятная ошибка до обращения к базе."""
+    lead = seeded["lead"]
+    response = await auth_client.patch(
+        f"/api/v1/crm/leads/{lead.id}",  # type: ignore[attr-defined]
+        json={"logist_contact": None},
+    )
+    assert response.status_code == 422, response.text
+    assert "нельзя очистить" in response.text
+
+
+async def test_nullable_field_can_be_cleared(
+    auth_client: AsyncClient, seeded: dict[str, object]
+) -> None:
+    """Необязательное поле (почта логиста) очищается штатно."""
+    lead = seeded["lead"]
+    response = await auth_client.patch(
+        f"/api/v1/crm/leads/{lead.id}",  # type: ignore[attr-defined]
+        json={"logist_email": None},
+    )
+    assert response.status_code == 200, response.text
+    assert response.json()["logist_email"] is None
+
+
+async def test_unknown_tag_does_not_wipe_existing_tags(
+    auth_client: AsyncClient, seeded: dict[str, object]
+) -> None:
+    """Несуществующий тег — ошибка; прежние теги карточки остаются на месте."""
+    lead = seeded["lead"]
+    response = await auth_client.patch(
+        f"/api/v1/crm/leads/{lead.id}",  # type: ignore[attr-defined]
+        json={"tag_ids": [999999]},
+    )
+    assert response.status_code == 404, response.text
+
+    card = await auth_client.get(f"/api/v1/crm/leads/{lead.id}")  # type: ignore[attr-defined]
+    assert [tag["name"] for tag in card.json()["tags"]] == ["Крупный клиент"]
+
+
+async def test_search_does_not_treat_percent_as_wildcard(
+    auth_client: AsyncClient, seeded: dict[str, object]
+) -> None:
+    """`%` и `_` в поиске — обычные символы, а не маска «что угодно»."""
+    for needle in ("%", "_"):
+        found = await auth_client.get("/api/v1/crm/leads", params={"search": needle})
+        assert found.json()["count"] == 0, f"поиск «{needle}» вернул записи"
+
+    customers = await auth_client.get("/api/v1/crm/customers", params={"search": "%"})
+    assert customers.json()["count"] == 0

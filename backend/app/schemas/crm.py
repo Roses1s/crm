@@ -2,11 +2,12 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
+from typing import ClassVar
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
 from app.models.timeline import EntryType
-from app.schemas.common import ORMModel
+from app.schemas.common import ORMModel, PatchModel
 from app.schemas.validators import validate_inn
 
 
@@ -26,7 +27,7 @@ class StageCreate(BaseModel):
     color: str = "purple"
 
 
-class StageUpdate(BaseModel):
+class StageUpdate(PatchModel):
     name: str | None = Field(default=None, min_length=1, max_length=100)
     sequence: int | None = None
     is_closed: bool | None = None
@@ -75,7 +76,7 @@ class TagCreate(BaseModel):
         return _validate_hex_color(value)
 
 
-class TagUpdate(BaseModel):
+class TagUpdate(PatchModel):
     name: str | None = Field(default=None, min_length=1, max_length=64)
     color: str | None = None
 
@@ -119,7 +120,11 @@ class LeadTransfer(BaseModel):
     user_id: int
 
 
-class LeadUpdate(BaseModel):
+class LeadUpdate(PatchModel):
+    # Почта логиста — единственное поле карточки, которое в базе
+    # необязательное: его разрешено очистить, передав null.
+    nullable_fields: ClassVar[frozenset[str]] = frozenset({"logist_email"})
+
     name: str | None = Field(default=None, min_length=1, max_length=255)
     inn: str | None = None
     logist_contact: str | None = None
@@ -215,5 +220,5 @@ class NoteCreate(BaseModel):
     body: str = Field(min_length=1, max_length=5000)
 
 
-class NoteUpdate(BaseModel):
+class NoteUpdate(PatchModel):
     body: str = Field(min_length=1, max_length=5000)

@@ -2,11 +2,12 @@ from __future__ import annotations
 
 from datetime import date, datetime
 from decimal import Decimal
+from typing import ClassVar
 
-from pydantic import BaseModel, ConfigDict, Field, field_validator
+from pydantic import BaseModel, Field, field_validator
 
 from app.models.shipment import ShipmentStatus, TaxRate, TransportType
-from app.schemas.common import ORMModel
+from app.schemas.common import ORMModel, PatchModel
 from app.schemas.crm import TagRead
 from app.schemas.validators import validate_inn_optional
 
@@ -90,11 +91,27 @@ class ShipmentCreate(ShipmentBase):
     created_at: datetime | None = None
 
 
-class ShipmentUpdate(BaseModel):
+class ShipmentUpdate(PatchModel):
     # Обычный PATCH не меняет системный статус: для этого есть отдельная ручка,
-    # которая обязательно пишет событие в ленту. extra="forbid" не даёт полю
-    # status (или опечатке в другом имени) тихо проигнорироваться с ложным 200.
-    model_config = ConfigDict(extra="forbid")
+    # которая обязательно пишет событие в ленту. Запрет неизвестных полей
+    # (из PatchModel) не даёт полю status или опечатке тихо проигнорироваться
+    # с ложным 200.
+    #
+    # Числа и даты в заявке в базе необязательные: интерфейс присылает им
+    # явный null, когда поле очистили, — это штатный способ стереть значение.
+    nullable_fields: ClassVar[frozenset[str]] = frozenset(
+        {
+            "cargo_weight",
+            "cargo_volume",
+            "capacity",
+            "customer_price",
+            "carrier_price",
+            "loading_date_from",
+            "loading_date_to",
+            "unloading_date_from",
+            "unloading_date_to",
+        }
+    )
 
     # min_length=1 — номер можно не передавать (тогда он не меняется), но
     # если передан явно, пустым быть не должен: иначе заявка молча теряет
