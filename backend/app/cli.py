@@ -20,11 +20,11 @@ from app.models.user import Role, User
 from app.services.stages import DEFAULT_STAGES as BOARD_STAGES
 
 DEFAULT_STAGES = [
-    ("Новый", 1, False, "slate"),
-    ("Квалификация", 2, False, "purple"),
-    ("Переговоры", 3, False, "blue"),
-    ("Договор", 4, False, "orange"),
-    ("Выиграно", 5, True, "green"),
+    ("Новый", 1, "slate"),
+    ("Квалификация", 2, "purple"),
+    ("Переговоры", 3, "blue"),
+    ("Договор", 4, "orange"),
+    ("Выиграно", 5, "green"),
 ]
 # Стандартная воронка менеджера — та же, что создаётся при первом входе,
 # импортирована из app.services.stages, чтобы не держать два списка в
@@ -126,8 +126,8 @@ async def seed() -> None:
 
         if int((await session.execute(select(func.count()).select_from(Stage))).scalar_one()) == 0:
             session.add_all(
-                Stage(name=n, sequence=s, is_closed=c, color=col, owner_id=admin.id)
-                for n, s, c, col in DEFAULT_STAGES
+                Stage(name=n, sequence=s, color=col, owner_id=admin.id)
+                for n, s, col in DEFAULT_STAGES
             )
         if int((await session.execute(select(func.count()).select_from(Tag))).scalar_one()) == 0:
             session.add_all(Tag(name=n, color=c) for n, c in DEFAULT_TAGS)

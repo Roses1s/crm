@@ -13,7 +13,7 @@ import { clearTokens, setAccessToken } from "@/shared/api/auth";
 import { startFakeApi, type FakeServer } from "@/test/fake-api";
 import { renderWithProviders } from "@/test/utils";
 
-const STAGES = [{ id: 1, name: "Новый", sequence: 1, is_closed: false, color: "" }];
+const STAGES = [{ id: 1, name: "Новый", sequence: 1, color: "" }];
 
 let server: FakeServer | undefined;
 

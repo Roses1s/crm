@@ -16,8 +16,8 @@ import { page, startFakeApi, type FakeServer } from "@/test/fake-api";
 import { renderWithProviders } from "@/test/utils";
 
 const STAGES = [
-  { id: 1, name: "Новый", sequence: 1, is_closed: false, color: "" },
-  { id: 2, name: "В работе", sequence: 2, is_closed: false, color: "" },
+  { id: 1, name: "Новый", sequence: 1, color: "" },
+  { id: 2, name: "В работе", sequence: 2, color: "" },
 ];
 
 const LEADS = [

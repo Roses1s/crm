@@ -43,7 +43,6 @@ class Stage(Base, TimestampMixin):
     )
     name: Mapped[str] = mapped_column(String(100), nullable=False)
     sequence: Mapped[int] = mapped_column(Integer, default=0, nullable=False, index=True)
-    is_closed: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False)
     color: Mapped[str] = mapped_column(String(20), default="purple", nullable=False)
 
     leads: Mapped[list[Lead]] = relationship(back_populates="stage")

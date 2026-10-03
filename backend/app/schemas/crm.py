@@ -16,21 +16,18 @@ class StageRead(ORMModel):
     id: int
     name: str
     sequence: int
-    is_closed: bool
     color: str
 
 
 class StageCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     sequence: int = 0
-    is_closed: bool = False
     color: str = "purple"
 
 
 class StageUpdate(PatchModel):
     name: str | None = Field(default=None, min_length=1, max_length=100)
     sequence: int | None = None
-    is_closed: bool | None = None
     color: str | None = None
 
 

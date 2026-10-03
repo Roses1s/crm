@@ -25,7 +25,6 @@ export interface Stage {
   id: number;
   name: string;
   sequence: number;
-  is_closed: boolean;
   color: string;
 }
 

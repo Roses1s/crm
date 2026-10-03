@@ -42,7 +42,7 @@ const LEAD = {
   tags: [],
 };
 
-const STAGES = [{ id: 1, name: "Новый", sequence: 1, is_closed: false, color: "" }];
+const STAGES = [{ id: 1, name: "Новый", sequence: 1, color: "" }];
 
 let server: FakeServer | undefined;
 afterEach(() => {
