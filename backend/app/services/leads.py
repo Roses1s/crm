@@ -18,7 +18,7 @@ from app.core.errors import AppError, NotFoundError, PermissionDeniedError
 from app.core.logging import get_logger
 from app.core.pagination import PageParams, build_page, paginate
 from app.models.crm import Lead, LossReason, lead_tags
-from app.models.timeline import Attachment, EntryType, TimelineEntry
+from app.models.timeline import LEAD_STAGE_LABEL, Attachment, EntryType, TimelineEntry
 from app.models.user import Role, User
 from app.schemas.crm import LeadCreate, LeadLose, LeadTransfer, LeadUpdate, NoteCreate, NoteUpdate
 from app.services.search import LIKE_ESCAPE, like_pattern
@@ -171,7 +171,7 @@ async def update_lead(session: AsyncSession, user: User, lead_id: int, payload: 
                 lead_id=lead.id,
                 author_id=user.id,
                 type=EntryType.history,
-                field_label="Этапы лидов",
+                field_label=LEAD_STAGE_LABEL,
                 old_value=old_name,
                 new_value=new_stage_obj.name,
             )
@@ -421,10 +421,15 @@ async def delete_timeline_entry(
 ) -> None:
     await get_lead_or_404(session, lead_id, user)
     entry = await _get_entry_or_404(session, lead_id, entry_id)
-    # История этапов/передач/проигрыша — системный аудит, а не пользовательская
-    # заметка. Она остаётся неизменяемой даже при прямом вызове API.
-    if entry.type is not EntryType.note:
-        raise AppError("Системную историю нельзя удалить", code="history_immutable")
+    # История передач и проигрыша — системный аудит, а не пользовательская
+    # заметка: она остаётся неизменяемой даже при прямом вызове API.
+    # Исключение — запись о переносе карточки между этапами: её по решению
+    # владельца (05.10.2026) может убрать любой сотрудник.
+    if entry.type is not EntryType.note and not entry.is_stage_change:
+        raise AppError(
+            "Удалить можно только примечание или запись о смене этапа",
+            code="history_immutable",
+        )
     await session.delete(entry)
     await session.commit()
     log.info("timeline.entry_deleted", lead_id=lead_id, entry_id=entry_id, by=user.id)

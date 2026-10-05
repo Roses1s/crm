@@ -98,6 +98,8 @@ export interface TimelineEntry {
   field_label?: string | null;
   old_value?: string | null;
   new_value?: string | null;
+  /** Запись о переносе карточки между этапами: такую историю разрешено удалять. */
+  is_stage_change?: boolean;
   attachments?: Attachment[];
   created_at: string;
   /** Заполняется бэкендом не всегда — подписи автора может не быть. */

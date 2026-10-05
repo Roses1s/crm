@@ -199,11 +199,13 @@ async def test_status_change_is_written_to_shipment_timeline(
     assert entries[0]["old_value"] == "Новая"
     assert entries[0]["new_value"] == "Машина загрузилась"
 
-    protected = await auth_client.delete(
+    # Запись о переносе заявки между этапами разрешено убрать любому сотруднику.
+    assert entries[0]["is_stage_change"] is True
+    deleted = await auth_client.delete(
         f"/api/v1/shipments/{shipment_id}/timeline/{entries[0]['id']}"
     )
-    assert protected.status_code == 400
-    assert protected.json()["code"] == "history_immutable"
+    assert deleted.status_code == 204
+    assert (await auth_client.get(f"/api/v1/shipments/{shipment_id}/timeline")).json() == []
 
     # Лента лида не должна показывать записи заявки.
     lead_timeline = await auth_client.get(f"/api/v1/crm/leads/{lead_id}/timeline")

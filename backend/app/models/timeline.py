@@ -19,6 +19,13 @@ class EntryType(enum.StrEnum):
     message = "message"
 
 
+#: Подписи записей истории о переносе карточки между этапами: у лида и у заявки.
+#: Такие записи разрешено удалять любому сотруднику, остальная история неизменяема.
+LEAD_STAGE_LABEL = "Этапы лидов"
+SHIPMENT_STAGE_LABEL = "Этап"
+STAGE_FIELD_LABELS = frozenset({LEAD_STAGE_LABEL, SHIPMENT_STAGE_LABEL})
+
+
 class TimelineEntry(Base, TimestampMixin):
     """Запись ленты чаттера: примечание или изменение поля."""
 
@@ -65,6 +72,11 @@ class TimelineEntry(Base, TimestampMixin):
     @property
     def author_name(self) -> str:
         return self.author.full_name or self.author.email if self.author else "Система"
+
+    @property
+    def is_stage_change(self) -> bool:
+        """Запись истории о переносе карточки между этапами."""
+        return self.type is EntryType.history and self.field_label in STAGE_FIELD_LABELS
 
     @property
     def author_initials(self) -> str:

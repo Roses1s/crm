@@ -140,4 +140,26 @@ describe("Лента примечаний", () => {
     expect(screen.getAllByRole("button", { name: "Изменить примечание" })).toHaveLength(1);
     expect(screen.getAllByRole("button", { name: "Удалить запись" })).toHaveLength(1);
   });
+
+  it("даёт удалить запись о смене этапа, но не даёт её править", async () => {
+    const user = userEvent.setup();
+    const onDeleteEntry = vi.fn();
+    const confirm = vi.spyOn(window, "confirm").mockReturnValue(true);
+    const stageMoved: TimelineEntry = { ...TIMELINE[1], is_stage_change: true };
+    renderWithProviders(
+      <Chatter
+        timeline={[stageMoved]}
+        onEditNote={vi.fn()}
+        onDeleteEntry={onDeleteEntry}
+        authorInitials="М"
+      />,
+    );
+
+    expect(screen.queryByRole("button", { name: "Изменить примечание" })).toBeNull();
+    await user.click(screen.getByRole("button", { name: "Удалить запись" }));
+
+    expect(confirm).toHaveBeenCalledWith("Удалить запись о смене этапа?");
+    expect(onDeleteEntry).toHaveBeenCalledWith(stageMoved);
+    confirm.mockRestore();
+  });
 });

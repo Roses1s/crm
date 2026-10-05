@@ -209,6 +209,9 @@ class TimelineEntryRead(ORMModel):
     field_label: str | None
     old_value: str | None
     new_value: str | None
+    # Запись о переносе карточки между этапами: её разрешено удалить,
+    # остальную системную историю — нет.
+    is_stage_change: bool
     created_at: datetime
     attachments: list[AttachmentRead] = Field(default_factory=list)
 

@@ -13,7 +13,7 @@ from app.core.logging import get_logger
 from app.core.pagination import PageParams, build_page, paginate
 from app.models.crm import Lead
 from app.models.shipment import Shipment, ShipmentStatus
-from app.models.timeline import Attachment, EntryType, TimelineEntry
+from app.models.timeline import SHIPMENT_STAGE_LABEL, Attachment, EntryType, TimelineEntry
 from app.models.user import Role, User
 from app.schemas.crm import NoteCreate, NoteUpdate
 from app.schemas.shipment import ShipmentCreate, ShipmentStatusUpdate, ShipmentUpdate
@@ -192,7 +192,7 @@ async def set_status(
                 shipment_id=shipment.id,
                 author_id=user.id,
                 type=EntryType.history,
-                field_label="Этап",
+                field_label=SHIPMENT_STAGE_LABEL,
                 old_value=STAGE_LABELS.get(previous, previous.value),
                 new_value=STAGE_LABELS.get(payload.status, payload.status.value),
             )
@@ -267,9 +267,14 @@ async def delete_entry(session: AsyncSession, user: User, shipment_id: int, entr
     await get_shipment_or_404(session, shipment_id, user)
     entry = await _get_entry_or_404(session, shipment_id, entry_id)
     # Системная история — аудит изменения заявки. Если разрешить удалить её
-    # через ту же ручку, статус можно переписать без проверяемого следа.
-    if entry.type is not EntryType.note:
-        raise AppError("Системную историю нельзя удалить", code="history_immutable")
+    # через ту же ручку, поля можно переписать без проверяемого следа.
+    # Исключение одно — запись о переносе заявки между этапами: её по решению
+    # владельца (05.10.2026) может убрать любой сотрудник.
+    if entry.type is not EntryType.note and not entry.is_stage_change:
+        raise AppError(
+            "Удалить можно только примечание или запись о смене этапа",
+            code="history_immutable",
+        )
     await session.delete(entry)
     await session.commit()
     log.info("shipment.entry_deleted", shipment_id=shipment_id, entry_id=entry_id, by=user.id)

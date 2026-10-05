@@ -555,11 +555,13 @@ export function Chatter({
                   )}
                 </div>
 
+                {/* Править можно только примечание, а удалить — ещё и запись
+                    о переносе карточки между этапами (решение владельца). */}
                 {editingId !== entry.id &&
-                  entry.type === "note" &&
-                  (onEditNote || onDeleteEntry) && (
+                  ((entry.type === "note" && (onEditNote || onDeleteEntry)) ||
+                    (entry.is_stage_change && onDeleteEntry)) && (
                     <div className="absolute right-0 top-1.5 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                      {onEditNote && (
+                      {onEditNote && entry.type === "note" && (
                         <button
                           type="button"
                           aria-label="Изменить примечание"
@@ -579,8 +581,10 @@ export function Chatter({
                           aria-label="Удалить запись"
                           title="Удалить"
                           onClick={() => {
-                            if (window.confirm("Удалить эту запись из ленты?"))
-                              onDeleteEntry(entry);
+                            const question = entry.is_stage_change
+                              ? "Удалить запись о смене этапа?"
+                              : "Удалить эту запись из ленты?";
+                            if (window.confirm(question)) onDeleteEntry(entry);
                           }}
                           className="inline-flex h-6 w-6 items-center justify-center rounded-sm text-odoo-text-muted transition-colors hover:bg-odoo-bg hover:text-odoo-danger"
                         >
