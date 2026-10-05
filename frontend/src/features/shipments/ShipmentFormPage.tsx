@@ -344,6 +344,8 @@ export function ShipmentFormPage() {
 
 function ShipmentForm({ id }: { id?: string }) {
   const isNew = !id || id === "new";
+  // Как и в карточке лида: номер есть в адресе, вложения не ждут ответа по заявке.
+  const savedId = isNew ? undefined : id;
   const navigate = useNavigate();
   const toast = useToast();
   const [searchParams] = useSearchParams();
@@ -353,15 +355,15 @@ function ShipmentForm({ id }: { id?: string }) {
   const { data: leadsPage } = useLeads();
   const leads = leadsPage?.items ?? [];
   const { data: timeline = [] } = useShipmentTimeline(id);
-  const { data: attachments = [] } = useShipmentAttachments(shipment?.id);
+  const { data: attachments = [] } = useShipmentAttachments(savedId);
 
   const save = useSaveShipment(id);
   const setStatus = useSetShipmentStatus(id);
   const addNote = useAddShipmentNote(id);
   const editNote = useEditShipmentNote(id);
   const deleteEntry = useDeleteShipmentTimelineEntry(id);
-  const uploadAttachment = useUploadShipmentAttachment(shipment?.id);
-  const deleteAttachment = useDeleteShipmentAttachment(shipment?.id);
+  const uploadAttachment = useUploadShipmentAttachment(savedId);
+  const deleteAttachment = useDeleteShipmentAttachment(savedId);
 
   // Лениво: emptyForm — общий модуль, "сейчас" должно считаться в момент
   // открытия именно этой формы, а не один раз при загрузке приложения.

@@ -73,15 +73,18 @@ function LeadForm({ id }: { id?: string }) {
   const isNew = id === "new" || !id;
   const navigate = useNavigate();
   const toast = useToast();
+  // Номер лида известен сразу из адреса, поэтому заявки и вложения уходят
+  // на сервер вместе с самим лидом, а не вторым заходом после его ответа.
+  const savedId = isNew ? undefined : id;
 
   const { data: currentUser } = useMe();
   const { data: lead, isLoading } = useLead(id);
   const { data: stages = [] } = useStages();
   const { data: allTags = [] } = useTags();
   const { data: timeline = [] } = useLeadTimeline(id);
-  const { data: shipments = [] } = useLeadShipments(lead?.id);
+  const { data: shipments = [] } = useLeadShipments(savedId);
   const { data: pager } = useLeadPager(id);
-  const { data: attachments = [] } = useLeadAttachments(lead?.id);
+  const { data: attachments = [] } = useLeadAttachments(savedId);
 
   const createLead = useCreateLead();
   const updateLead = useUpdateLead(id);
@@ -91,9 +94,9 @@ function LeadForm({ id }: { id?: string }) {
   const addNote = useAddNote(id);
   const editNote = useEditNote(id);
   const deleteTimelineEntry = useDeleteTimelineEntry(id);
-  const uploadAttachment = useUploadAttachment(lead?.id);
-  const transferLead = useTransferLead(lead?.id);
-  const deleteAttachment = useDeleteAttachment(lead?.id);
+  const uploadAttachment = useUploadAttachment(savedId);
+  const transferLead = useTransferLead(savedId);
+  const deleteAttachment = useDeleteAttachment(savedId);
 
   const [form, setForm] = useState<FormState>(empty);
   const [pristine, setPristine] = useState<FormState>(empty);
