@@ -61,7 +61,7 @@ describe("Лента примечаний", () => {
     const logButton = screen.getByRole("button", { name: "Лог" });
     expect(logButton).toHaveClass(
       "h-[var(--odoo-chatter-log-button-height)]",
-      "w-[var(--odoo-chatter-log-button-width)]",
+      "min-w-[var(--odoo-chatter-log-button-width)]",
     );
     expect(logButton.parentElement).toHaveStyle(
       "margin-inline-start: var(--odoo-chatter-composer-indent)",
@@ -100,6 +100,31 @@ describe("Лента примечаний", () => {
     await user.click(screen.getByRole("button", { name: "Лог" }));
 
     expect(onSubmit).toHaveBeenCalledWith("Уточнить ставку у перевозчика", []);
+  });
+
+  it("растягивает кнопку отправки под надпись «Сохранение…»", () => {
+    renderWithProviders(<Chatter timeline={[]} onSubmit={vi.fn()} posting authorInitials="М" />);
+
+    const button = screen.getByRole("button", { name: "Сохранение…" });
+    // Жёсткая ширина обрезала бы надпись, поэтому у кнопки только минимальная.
+    expect(button).toHaveClass("min-w-[var(--odoo-chatter-log-button-width)]", "whitespace-nowrap");
+    expect(button.className).not.toMatch(/(^|\s)w-\[var\(--odoo-chatter-log-button-width\)\]/);
+  });
+
+  it("прикрепляет файл к примечанию при его изменении", async () => {
+    const user = userEvent.setup();
+    const onUpload = vi.fn();
+    renderWithProviders(
+      <Chatter timeline={TIMELINE} onEditNote={vi.fn()} onUpload={onUpload} authorInitials="М" />,
+    );
+
+    await user.click(screen.getByRole("button", { name: "Изменить примечание" }));
+    const file = new File(["счёт"], "schet.pdf", { type: "application/pdf" });
+    await user.upload(screen.getByLabelText("Файлы примечания"), file);
+
+    expect(onUpload).toHaveBeenCalledWith(file, 2);
+    // Поле выбора файлов есть только у записи, которую правят.
+    expect(screen.getAllByLabelText("Файлы примечания")).toHaveLength(1);
   });
 
   it("показывает изменение и удаление только для примечания, но не для history", () => {

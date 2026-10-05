@@ -83,7 +83,11 @@ interface ChatterProps {
   /** Отправка примечания вместе с выбранными файлами. */
   onSubmit?: (body: string, files: File[]) => void;
   posting?: boolean;
-  onUpload?: (file: File) => void;
+  /**
+   * Загрузка файла. Без `entryId` файл попадает в общий список вложений карточки,
+   * с номером записи — прикрепляется к этой записи ленты (правка примечания).
+   */
+  onUpload?: (file: File, entryId?: number) => void;
   onDelete?: (attachment: Attachment) => void;
   uploading?: boolean;
   onPreview?: (attachment: Attachment) => void;
@@ -116,6 +120,8 @@ export function Chatter({
   const [pending, setPending] = useState<File[]>([]);
   const panelInput = useRef<HTMLInputElement | null>(null);
   const composerInput = useRef<HTMLInputElement | null>(null);
+  // Правка открыта только у одной записи, поэтому поля выбора файлов хватает одного.
+  const editInput = useRef<HTMLInputElement | null>(null);
   const composerText = useRef<HTMLTextAreaElement | null>(null);
   const files = attachments ?? [];
 
@@ -397,7 +403,9 @@ export function Chatter({
           <button
             type="submit"
             disabled={posting || !onSubmit || (!text.trim() && pending.length === 0)}
-            className="h-[var(--odoo-chatter-log-button-height)] w-[var(--odoo-chatter-log-button-width)] rounded-[4px] bg-odoo-primary px-2 text-[13px] font-medium text-white transition-colors hover:bg-odoo-primary-hover disabled:opacity-50"
+            // Ширина минимальная, а не жёсткая: длинная надпись «Сохранение…»
+            // не помещалась в кнопку шириной под слово «Лог» и вылезала за её края.
+            className="h-[var(--odoo-chatter-log-button-height)] min-w-[var(--odoo-chatter-log-button-width)] whitespace-nowrap rounded-[4px] bg-odoo-primary px-2 text-[13px] font-medium text-white transition-colors hover:bg-odoo-primary-hover disabled:opacity-50"
           >
             {posting ? "Сохранение…" : current.action}
           </button>
@@ -476,6 +484,35 @@ export function Chatter({
                         >
                           Отмена
                         </button>
+                        {onUpload && (
+                          <>
+                            {/* Файл уходит на сервер сразу и привязывается к этой записи:
+                                он появляется под примечанием, не дожидаясь «Сохранить». */}
+                            <input
+                              ref={editInput}
+                              type="file"
+                              multiple
+                              className="hidden"
+                              aria-label="Файлы примечания"
+                              onChange={(e) => {
+                                for (const file of Array.from(e.target.files ?? [])) {
+                                  onUpload(file, Number(entry.id));
+                                }
+                                e.target.value = "";
+                              }}
+                            />
+                            <button
+                              type="button"
+                              disabled={uploading}
+                              aria-label="Прикрепить файл к примечанию"
+                              title={uploading ? "Загрузка…" : "Прикрепить файл"}
+                              onClick={() => editInput.current?.click()}
+                              className="ml-auto inline-flex h-6 w-6 items-center justify-center rounded-sm text-odoo-text-muted transition-colors hover:bg-odoo-bg hover:text-odoo-text disabled:opacity-60"
+                            >
+                              <Paperclip className="h-3.5 w-3.5" />
+                            </button>
+                          </>
+                        )}
                       </div>
                     </div>
                   ) : (

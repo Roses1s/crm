@@ -573,7 +573,7 @@ function ShipmentForm({ id }: { id?: string }) {
           },
         });
       }}
-      onUpload={(file) => uploadAttachment.mutate({ file })}
+      onUpload={(file, entryId) => uploadAttachment.mutate({ file, entryId })}
       onDelete={(file) => deleteAttachment.mutate(file.id)}
       onPreview={(file) => setPreview(file)}
       onEditNote={(entryId, body) => editNote.mutate({ entryId, body })}
