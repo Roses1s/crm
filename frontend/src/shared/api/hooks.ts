@@ -127,10 +127,26 @@ export function useMe() {
  * Этапы доски. `ownerId` передаёт только администратор, когда открывает
  * доску сотрудника; свою доску запрашиваем без параметра.
  */
+/**
+ * Справочники (этапы, теги, причины проигрыша, плитки лаунчера) меняются
+ * в лучшем случае раз в месяц, а общая настройка считала их устаревшими через
+ * 30 секунд — и каждый переход между экранами снова шёл на сервер. Держим их
+ * свежими четверть часа: свои правки обновляют список сразу (мутации сбрасывают
+ * кеш), а правку коллеги подхватит возврат во вкладку.
+ */
+const REFERENCE_DATA = {
+  staleTime: 15 * 60_000,
+  // Срок хранения тоже поднимаем: иначе кеш успевает очиститься через пять
+  // минут простоя (общая настройка) и «свежесть» ничего не даст.
+  gcTime: 30 * 60_000,
+  refetchOnWindowFocus: true,
+} as const;
+
 export function useStages(ownerId?: number | null) {
   return useQuery({
     queryKey: [...keys.stages, ownerId ?? "me"],
     queryFn: () => api<Stage[]>(`/crm/stages${ownerId ? `?owner_id=${ownerId}` : ""}`),
+    ...REFERENCE_DATA,
   });
 }
 
@@ -138,6 +154,7 @@ export function useTags() {
   return useQuery({
     queryKey: keys.tags,
     queryFn: () => api<Tag[]>("/crm/tags"),
+    ...REFERENCE_DATA,
   });
 }
 
@@ -188,6 +205,7 @@ export function useLossReasons() {
   return useQuery({
     queryKey: keys.lossReasons,
     queryFn: () => api<LossReason[]>("/crm/loss-reasons"),
+    ...REFERENCE_DATA,
   });
 }
 
@@ -195,6 +213,7 @@ export function useLauncherApps() {
   return useQuery({
     queryKey: keys.apps,
     queryFn: () => api<LauncherApp[]>("/launcher/apps"),
+    ...REFERENCE_DATA,
   });
 }
 
