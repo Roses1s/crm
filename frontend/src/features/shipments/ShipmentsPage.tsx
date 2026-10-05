@@ -1,0 +1,154 @@
+import { useEffect, useState } from "react";
+import { Link, useNavigate, useSearchParams } from "react-router-dom";
+
+import { AppShell, ControlPanel } from "@/app/layout/AppShell";
+import { ListLimitNotice } from "@/shared/ui/list-limit-notice";
+import { useShipments } from "@/shared/api/hooks";
+import { formatShipmentDate, SHIPMENT_STATUS } from "./shipment-status";
+
+/** Инициалы продавца для аватарки (до двух букв). */
+function initials(name: string | null | undefined): string {
+  if (!name) return "—";
+  const parts = name.trim().split(/\s+/).filter(Boolean);
+  if (parts.length === 0) return "—";
+  return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
+}
+
+/** Список заявок. Фильтр по статусу и поиск — в адресной строке и в запросе к API. */
+export function ShipmentsPage() {
+  const navigate = useNavigate();
+  const [params, setParams] = useSearchParams();
+  const status = params.get("status") ?? "";
+  const search = params.get("search") ?? "";
+  const [searchInput, setSearchInput] = useState(search);
+  const { data: shipmentsPage, isLoading } = useShipments(status, search);
+  const shipments = shipmentsPage?.items ?? [];
+
+  // Поиск дебаунсим на 300мс и пишем в адресную строку с replace — как на
+  // «Лидах» и «Клиентах» (KanbanPage/CustomersPage): иначе запрос к API
+  // улетал бы на каждое нажатие клавиши, а история браузера забивалась бы
+  // записью на каждый символ, ломая кнопку «Назад».
+  useEffect(() => {
+    const timer = setTimeout(() => {
+      setParams(
+        (prev) => {
+          const next = new URLSearchParams(prev);
+          if (searchInput) next.set("search", searchInput);
+          else next.delete("search");
+          return next;
+        },
+        { replace: true },
+      );
+    }, 300);
+    return () => clearTimeout(timer);
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [searchInput]);
+
+  const statusFilter = (
+    <select
+      className="h-8 rounded-[3px] border border-odoo-border bg-odoo-surface-sunken px-2 text-[13px] text-odoo-text-muted outline-none transition-colors hover:border-odoo-border focus:border-odoo-focus/40"
+      value={status}
+      onChange={(e) => {
+        const next = new URLSearchParams(params);
+        if (e.target.value) next.set("status", e.target.value);
+        else next.delete("status");
+        setParams(next);
+      }}
+    >
+      <option value="">Все статусы</option>
+      {Object.entries(SHIPMENT_STATUS).map(([k, v]) => (
+        <option key={k} value={k}>
+          {v.label}
+        </option>
+      ))}
+    </select>
+  );
+
+  return (
+    <AppShell>
+      <ControlPanel
+        title="Заявки"
+        status={statusFilter}
+        count={shipmentsPage?.total ?? 0}
+        search={searchInput}
+        onSearch={setSearchInput}
+      />
+
+      <ListLimitNotice data={shipmentsPage} noun="заявок" />
+
+      <div className="flex-1 overflow-auto">
+        <table className="w-full border-collapse text-[13px]">
+          <thead className="sticky top-0 z-10 bg-odoo-surface-sunken text-odoo-text-muted">
+            <tr className="border-b border-odoo-border">
+              <th className="whitespace-nowrap px-3 py-2.5 text-left font-semibold">Номер</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-left font-semibold">
+                Дата создания
+              </th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-left font-semibold">Продавец</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-left font-semibold">Клиент</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-left font-semibold">Маршрут</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-left font-semibold">Перевозчик</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-left font-semibold">Статус</th>
+            </tr>
+          </thead>
+          <tbody>
+            {!isLoading && shipments.length === 0 && (
+              <tr>
+                <td colSpan={7} className="px-3 py-8 text-center text-odoo-text-muted">
+                  Заявок нет.
+                </td>
+              </tr>
+            )}
+            {shipments.map((s) => {
+              const st = SHIPMENT_STATUS[s.status] ?? SHIPMENT_STATUS.new;
+              return (
+                <tr
+                  key={s.id}
+                  onClick={() => navigate(`/shipments/${s.id}`)}
+                  className="cursor-pointer border-b border-odoo-border-light bg-odoo-surface transition-colors hover:bg-odoo-bg"
+                >
+                  <td className="whitespace-nowrap px-3 py-2 font-medium text-odoo-action">
+                    {/* Настоящая ссылка — держит клавиатурный фокус, открытие в
+                        новой вкладке средней кнопкой/Ctrl-клик и «копировать
+                        ссылку» по правому клику. Клик по ней не даёт событию
+                        всплыть до <tr>, чтобы не навигировать дважды. */}
+                    <Link
+                      to={`/shipments/${s.id}`}
+                      onClick={(e) => e.stopPropagation()}
+                      className="hover:underline"
+                    >
+                      {s.number}
+                    </Link>
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2 text-odoo-text-muted">
+                    {formatShipmentDate(s.created_at)}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2">
+                    <span className="flex items-center gap-2">
+                      <span className="flex h-6 w-6 shrink-0 items-center justify-center rounded-[4px] bg-odoo-avatar text-[10px] font-semibold text-white">
+                        {initials(s.seller_name)}
+                      </span>
+                      <span className="text-odoo-text">{s.seller_name || "—"}</span>
+                    </span>
+                  </td>
+                  <td className="px-3 py-2 text-odoo-text">{s.lead_name}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-odoo-text-muted">{s.route}</td>
+                  <td className="whitespace-nowrap px-3 py-2 text-odoo-text-muted">
+                    {s.carrier_name || "—"}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2">
+                    <span
+                      className={`inline-flex rounded-[10px] px-2 py-0.5 text-[11px] font-medium ${st.cls}`}
+                    >
+                      {st.label}
+                    </span>
+                  </td>
+                </tr>
+              );
+            })}
+          </tbody>
+        </table>
+      </div>
+    </AppShell>
+  );
+}

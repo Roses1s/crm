@@ -1,0 +1,236 @@
+# =============================================================================
+#  CRM Detroid — полный стек: база, кэш, бэкенд, воркер, планировщик,
+#  фронтенд и nginx.
+#  На сервере лежит в /opt/crm/docker-compose.yml (каталог = клон репозитория).
+#
+#  Production: ./deploy.sh (дамп, отдельная миграция, безопасный запуск)
+#  Локально: см. README.md — сначала build и `run backend alembic upgrade head`
+#  Логи:     docker compose logs -f backend
+#  Остановка: docker compose down
+#
+#  Наружу торчит только nginx (80/443). Postgres, Valkey, backend и frontend
+#  доступны исключительно внутри docker-сетей — это важно, потому что Docker
+#  умеет обходить UFW, и любой опубликованный порт стал бы публичным.
+# =============================================================================
+
+name: crm
+
+# Ротация логов: по умолчанию Docker пишет их без ограничений и способен
+# занять весь диск (15 ГБ). Держим по 10 МБ на файл и три файла на контейнер.
+x-logging: &default-logging
+  driver: json-file
+  options:
+    max-size: "10m"
+    max-file: "3"
+
+services:
+  # --- база данных ----------------------------------------------------------
+  postgres:
+    image: postgres:18-alpine
+    container_name: crm-postgres
+    restart: unless-stopped
+    logging: *default-logging
+    # Предел памяти: контейнер перезапустится сам, а не утянет сервер.
+    # Сервер на 4 ГБ — базе выделяем 1 ГБ.
+    mem_limit: 1024m
+    environment:
+      POSTGRES_USER: ${POSTGRES_USER:-crm}
+      POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?задайте POSTGRES_PASSWORD в .env}
+      POSTGRES_DB: ${POSTGRES_DB:-crm}
+      POSTGRES_INITDB_ARGS: "--data-checksums"
+    # Тюнинг под 1 ГБ памяти контейнера. Значения по умолчанию у Postgres
+    # рассчитаны на крошечную машину (shared_buffers всего 128 МБ) и не
+    # используют доступную память. Флаги ниже ускоряют запросы, не рискуя ООM.
+    command:
+      - "postgres"
+      - "-c"
+      - "shared_buffers=256MB"
+      - "-c"
+      - "effective_cache_size=768MB"
+      - "-c"
+      - "work_mem=16MB"
+      - "-c"
+      - "maintenance_work_mem=128MB"
+      - "-c"
+      # Бюджет посчитан в backend/app/core/config.py (комментарий у
+      # db_pool_size/db_max_overflow): GUNICORN_WORKERS * (pool_size +
+      # max_overflow) + запас под Celery/ручные подключения. Меняете
+      # GUNICORN_WORKERS или пул на бэкенде — пересчитайте и это число.
+      - "max_connections=120"
+    volumes:
+      # ВАЖНО: в Postgres 18 данные лежат в /var/lib/postgresql/18/docker,
+      # а том монтируется на уровень выше — в /var/lib/postgresql.
+      # Старый путь /var/lib/postgresql/data образ 18+ не принимает и не стартует.
+      - pgdata:/var/lib/postgresql
+    # 64 МБ разделяемой памяти по умолчанию мало для параллельных запросов.
+    shm_size: 256mb
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U ${POSTGRES_USER:-crm} -d ${POSTGRES_DB:-crm}"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+      start_period: 30s
+    networks: [internal]
+
+  # --- кеш и брокер Celery --------------------------------------------------
+  valkey:
+    image: valkey/valkey:8-alpine
+    container_name: crm-valkey
+    restart: unless-stopped
+    logging: *default-logging
+    # Предел памяти: контейнер перезапустится сам, а не утянет сервер.
+    mem_limit: 256m
+    command: ["valkey-server", "--appendonly", "yes", "--save", "60", "1"]
+    volumes:
+      - valkeydata:/data
+    healthcheck:
+      test: ["CMD", "valkey-cli", "ping"]
+      interval: 10s
+      timeout: 5s
+      retries: 5
+    networks: [internal]
+
+  # --- API ------------------------------------------------------------------
+  backend:
+    build:
+      context: ./backend
+    image: crm-backend:latest
+    container_name: crm-backend
+    restart: unless-stopped
+    logging: *default-logging
+    # Предел памяти: контейнер перезапустится сам, а не утянет сервер.
+    # Сервер на 4 ГБ — API даём ~0,9 ГБ на 3 воркера.
+    mem_limit: 896m
+    env_file: [.env]
+    environment:
+      POSTGRES_HOST: postgres
+      VALKEY_URL: redis://valkey:6379/0
+      GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
+    # Миграции запускает deploy.sh отдельным контролируемым шагом до замены
+    # контейнеров. API сам схему не меняет: иначе автоматический рестарт мог бы
+    # неожиданно применить миграцию вне окна деплоя.
+    command: gunicorn app.main:app -c gunicorn.conf.py
+    volumes:
+      - backups:/var/backups/crm
+      # Вложения лидов: том переживает пересборку образа и перезапуск.
+      - attachments:/var/lib/crm/attachments
+    depends_on:
+      postgres:
+        condition: service_healthy
+      valkey:
+        condition: service_healthy
+    networks: [internal, edge]
+
+  # --- фоновые задачи -------------------------------------------------------
+  worker:
+    build:
+      context: ./backend
+    image: crm-backend:latest
+    container_name: crm-worker
+    restart: unless-stopped
+    logging: *default-logging
+    # Предел памяти: контейнер перезапустится сам, а не утянет сервер.
+    mem_limit: 448m
+    env_file: [.env]
+    environment:
+      POSTGRES_HOST: postgres
+      VALKEY_URL: redis://valkey:6379/0
+    # concurrency=1: на 2 ГБ памяти больше одного процесса держать незачем.
+    command: celery -A app.worker.celery_app.celery worker -l info --concurrency 1
+    # Свой healthcheck: из образа бэкенда унаследовался бы HTTP-запрос к :8000,
+    # которого у воркера нет, и контейнер вечно висел бы «unhealthy».
+    healthcheck:
+      test: ["CMD-SHELL", "celery -A app.worker.celery_app.celery inspect ping -d celery@$$HOSTNAME | grep -q pong"]
+      interval: 60s
+      timeout: 15s
+      retries: 3
+      start_period: 40s
+    volumes:
+      - backups:/var/backups/crm
+      - attachments:/var/lib/crm/attachments
+    depends_on:
+      backend:
+        condition: service_started
+      valkey:
+        condition: service_healthy
+    networks: [internal]
+
+  beat:
+    build:
+      context: ./backend
+    image: crm-backend:latest
+    container_name: crm-beat
+    restart: unless-stopped
+    logging: *default-logging
+    # Предел памяти: контейнер перезапустится сам, а не утянет сервер.
+    mem_limit: 160m
+    env_file: [.env]
+    environment:
+      POSTGRES_HOST: postgres
+      VALKEY_URL: redis://valkey:6379/0
+    # --schedule в /tmp: планировщику нужно писать свою базу расписания,
+    # и он не должен зависеть от прав на рабочий каталог.
+    command: >
+      celery -A app.worker.celery_app.celery beat -l info
+      --schedule /tmp/celerybeat-schedule
+    # У планировщика нет порта и очереди — проверять нечего, полагаемся
+    # на restart-политику.
+    healthcheck:
+      disable: true
+    depends_on:
+      worker:
+        condition: service_started
+    networks: [internal]
+
+  # --- собранный фронтенд ---------------------------------------------------
+  frontend:
+    build:
+      context: ./frontend
+    image: crm-frontend:latest
+    container_name: crm-frontend
+    restart: unless-stopped
+    logging: *default-logging
+    # Предел памяти: контейнер перезапустится сам, а не утянет сервер.
+    mem_limit: 128m
+    networks: [edge]
+
+  # --- публичный вход -------------------------------------------------------
+  nginx:
+    image: nginx:1.27-alpine
+    container_name: crm-nginx
+    restart: unless-stopped
+    logging: *default-logging
+    # Предел памяти: контейнер перезапустится сам, а не утянет сервер.
+    mem_limit: 128m
+    ports:
+      - "80:80"
+      - "443:443"
+    volumes:
+      - ./deploy/nginx/conf.d:/etc/nginx/conf.d:ro
+      - ./deploy/nginx/snippets:/etc/nginx/snippets:ro
+      - ./certbot/www:/var/www/certbot:ro
+      - /etc/letsencrypt:/etc/letsencrypt:ro
+    healthcheck:
+      test: ["CMD", "wget", "-q", "-O", "-", "http://127.0.0.1/healthz"]
+      interval: 30s
+      timeout: 5s
+      retries: 3
+      start_period: 10s
+    depends_on:
+      - backend
+      - frontend
+    networks: [edge]
+
+volumes:
+  pgdata:
+  valkeydata:
+  backups:
+  attachments:
+
+networks:
+  # internal — без выхода наружу: база, кеш, воркеры
+  internal:
+    name: crm_internal
+  # edge — nginx, фронтенд и API
+  edge:
+    name: crm_edge

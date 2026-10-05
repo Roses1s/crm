@@ -1,0 +1,65 @@
+"""Celery: фоновые и периодические задачи.
+
+Брокер и бэкенд результатов — Valkey (протокол совместим с Redis).
+Запуск воркера:   celery -A app.worker.celery_app.celery worker -l info
+Запуск планировщика: celery -A app.worker.celery_app.celery beat -l info
+"""
+
+from __future__ import annotations
+
+from celery import Celery
+from celery.schedules import crontab
+
+from app.core.config import settings
+
+celery = Celery(
+    "crm",
+    broker=settings.celery_broker_url,
+    backend=settings.celery_result_backend,
+    include=["app.worker.tasks"],
+)
+
+celery.conf.update(
+    task_serializer="json",
+    result_serializer="json",
+    accept_content=["json"],
+    timezone="Europe/Moscow",
+    enable_utc=True,
+    task_acks_late=True,
+    task_reject_on_worker_lost=True,
+    worker_prefetch_multiplier=1,
+    task_time_limit=600,
+    task_soft_time_limit=540,
+    result_expires=3600,
+    broker_connection_retry_on_startup=True,
+)
+
+# Расписание фоновых задач (время сервера). Перечислены по порядку запуска:
+#   каждую ночь 03:00 — бэкап базы;
+#   по воскресеньям 04:00 — бэкап файлов, 04:30 и 04:45 — уборка.
+celery.conf.beat_schedule = {
+    "nightly-backup": {
+        "task": "app.worker.tasks.backup_database",
+        "schedule": crontab(hour=3, minute=0),
+    },
+    "weekly-files-backup": {
+        "task": "app.worker.tasks.backup_attachments",
+        "schedule": crontab(hour=4, minute=0, day_of_week="sun"),
+    },
+    "cleanup-attachments": {
+        "task": "app.worker.tasks.cleanup_orphan_attachments",
+        "schedule": crontab(hour=4, minute=30, day_of_week="sun"),
+    },
+    "cleanup-revoked-tokens": {
+        "task": "app.worker.tasks.cleanup_revoked_tokens",
+        "schedule": crontab(hour=4, minute=45, day_of_week="sun"),
+    },
+    "cleanup-login-attempts": {
+        "task": "app.worker.tasks.cleanup_login_attempts",
+        "schedule": crontab(hour=5, minute=0, day_of_week="sun"),
+    },
+    "cleanup-orphan-files": {
+        "task": "app.worker.tasks.cleanup_orphan_files",
+        "schedule": crontab(hour=5, minute=15, day_of_week="sun"),
+    },
+}

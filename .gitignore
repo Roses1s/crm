@@ -1,0 +1,30 @@
+# окружение и секреты
+.env
+
+# журнал деплоя на сервере
+.deploy.log
+*.env.local
+
+# зависимости и сборки
+node_modules/
+dist/
+.venv/
+__pycache__/
+*.py[cod]
+
+# артефакты сборки
+*.egg-info/
+
+# кеши инструментов
+.mypy_cache/
+.ruff_cache/
+.pytest_cache/
+*.tsbuildinfo
+
+# локальные базы
+*.db
+*.sqlite3
+
+# сертификаты и данные, создаваемые на сервере
+certbot/
+tsconfig.tsbuildinfo

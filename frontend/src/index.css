@@ -1,0 +1,425 @@
+@import "tailwindcss";
+
+/*
+ * Tailwind CSS v4.
+ *
+ * В v4 нет tailwind.config.ts — дизайн-токены объявляются прямо в CSS через
+ * @theme. Тёмная тема переключается классом .dark на <html>, поэтому вариант
+ * dark: переопределён вручную (по умолчанию v4 использует prefers-color-scheme).
+ *
+ * Значения токенов лежат в :root / .dark ниже, а @theme inline только даёт им
+ * имена утилит (bg-odoo-surface, text-odoo-text-muted и т. д.). Благодаря
+ * inline утилита подставляет rgb(var(--odoo-*)) напрямую, поэтому смена темы
+ * перекрашивает интерфейс мгновенно, без пересборки классов.
+ */
+
+@custom-variant dark (&:where(.dark, .dark *));
+
+@theme inline {
+  --color-odoo-primary: rgb(var(--odoo-primary));
+  --color-odoo-primary-hover: rgb(var(--odoo-primary-hover));
+  --color-odoo-primary-soft: rgb(var(--odoo-primary-soft));
+  --color-odoo-primary-soft-text: rgb(var(--odoo-primary-soft-text));
+  --color-odoo-secondary: rgb(var(--odoo-secondary));
+
+  /* Фиксированные цвета фирменного тёмного фона (экран логина). */
+  --color-odoo-dark: #1b1d21;
+  --color-odoo-dark-light: #2c2c33;
+
+  --color-odoo-bg: rgb(var(--odoo-bg));
+  --color-odoo-surface: rgb(var(--odoo-surface));
+  --color-odoo-surface-hover: rgb(var(--odoo-surface-hover));
+  --color-odoo-surface-sunken: rgb(var(--odoo-surface-sunken));
+  --color-odoo-skeleton: rgb(var(--odoo-skeleton));
+  --color-odoo-board-canvas: rgb(var(--odoo-board-canvas));
+  --color-odoo-board-card: rgb(var(--odoo-board-card));
+  --color-odoo-board-card-hover: rgb(var(--odoo-board-card-hover));
+  --color-odoo-track: rgb(var(--odoo-track));
+
+  --color-odoo-border: rgb(var(--odoo-border));
+  --color-odoo-border-light: rgb(var(--odoo-border-light));
+
+  --color-odoo-text: rgb(var(--odoo-text));
+  --color-odoo-text-soft: rgb(var(--odoo-text-soft));
+  --color-odoo-text-muted: rgb(var(--odoo-text-muted));
+  --color-odoo-text-light: rgb(var(--odoo-text-light));
+
+  --color-odoo-success: rgb(var(--odoo-success));
+  --color-odoo-warning: rgb(var(--odoo-warning));
+  --color-odoo-danger: rgb(var(--odoo-danger));
+  --color-odoo-info: rgb(var(--odoo-info));
+
+  --color-odoo-drop: rgb(var(--odoo-drop));
+  --color-odoo-accent-soft: rgb(var(--odoo-accent-soft));
+  --color-odoo-accent-line: rgb(var(--odoo-accent-line));
+  --color-odoo-search-divider: rgb(var(--odoo-search-divider));
+  --color-odoo-search-icon: rgb(var(--odoo-search-icon));
+  --color-odoo-search-placeholder: rgb(var(--odoo-search-placeholder));
+  --color-odoo-search-action: rgb(var(--odoo-search-action));
+  --color-odoo-search-action-hover: rgb(var(--odoo-search-action-hover));
+  --color-odoo-chip: rgb(var(--odoo-chip));
+  --color-odoo-chip-text: rgb(var(--odoo-chip-text));
+  --color-odoo-avatar: rgb(var(--odoo-avatar));
+  --color-odoo-action: rgb(var(--odoo-action));
+  --color-odoo-nav: rgb(var(--odoo-nav));
+  --color-odoo-focus: rgb(var(--odoo-focus));
+  --color-odoo-overlay: rgb(var(--odoo-overlay));
+  --color-odoo-chatter-divider: rgb(var(--odoo-chatter-divider));
+
+  /* Теги подстраиваются под тему, сохраняя смысл цвета и читаемость. */
+  --color-odoo-tag-blue-bg: rgb(var(--odoo-tag-blue-bg));
+  --color-odoo-tag-blue-text: rgb(var(--odoo-tag-blue-text));
+  --color-odoo-tag-green-bg: rgb(var(--odoo-tag-green-bg));
+  --color-odoo-tag-green-text: rgb(var(--odoo-tag-green-text));
+  --color-odoo-tag-yellow-bg: rgb(var(--odoo-tag-yellow-bg));
+  --color-odoo-tag-yellow-text: rgb(var(--odoo-tag-yellow-text));
+
+  /* Цвет рамки по умолчанию для всех элементов (см. @layer base ниже). */
+  --color-border: hsl(var(--border));
+
+  --radius-lg: var(--radius);
+  --radius-md: calc(var(--radius) - 2px);
+  --radius-sm: calc(var(--radius) - 4px);
+}
+
+/*
+ * Токены тем.
+ *
+ * Обе темы построены на собственных семантических ролях. Тёмная опирается на
+ * slate-палитру с образца, а светлая сохраняет соответствующие роли и контраст.
+ */
+:root {
+  color-scheme: light;
+
+  /* Базовые роли всей CRM: спокойная светлая тема с тем же фиолетово-бирюзовым ритмом. */
+  --odoo-primary: 113 75 103; /* #714B67 — фирменный фиолетовый Odoo (manifest) */
+  --odoo-primary-hover: 94 62 85; /* #5E3E55 — темнее для наведения на светлой теме */
+  --odoo-primary-soft: 234 221 231; /* #EADDE7 — светло-сиреневая «таблетка» */
+  --odoo-primary-soft-text: 113 75 103; /* #714B67 — фиолетовый текст на «таблетке» */
+  --odoo-secondary: 0 143 132; /* #008F84 */
+
+  --odoo-bg: 247 246 248; /* #F7F6F8 */
+  --odoo-surface: 255 255 255; /* #FFFFFF */
+  --odoo-surface-hover: 248 243 247; /* #F8F3F7 */
+  --odoo-surface-sunken: 240 238 241; /* #F0EEF1 */
+  --odoo-skeleton: 229 225 231;
+  --odoo-board-canvas: 247 246 248;
+  --odoo-board-card: 255 255 255;
+  --odoo-board-card-hover: 248 243 247;
+  --odoo-track: 221 217 223; /* #DDD9DF */
+
+  --odoo-border: 221 217 223; /* #DDD9DF */
+  --odoo-border-light: 236 233 237; /* #ECE9ED */
+
+  --odoo-text: 41 37 42; /* #29252A */
+  --odoo-text-soft: 98 91 99; /* #625B63 */
+  --odoo-text-muted: 124 116 125; /* #7C747D */
+  --odoo-text-light: 164 157 165; /* #A49DA5 */
+
+  --odoo-success: 35 134 74; /* #23864A */
+  --odoo-warning: 168 106 0; /* #A86A00 */
+  --odoo-danger: 184 58 75; /* #B83A4B */
+  --odoo-info: 31 132 163; /* #1F84A3 */
+
+  /* Контекстные роли, чтобы экран не зависел от случайных локальных HEX. */
+  --odoo-nav: 255 255 255;
+  --odoo-focus: 107 62 102;
+  --odoo-overlay: 42 32 42;
+  --odoo-statusbar: 221 217 223;
+  --odoo-statusbar-segment: 247 246 248;
+  --odoo-statusbar-text: 98 91 99;
+  --odoo-statusbar-current: 230 243 240;
+  --odoo-statusbar-current-border: 0 143 132;
+  --odoo-statusbar-current-text: 41 37 42;
+  --odoo-drop: 243 247 247;
+  --odoo-accent-soft: 230 243 240;
+  --odoo-accent-line: 98 174 165;
+  --odoo-search-divider: 198 218 214;
+  --odoo-search-icon: 88 104 102;
+  --odoo-search-placeholder: 139 132 140;
+  --odoo-search-action: 64 93 89;
+  --odoo-search-action-hover: 240 247 246;
+  --odoo-chip: 240 235 239;
+  --odoo-chip-text: 105 91 103;
+  --odoo-avatar: 81 75 84;
+  --odoo-action: 0 125 115;
+  --odoo-tag-blue-bg: 212 230 249;
+  --odoo-tag-blue-text: 26 82 118;
+  --odoo-tag-green-bg: 213 245 227;
+  --odoo-tag-green-text: 30 132 73;
+  --odoo-tag-yellow-bg: 252 243 207;
+  --odoo-tag-yellow-text: 125 102 8;
+
+  /* Чаттер: единая геометрия автора, отступов и мягких разделителей ленты. */
+  --odoo-chatter-avatar-size: 36px;
+  --odoo-chatter-panel-padding: 16px;
+  --odoo-chatter-composer-indent: 44px;
+  --odoo-chatter-composer-min-height: 36px;
+  --odoo-chatter-log-button-width: 42px;
+  --odoo-chatter-log-button-height: 30px;
+  --odoo-chatter-divider: 236 233 237;
+
+  /* Геометрия карточки: отдельные имена не дают расползаться числам по JSX. */
+  --odoo-record-control-panel-height: 96px;
+  --odoo-record-aside-width: 34.3%;
+  --odoo-form-workspace-padding: 16px;
+  --odoo-form-sheet-padding: 16px;
+  --odoo-form-sheet-padding-wide: 24px;
+  --odoo-form-sheet-radius: 4px;
+  --odoo-form-group-gap: 24px;
+  --odoo-form-section-gap: 32px;
+  --odoo-form-field-gap: 8px;
+
+  --border: 300 10% 87%;
+  --radius: 0.375rem;
+}
+
+.dark {
+  color-scheme: dark;
+
+  /* Нейтральные графитовые поверхности на почти-чёрном фоне — как тёмная тема Odoo 17. */
+  --odoo-primary: 113 75 103; /* #714B67 — фирменный фиолетовый Odoo (manifest) */
+  --odoo-primary-hover: 138 95 126; /* #8A5F7E — светлее для наведения на тёмной теме */
+  --odoo-primary-soft: 58 43 55; /* #3A2B37 — приглушённая мовная «таблетка» */
+  --odoo-primary-soft-text: 214 166 198; /* #D6A6C6 — светло-фиолетовый текст на «таблетке» */
+  --odoo-secondary: 31 166 160; /* #1FA6A0 — приглушённый бирюзовый под образец Odoo */
+
+  --odoo-bg: 27 29 38; /* #1B1D26 — прежний тёмный фон приложения (по просьбе владельца) */
+  --odoo-surface: 38 42 54; /* #262A36 — лист/панель/поле */
+  --odoo-surface-hover: 48 52 66; /* #303442 */
+  --odoo-surface-sunken: 32 35 44; /* #20232C */
+  --odoo-skeleton: 61 65 80;
+  --odoo-board-canvas: 27 29 38;
+  --odoo-board-card: 36 39 51;
+  --odoo-board-card-hover: 43 47 61;
+  --odoo-track: 60 62 75; /* #3C3E4B */
+
+  --odoo-border: 60 62 75; /* #3C3E4B */
+  --odoo-border-light: 52 55 68; /* #343744 */
+
+  --odoo-text: 228 228 230; /* #E4E4E6 */
+  --odoo-text-soft: 200 200 204; /* #C8C8CC */
+  --odoo-text-muted: 154 154 160; /* #9A9AA0 */
+  --odoo-text-light: 128 130 139; /* #80828B */
+
+  --odoo-success: 70 184 106; /* #46B86A */
+  --odoo-warning: 255 193 7; /* #FFC107 */
+  --odoo-danger: 232 87 101; /* #E85765 */
+  --odoo-info: 71 187 220; /* #47BBDC */
+
+  --odoo-nav: 38 42 54;
+  --odoo-focus: 31 166 160;
+  --odoo-overlay: 5 7 12;
+  --odoo-statusbar: 60 62 75;
+  --odoo-statusbar-segment: 48 52 66;
+  --odoo-statusbar-text: 228 228 230;
+  --odoo-statusbar-current: 31 70 73;
+  --odoo-statusbar-current-border: 31 166 160;
+  --odoo-statusbar-current-text: 228 228 230;
+  --odoo-drop: 34 39 50;
+  --odoo-accent-soft: 27 57 58;
+  --odoo-accent-line: 31 166 160;
+  --odoo-search-divider: 58 89 87;
+  --odoo-search-icon: 163 177 180;
+  --odoo-search-placeholder: 139 149 153;
+  --odoo-search-action: 181 208 205;
+  --odoo-search-action-hover: 38 64 64;
+  --odoo-chip: 61 48 62;
+  --odoo-chip-text: 211 198 211;
+  --odoo-avatar: 66 70 82;
+  --odoo-action: 31 166 160;
+  --odoo-tag-blue-bg: 40 71 92;
+  --odoo-tag-blue-text: 142 207 240;
+  --odoo-tag-green-bg: 34 82 58;
+  --odoo-tag-green-text: 145 224 169;
+  --odoo-tag-yellow-bg: 88 69 25;
+  --odoo-tag-yellow-text: 255 221 121;
+  --odoo-chatter-divider: 52 55 68;
+  --border: 230 10% 24%;
+}
+
+/*
+ * Геометрия сгруппированного канбана повторяет модель Odoo: на телефоне этап
+ * занимает 90% окна, а на широком экране его ширина складывается из записи и
+ * двух внутренних полей. Сам этап не рисует отдельную поверхность — тёмный
+ * фон доски остаётся виден между карточками и группами.
+ */
+.crm-kanban-renderer {
+  --odoo-kanban-group-padding-x: 8px;
+  --odoo-kanban-record-width: 300px;
+  --odoo-kanban-record-small-width: 240px;
+  --odoo-kanban-group-width: 90vw;
+  --odoo-kanban-record-current-width: calc(90vw - (var(--odoo-kanban-group-padding-x) * 2));
+}
+
+@media (min-width: 768px) {
+  .crm-kanban-renderer {
+    --odoo-kanban-record-current-width: var(--odoo-kanban-record-small-width);
+    --odoo-kanban-group-width: calc(
+      var(--odoo-kanban-record-current-width) + (var(--odoo-kanban-group-padding-x) * 2)
+    );
+  }
+}
+
+@media (min-width: 1024px) {
+  .crm-kanban-renderer {
+    --odoo-kanban-record-current-width: var(--odoo-kanban-record-width);
+  }
+}
+
+@media (hover: hover) and (pointer: fine) {
+  /*
+   * У Odoo в спокойном состоянии видна только кнопка быстрого добавления.
+   * Остальные действия этапа появляются при наведении или клавиатурном фокусе,
+   * поэтому не сужают заголовок, но остаются доступны мышью и клавиатурой.
+   */
+  .crm-kanban-stage-header .crm-kanban-stage-secondary-action {
+    width: 0;
+    overflow: hidden;
+    opacity: 0;
+    pointer-events: none;
+    transition:
+      width 120ms ease,
+      opacity 120ms ease;
+  }
+
+  .crm-kanban-stage-header:hover .crm-kanban-stage-secondary-action,
+  .crm-kanban-stage-header:focus-within .crm-kanban-stage-secondary-action {
+    opacity: 1;
+    pointer-events: auto;
+  }
+
+  .crm-kanban-stage-header:hover .crm-kanban-stage-fold-action,
+  .crm-kanban-stage-header:focus-within .crm-kanban-stage-fold-action {
+    width: 1.25rem;
+  }
+
+  .crm-kanban-stage-header:hover .crm-kanban-stage-menu-action,
+  .crm-kanban-stage-header:focus-within .crm-kanban-stage-menu-action {
+    width: 1.5rem;
+  }
+}
+
+@layer base {
+  *,
+  ::before,
+  ::after {
+    border-color: var(--color-border);
+  }
+
+  body {
+    /*
+     * Системный стек шрифтов — тот же, что использует Odoo 17 (наследует его из
+     * Bootstrap). Odoo своего шрифта не грузит, поэтому на одной ОС и Odoo, и
+     * наша CRM рисуются одним системным шрифтом (на Windows — Segoe UI). Так
+     * достигается совпадение шрифта с образцом без подгрузки Google Fonts.
+     */
+    font-family:
+      -apple-system, BlinkMacSystemFont, "Segoe UI", Roboto, "Helvetica Neue", Arial, "Noto Sans",
+      "Liberation Sans", sans-serif, "Apple Color Emoji", "Segoe UI Emoji", "Segoe UI Symbol",
+      "Noto Color Emoji";
+    font-size: 13px;
+    line-height: 1.5;
+    color: rgb(var(--odoo-text));
+    background: rgb(var(--odoo-bg));
+    -webkit-font-smoothing: antialiased;
+  }
+
+  h1 {
+    font-size: 22px;
+    font-weight: 600;
+  }
+  h2 {
+    font-size: 18px;
+    font-weight: 600;
+  }
+  h3 {
+    font-size: 15px;
+    font-weight: 600;
+  }
+  h4 {
+    font-size: 13px;
+    font-weight: 600;
+    text-transform: uppercase;
+    letter-spacing: 0.5px;
+  }
+
+  /*
+   * Поля ввода и выпадающие списки. Без явных цветов браузер в тёмной теме
+   * рисует их сам: список <option> получался серым по белому и не читался.
+   */
+  input,
+  select,
+  textarea {
+    background-color: rgb(var(--odoo-surface));
+    color: rgb(var(--odoo-text));
+  }
+
+  select option {
+    background-color: rgb(var(--odoo-surface));
+    color: rgb(var(--odoo-text));
+  }
+
+  input::placeholder,
+  textarea::placeholder {
+    color: rgb(var(--odoo-text-muted));
+  }
+
+  input:disabled,
+  textarea:disabled,
+  select:disabled {
+    background-color: rgb(var(--odoo-surface-sunken));
+    color: rgb(var(--odoo-text-muted));
+    cursor: not-allowed;
+  }
+
+  /* Единый заметный, но спокойный фокус для клавиатурной навигации всей CRM. */
+  a:focus-visible,
+  button:focus-visible,
+  input:focus-visible,
+  select:focus-visible,
+  textarea:focus-visible {
+    outline: 2px solid rgb(var(--odoo-focus));
+    outline-offset: 1px;
+  }
+
+  ::selection {
+    background-color: rgb(var(--odoo-accent-soft));
+    color: rgb(var(--odoo-text));
+  }
+
+  ::-webkit-scrollbar {
+    width: 6px;
+    height: 6px;
+  }
+  ::-webkit-scrollbar-thumb {
+    background: rgb(var(--odoo-border));
+    border-radius: 9999px;
+  }
+}
+
+/*
+ * Браузер рисует сохранённые данные во входных полях собственными цветами.
+ * Явно возвращаем их в палитру текущей темы, чтобы автозаполнение не ломало
+ * контраст ни на светлом, ни на тёмном экране входа.
+ */
+.login-screen input:-webkit-autofill,
+.login-screen input:-webkit-autofill:hover,
+.login-screen input:-webkit-autofill:focus {
+  -webkit-text-fill-color: rgb(var(--odoo-text));
+  caret-color: rgb(var(--odoo-text));
+  box-shadow: 0 0 0 1000px rgb(var(--odoo-surface)) inset;
+  transition: background-color 9999s ease-in-out 0s;
+}
+
+/* Плашка тоста (см. shared/ui/toast.tsx) — лёгкое появление сверху. */
+@keyframes toast-in {
+  from {
+    opacity: 0;
+    transform: translateY(-6px);
+  }
+  to {
+    opacity: 1;
+    transform: translateY(0);
+  }
+}
