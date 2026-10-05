@@ -1,5 +1,7 @@
 import { QueryCache, QueryClient } from "@tanstack/react-query";
 
+import { clearBlobCache } from "@/shared/lib/blob-cache";
+
 /**
  * Единый QueryClient приложения.
  *
@@ -36,4 +38,7 @@ export function clearSessionCache(): void {
   void queryClient.cancelQueries();
   // clear очищает одновременно QueryCache и MutationCache.
   queryClient.clear();
+  // Скачанные вложения лежат отдельно от кеша запросов — их тоже убираем,
+  // иначе картинки прежнего сотрудника остались бы в памяти вкладки.
+  clearBlobCache();
 }
