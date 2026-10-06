@@ -4,9 +4,10 @@
 карточки заявки. Связь `shipment_tags` в базе осталась (значения приезжают
 и уходят без изменений), поэтому вернуть поле можно одной правкой вёрстки.
 
-Красить и создавать теги может любой сотрудник — это не настройка системы,
-а рабочий инструмент вроде наклеек на канбане. Поэтому ни одна ручка здесь не
-требует прав администратора.
+Красить, создавать и переименовывать теги может любой сотрудник — это не
+настройка системы, а рабочий инструмент вроде наклеек на канбане. А вот
+удалять — только администратор: тег общий, и одно нажатие снимает его сразу
+со всех карточек компании (ревью 03.10, Б-16).
 """
 
 from __future__ import annotations
@@ -15,7 +16,7 @@ from fastapi import APIRouter, status
 from fastapi_cache.decorator import cache
 from sqlalchemy import select
 
-from app.api.deps import CurrentUser, SessionDep
+from app.api.deps import AdminUser, CurrentUser, SessionDep
 from app.core.cache import invalidate, public_key_builder
 from app.core.config import settings
 from app.core.errors import NotFoundError
@@ -65,7 +66,9 @@ async def update_tag(tag_id: int, payload: TagUpdate, session: SessionDep, _: Cu
 
 
 @router.delete("/{tag_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Удалить тег")
-async def delete_tag(tag_id: int, session: SessionDep, _: CurrentUser) -> None:
+async def delete_tag(tag_id: int, session: SessionDep, _: AdminUser) -> None:
+    """Тег общий: удаление снимает его со всех карточек компании сразу —
+    поэтому доверяем его только администратору (Б-16)."""
     tag = await session.get(Tag, tag_id)
     if tag is None:
         raise NotFoundError(f"Тег {tag_id} не найден")

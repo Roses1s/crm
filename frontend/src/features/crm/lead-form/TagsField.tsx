@@ -1,7 +1,8 @@
 // Виджет many2many_tags: выбранные теги — пилюли с крестиком, выпадающий
-// список — выбор/создание/правка/удаление. Теги свободны для всех —
-// создавать, красить (любой HEX), переименовывать и удалять может любой
-// пользователь, не только админ (см. backend app/api/v1/tags.py).
+// список — выбор/создание/правка/удаление. Создавать, красить (любой HEX)
+// и переименовывать теги может любой сотрудник, а вот удалять — только
+// администратор: тег общий, и одно нажатие снимает его со всех карточек
+// компании (см. backend app/api/v1/tags.py).
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useState } from "react";
 
@@ -17,10 +18,13 @@ export function TagsField({
   all,
   value,
   onChange,
+  canDelete = false,
 }: {
   all: Tag[];
   value: number[];
   onChange: (ids: number[]) => void;
+  /** Удалять общий тег может только администратор (Б-16). */
+  canDelete?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -206,14 +210,16 @@ export function TagsField({
                   >
                     <Pencil className="h-3.5 w-3.5" />
                   </button>
-                  <button
-                    type="button"
-                    aria-label={`Удалить тег ${tag.name}`}
-                    className="shrink-0 rounded-sm p-0.5 text-odoo-text-light opacity-0 transition-opacity hover:text-odoo-danger group-hover:opacity-100"
-                    onClick={() => removeTag(tag)}
-                  >
-                    <Trash2 className="h-3.5 w-3.5" />
-                  </button>
+                  {canDelete && (
+                    <button
+                      type="button"
+                      aria-label={`Удалить тег ${tag.name}`}
+                      className="shrink-0 rounded-sm p-0.5 text-odoo-text-light opacity-0 transition-opacity hover:text-odoo-danger group-hover:opacity-100"
+                      onClick={() => removeTag(tag)}
+                    >
+                      <Trash2 className="h-3.5 w-3.5" />
+                    </button>
+                  )}
                 </div>
               ),
             )}

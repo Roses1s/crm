@@ -711,6 +711,7 @@ function LeadForm({ id }: { id?: string }) {
                               all={allTags}
                               value={form.tag_ids}
                               onChange={(ids) => set("tag_ids", ids)}
+                              canDelete={currentUser?.role === "admin"}
                             />
                           </Field>
                         </InnerGroup>

@@ -17,9 +17,9 @@ import { renderWithProviders } from "@/test/utils";
 let server: FakeServer | undefined;
 afterEach(() => server?.restore());
 
-function Harness() {
+function Harness({ canDelete = false }: { canDelete?: boolean }) {
   const { data: allTags = [] } = useTags();
-  return <TagsField all={allTags} value={[1]} onChange={() => {}} />;
+  return <TagsField all={allTags} value={[1]} onChange={() => {}} canDelete={canDelete} />;
 }
 
 it("цвет тега сохраняется сразу по клику на пресет, без отдельного «Сохранить»", async () => {
@@ -83,4 +83,26 @@ it("«Отмена» откатывает уже автосохранённый 
   // что было у тега до открытия панели редактирования.
   await user.click(screen.getByRole("button", { name: "Отмена" }));
   await waitFor(() => expect(current.color).toBe("#112233"));
+});
+
+const current0 = { id: 1, name: "Важное", color: "#112233" };
+
+it("корзину удаления тега видит только администратор (Б-16)", async () => {
+  server = startFakeApi([{ method: "GET", path: "/crm/tags", response: () => [current0] }]);
+
+  // Обычный сотрудник: менять можно, удалять нельзя.
+  const { unmount } = renderWithProviders(<Harness />);
+  const user = userEvent.setup();
+  await screen.findByText("Важное");
+  await user.click(screen.getByRole("button", { name: "Теги" }));
+  await user.click(await screen.findByRole("button", { name: "Изменить тег Важное" }));
+  expect(screen.queryByRole("button", { name: "Удалить тег Важное" })).toBeNull();
+  unmount();
+
+  // Администратор: корзина на месте.
+  server = startFakeApi([{ method: "GET", path: "/crm/tags", response: () => [current0] }]);
+  renderWithProviders(<Harness canDelete />);
+  await screen.findByText("Важное");
+  await user.click(screen.getByRole("button", { name: "Теги" }));
+  expect(await screen.findByRole("button", { name: "Удалить тег Важное" })).toBeInTheDocument();
 });

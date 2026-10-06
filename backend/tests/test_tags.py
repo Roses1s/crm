@@ -1,4 +1,4 @@
-"""Теги: создавать/красить/удалять может любой сотрудник, цвет — любой HEX."""
+"""Теги: создавать/красить может любой сотрудник, удалять — только админ (Б-16)."""
 
 from __future__ import annotations
 
@@ -15,7 +15,9 @@ async def manager_headers(client: AsyncClient) -> dict[str, str]:
     return {"Authorization": f"Bearer {login.json()['access_token']}"}
 
 
-async def test_manager_can_create_and_delete_tag(auth_client: AsyncClient, seeded: dict) -> None:
+async def test_manager_creates_but_cannot_delete_tag(auth_client: AsyncClient, seeded: dict) -> None:
+    """Создавать теги можно всем, а удалять — только администратору:
+    тег общий, одно нажатие снимает его со всех карточек компании."""
     headers = await manager_headers(auth_client)
 
     created = await auth_client.post(
@@ -25,7 +27,12 @@ async def test_manager_can_create_and_delete_tag(auth_client: AsyncClient, seede
     assert created.json()["color"] == "#ff00aa"
     tag_id = created.json()["id"]
 
-    deleted = await auth_client.delete(f"/api/v1/crm/tags/{tag_id}", headers=headers)
+    # Менеджеру удаление запрещено.
+    denied = await auth_client.delete(f"/api/v1/crm/tags/{tag_id}", headers=headers)
+    assert denied.status_code == 403
+
+    # Администратору — можно.
+    deleted = await auth_client.delete(f"/api/v1/crm/tags/{tag_id}")
     assert deleted.status_code == 204
 
 
