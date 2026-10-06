@@ -8,7 +8,7 @@
 
 from __future__ import annotations
 
-from sqlalchemy import select
+from sqlalchemy import select, text
 from sqlalchemy.ext.asyncio import AsyncSession
 
 from app.core.errors import AppError, NotFoundError, PermissionDeniedError
@@ -28,7 +28,24 @@ DEFAULT_STAGES: list[tuple[str, str]] = [
 
 
 async def ensure_default_stages(session: AsyncSession, owner_id: int) -> None:
-    """Создаёт стандартную воронку, если у сотрудника ещё нет ни одного этапа."""
+    """Создаёт стандартную воронку, если у сотрудника ещё нет ни одного этапа.
+
+    «Проверили — вставили» без защиты могло выполниться дважды: два
+    одновременных первых запроса (вход с двух устройств, два админa открыли
+    доску нового сотрудника) оба не находили этапов и создавали по воронке —
+    карточки «расползались» по одинаковым колонкам (ревью 03.10, Б-17).
+    Поэтому на PostgreSQL проверка-и-вставка сериализуется транзакционной
+    advisory-блокировкой по номеру сотрудника: второй запрос ждёт первого и
+    видит уже созданную доску. В SQLite (тесты) она не нужна — там один
+    процесс, а SQL-функции такой нет.
+    """
+    if session.bind is not None and session.bind.dialect.name == "postgresql":
+        # Пара чисел задаёт собственное пространство ключей: 4227 — «доски
+        # CRM», второе — номер сотрудника. Блокировка живёт до конца
+        # транзакции (суффикс _xact) и отпускается сама.
+        await session.execute(
+            text("SELECT pg_advisory_xact_lock(4227, :owner_id)"), {"owner_id": owner_id}
+        )
     existing = await session.execute(select(Stage.id).where(Stage.owner_id == owner_id).limit(1))
     if existing.first() is not None:
         return
