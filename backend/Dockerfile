@@ -3,9 +3,15 @@
 #  Бэкенд CRM Detroid — Python 3.13, Gunicorn + UvicornWorker
 #  Многоступенчатая сборка: инструменты компиляции остаются в builder-слое,
 #  в финальный образ попадают только готовые зависимости.
+#
+#  Базовые образы закреплены по digest (И-02 ревью 06.10): плавающий тег
+#  3.13-slim может молча обновиться и изменить прод. Обновление теперь
+#  осознанное: проверяем новый digest на hub.docker.com, меняем здесь и в
+#  docker-compose.yml, собираем с нуля. Digest — многоархитектурный
+#  (manifest list), собран 06.10.2026.
 # ---------------------------------------------------------------------------
 
-FROM python:3.13-slim AS builder
+FROM python:3.13-slim@sha256:bf44cdfcb76cd3b41e879bc058fc37ec5872002ccfde7fcb765e218cde0cd79c AS builder
 
 ENV PIP_NO_CACHE_DIR=1 \
     PIP_DISABLE_PIP_VERSION_CHECK=1
@@ -38,7 +44,7 @@ RUN mkdir -p app && touch app/__init__.py \
     && /opt/venv/bin/pip install . --no-deps
 
 # ---------------------------------------------------------------------------
-FROM python:3.13-slim AS runtime
+FROM python:3.13-slim@sha256:bf44cdfcb76cd3b41e879bc058fc37ec5872002ccfde7fcb765e218cde0cd79c AS runtime
 
 ENV PYTHONUNBUFFERED=1 \
     PYTHONDONTWRITEBYTECODE=1 \

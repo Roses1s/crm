@@ -26,7 +26,10 @@ x-logging: &default-logging
 services:
   # --- база данных ----------------------------------------------------------
   postgres:
-    image: postgres:18-alpine
+    # Digest-ы закреплены 06.10.2026 (И-02 ревью): обновление образов —
+    # осознанная правка, а не тихий сдвиг тега. Новый digest смотреть на
+    # hub.docker.com в поле «Digest» нужного тега.
+    image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
     container_name: crm-postgres
     restart: unless-stopped
     logging: *default-logging
@@ -74,7 +77,7 @@ services:
 
   # --- кеш и брокер Celery --------------------------------------------------
   valkey:
-    image: valkey/valkey:8-alpine
+    image: valkey/valkey:8-alpine@sha256:081c2f5cb575efc901aa80ff9cdbd1ec6a301682fd35e1ebb4b0990a4a4a8507
     container_name: crm-valkey
     restart: unless-stopped
     logging: *default-logging
@@ -196,7 +199,9 @@ services:
 
   # --- публичный вход -------------------------------------------------------
   nginx:
-    image: nginx:1.27-alpine
+    # nginx 1.27 -> 1.30 (И-03): актуальная стабильная ветка. Перед выкаткой
+    # проверить конфиг: docker compose exec nginx nginx -t
+    image: nginx:1.30-alpine@sha256:0985e772fb9f729e6fa0980da05fca5d9c468e870eed43071545afa9d2e27d94
     container_name: crm-nginx
     restart: unless-stopped
     logging: *default-logging
