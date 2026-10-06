@@ -139,6 +139,49 @@ async def test_history_entry_cannot_be_edited(auth_client: AsyncClient, seeded: 
     assert bad.status_code == 400
 
 
+async def test_note_can_be_edited_only_by_author(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    """Править примечание может только его автор — даже администратору нельзя (Б-11).
+
+    Строка ленты подписана именем автора: правка чужого текста выглядела бы
+    как его слова. Нуждающуюся в правке запись можно удалить и написать свою.
+    """
+    headers = await manager_headers(auth_client)
+    manager_id = seeded["manager"].id  # type: ignore[attr-defined]
+    stage_id = (await auth_client.get("/api/v1/crm/stages", headers=headers)).json()[0]["id"]
+    lead_id = (
+        await auth_client.post(
+            "/api/v1/crm/leads",
+            json={"name": "ООО «Автор примечания»", "inn": "7451234565", "stage_id": stage_id},
+            headers=headers,
+        )
+    ).json()["id"]
+
+    entry_id = (
+        await auth_client.post(
+            f"/api/v1/crm/leads/{lead_id}/notes", json={"body": "заметка менеджера"}, headers=headers
+        )
+    ).json()["id"]
+
+    # Автор правит свободно; в ответе виден номер автора.
+    edited = await auth_client.patch(
+        f"/api/v1/crm/leads/{lead_id}/timeline/{entry_id}",
+        json={"body": "исправленная заметка"},
+        headers=headers,
+    )
+    assert edited.status_code == 200
+    assert edited.json()["body"] == "исправленная заметка"
+    assert edited.json()["author_id"] == manager_id
+
+    # Администратор видит этот лид, но править чужое примечание не может.
+    denied = await auth_client.patch(
+        f"/api/v1/crm/leads/{lead_id}/timeline/{entry_id}",
+        json={"body": "правка администратора"},
+    )
+    assert denied.status_code == 403
+
+
 async def test_note_and_stage_record_are_deletable_but_other_history_is_not(
     auth_client: AsyncClient, seeded: dict
 ) -> None:

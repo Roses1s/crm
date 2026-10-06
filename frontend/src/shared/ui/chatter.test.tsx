@@ -12,6 +12,7 @@ const TIMELINE: TimelineEntry[] = [
     type: "note",
     author_name: "Мария Иванова",
     author_initials: "МИ",
+    author_id: 7,
     body: "Договорились перезвонить завтра.\nЖдём ответ логиста.",
     created_at: "2026-09-30T12:00:00+05:00",
   },
@@ -115,7 +116,13 @@ describe("Лента примечаний", () => {
     const user = userEvent.setup();
     const onUpload = vi.fn();
     renderWithProviders(
-      <Chatter timeline={TIMELINE} onEditNote={vi.fn()} onUpload={onUpload} authorInitials="М" />,
+      <Chatter
+        timeline={TIMELINE}
+        onEditNote={vi.fn()}
+        onUpload={onUpload}
+        authorInitials="М"
+        currentUserId={7}
+      />,
     );
 
     await user.click(screen.getByRole("button", { name: "Изменить примечание" }));
@@ -134,10 +141,27 @@ describe("Лента примечаний", () => {
         onEditNote={vi.fn()}
         onDeleteEntry={vi.fn()}
         authorInitials="М"
+        currentUserId={7}
       />,
     );
 
     expect(screen.getAllByRole("button", { name: "Изменить примечание" })).toHaveLength(1);
+    expect(screen.getAllByRole("button", { name: "Удалить запись" })).toHaveLength(1);
+  });
+
+  it("не показывает правку чужого примечания (Б-11)", () => {
+    renderWithProviders(
+      <Chatter
+        timeline={[{ ...TIMELINE[0], author_id: 8 }]}
+        onEditNote={vi.fn()}
+        onDeleteEntry={vi.fn()}
+        authorInitials="М"
+        currentUserId={7}
+      />,
+    );
+
+    // Удалить запись можно, а править чужой текст — нет.
+    expect(screen.queryByRole("button", { name: "Изменить примечание" })).toBeNull();
     expect(screen.getAllByRole("button", { name: "Удалить запись" })).toHaveLength(1);
   });
 

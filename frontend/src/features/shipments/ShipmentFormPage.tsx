@@ -577,6 +577,7 @@ function ShipmentForm({ id }: { id?: string }) {
       onPreview={(file) => setPreview(file)}
       onEditNote={(entryId, body) => editNote.mutate({ entryId, body })}
       onDeleteEntry={(entry) => deleteEntry.mutate(Number(entry.id))}
+      currentUserId={currentUser?.id}
     />
   ) : undefined;
 

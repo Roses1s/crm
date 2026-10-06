@@ -205,6 +205,9 @@ class TimelineEntryRead(ORMModel):
     type: EntryType
     author_name: str
     author_initials: str
+    # Кто написал запись: по этому номеру фронтенд прячет кнопку правки
+    # у чужих примечаний (менять их может только автор — ревью, Б-11).
+    author_id: int | None
     body: str
     field_label: str | None
     old_value: str | None

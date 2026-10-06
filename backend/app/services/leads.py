@@ -410,6 +410,12 @@ async def update_timeline_entry(
     entry = await _get_entry_or_404(session, lead_id, entry_id)
     if entry.type is not EntryType.note:
         raise AppError("Изменять можно только примечания", code="not_editable")
+    # Править примечание может только его автор: строка в ленте подписана
+    # именем автора, и переписанный чужой текст выглядел бы как слова автора.
+    # Администратору тоже нельзя — при необходимости запись можно удалить
+    # и написать свою (ревью 03.10, Б-11).
+    if entry.author_id != user.id:
+        raise PermissionDeniedError("Изменить примечание может только его автор")
     entry.body = payload.body
     await session.commit()
     await session.refresh(entry)

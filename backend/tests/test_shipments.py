@@ -239,6 +239,44 @@ async def test_shipment_note_crud(auth_client: AsyncClient, seeded: dict) -> Non
     assert after.json() == []
 
 
+async def test_shipment_note_can_be_edited_only_by_author(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    """Примечание заявки правит только автор — та же защита, что у лидов (Б-11)."""
+    headers = await manager_headers(auth_client)
+    stage_id = (await auth_client.get("/api/v1/crm/stages", headers=headers)).json()[0]["id"]
+    lead_id = (
+        await auth_client.post(
+            "/api/v1/crm/leads",
+            json={"name": "ООО «Автор примечания»", "inn": "7451234565", "stage_id": stage_id},
+            headers=headers,
+        )
+    ).json()["id"]
+    shipment_id = (
+        await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id}, headers=headers)
+    ).json()["id"]
+    entry_id = (
+        await auth_client.post(
+            f"/api/v1/shipments/{shipment_id}/notes",
+            json={"body": "заметка менеджера"},
+            headers=headers,
+        )
+    ).json()["id"]
+
+    edited = await auth_client.patch(
+        f"/api/v1/shipments/{shipment_id}/timeline/{entry_id}",
+        json={"body": "исправленная заметка"},
+        headers=headers,
+    )
+    assert edited.status_code == 200
+
+    denied = await auth_client.patch(
+        f"/api/v1/shipments/{shipment_id}/timeline/{entry_id}",
+        json={"body": "правка администратора"},
+    )
+    assert denied.status_code == 403
+
+
 async def test_reassign_shipment_moves_history_and_attachments_atomically(
     auth_client: AsyncClient, seeded: dict, session
 ) -> None:

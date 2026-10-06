@@ -95,6 +95,11 @@ interface ChatterProps {
   onEditNote?: (entryId: number, body: string) => void;
   /** Удаление записи ленты (примечание или событие истории). */
   onDeleteEntry?: (entry: TimelineEntry) => void;
+  /**
+   * Номер текущего сотрудника: кнопка правки показывается только у его
+   * собственных примечаний — чужие менять может только их автор (Б-11).
+   */
+  currentUserId?: number;
 }
 
 export function Chatter({
@@ -109,6 +114,7 @@ export function Chatter({
   onPreview,
   onEditNote,
   onDeleteEntry,
+  currentUserId,
 }: ChatterProps) {
   const [text, setText] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -555,13 +561,17 @@ export function Chatter({
                   )}
                 </div>
 
-                {/* Править можно только примечание, а удалить — ещё и запись
-                    о переносе карточки между этапами (решение владельца). */}
+                {/* Править можно только своё примечание (Б-11), а удалить —
+                    любое примечание и запись о переносе карточки между
+                    этапами (решение владельца). */}
                 {editingId !== entry.id &&
                   ((entry.type === "note" && (onEditNote || onDeleteEntry)) ||
                     (entry.is_stage_change && onDeleteEntry)) && (
                     <div className="absolute right-0 top-1.5 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">
-                      {onEditNote && entry.type === "note" && (
+                      {onEditNote &&
+                        entry.type === "note" &&
+                        entry.author_id != null &&
+                        entry.author_id === currentUserId && (
                         <button
                           type="button"
                           aria-label="Изменить примечание"

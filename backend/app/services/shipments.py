@@ -300,6 +300,10 @@ async def update_entry(
     entry = await _get_entry_or_404(session, shipment_id, entry_id)
     if entry.type is not EntryType.note:
         raise AppError("Изменять можно только примечания", code="not_editable")
+    # Только автор (та же защита, что у примечаний лида — ревью 03.10, Б-11):
+    # правка чужой записи оставала бы прежнюю подпись автора.
+    if entry.author_id != user.id:
+        raise PermissionDeniedError("Изменить примечание может только его автор")
     entry.body = payload.body
     await session.commit()
     await session.refresh(entry)

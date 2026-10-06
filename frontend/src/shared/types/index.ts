@@ -105,6 +105,8 @@ export interface TimelineEntry {
   /** Заполняется бэкендом не всегда — подписи автора может не быть. */
   author_name?: string;
   author_initials?: string;
+  /** Кто написал запись: правку примечания видит только автор (Б-11). */
+  author_id?: number | null;
 }
 
 /**

@@ -394,6 +394,7 @@ function LeadForm({ id }: { id?: string }) {
       onPreview={(file) => setPreview(file)}
       onEditNote={(entryId, body) => editNote.mutate({ entryId, body })}
       onDeleteEntry={(entry) => deleteTimelineEntry.mutate(Number(entry.id))}
+      currentUserId={currentUser?.id}
     />
   ) : undefined;
 
