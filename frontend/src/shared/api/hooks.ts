@@ -76,7 +76,8 @@ const keys = {
   lead: (id: string | number) => ["lead", String(id)] as const,
   timeline: (id: string | number) => ["timeline", String(id)] as const,
   pager: (id: string | number) => ["pager", String(id)] as const,
-  shipments: (status: string, search = "") => ["shipments", status, search] as const,
+  shipments: (status: string, search = "", assignedTo: number | null = null) =>
+    ["shipments", status, search, assignedTo] as const,
   shipment: (id: string | number) => ["shipment", String(id)] as const,
   leadShipments: (id: string | number) => ["lead-shipments", String(id)] as const,
   attachments: (id: string | number) => ["attachments", String(id)] as const,
@@ -707,13 +708,15 @@ export async function downloadAttachment(attachment: Attachment): Promise<void> 
 /** Ответ списка заявок: обычная страница плюс итоги по всему фильтру. */
 type ShipmentsPageData = Page<Shipment> & { totals: ShipmentTotals };
 
-export function useShipments(status = "", search = "") {
+export function useShipments(status = "", search = "", assignedTo: number | null = null) {
   return useQuery({
-    queryKey: keys.shipments(status, search),
+    queryKey: keys.shipments(status, search, assignedTo),
     queryFn: () => {
       const params = new URLSearchParams({ page_size: String(LIST_LIMIT) });
       if (status) params.set("status", status);
       if (search) params.set("search", search);
+      // Отбор «заявки сотрудника» — админский; сервер сам проверит права.
+      if (assignedTo !== null) params.set("assigned_to", String(assignedTo));
       return api<ShipmentsPageData>(`/shipments?${params.toString()}`);
     },
     select: (page) => ({ ...toListResult(page, LIST_LIMIT), totals: page.totals }),

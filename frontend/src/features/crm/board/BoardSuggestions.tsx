@@ -6,15 +6,21 @@ import { useUsers } from "@/shared/api/hooks";
 /**
  * Подбор сотрудников по тому, что админ набрал в строке поиска.
  * Возвращает готовый выпадающий список — он показывается прямо под полем.
+ * Используется на доске лидов («открыть доску») и в списке заявок
+ * («показать заявки»), поэтому подпись действия задаётся снаружи.
  */
 export function BoardSuggestions({
   query,
-  boardUserId,
+  excludeUserId,
   onPick,
+  actionLabel = "открыть доску",
 }: {
   query: string;
-  boardUserId: number | null;
+  /** Уже выбранный сотрудник — из подсказок его убираем. */
+  excludeUserId: number | null;
   onPick: (userId: number) => void;
+  /** Текст справа в строке подсказки, например «показать заявки». */
+  actionLabel?: string;
 }) {
   const { data: users = [] } = useUsers();
   // Закрытие «крестиком» не должно возвращаться, пока не изменится запрос.
@@ -24,10 +30,10 @@ export function BoardSuggestions({
     const q = query.trim().toLowerCase();
     if (q.length < 2) return [];
     return users
-      .filter((u) => u.is_active && u.id !== boardUserId)
+      .filter((u) => u.is_active && u.id !== excludeUserId)
       .filter((u) => `${u.last_name} ${u.first_name} ${u.email}`.toLowerCase().includes(q))
       .slice(0, 5);
-  }, [users, query, boardUserId]);
+  }, [users, query, excludeUserId]);
 
   if (matches.length === 0 || dismissed === query.trim()) return null;
 
@@ -55,7 +61,7 @@ export function BoardSuggestions({
           <span className="min-w-0 flex-1 truncate">
             {`${u.last_name} ${u.first_name}`.trim() || u.email}
           </span>
-          <span className="shrink-0 text-[11px] text-odoo-text-muted">открыть доску</span>
+          <span className="shrink-0 text-[11px] text-odoo-text-muted">{actionLabel}</span>
         </button>
       ))}
     </div>

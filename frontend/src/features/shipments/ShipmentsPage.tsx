@@ -2,8 +2,10 @@ import { useEffect, useState } from "react";
 import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { AppShell, ControlPanel } from "@/app/layout/AppShell";
+import { BoardSuggestions } from "@/features/crm/board/BoardSuggestions";
 import { ListLimitNotice } from "@/shared/ui/list-limit-notice";
-import { useShipments } from "@/shared/api/hooks";
+import { useMe, useShipments } from "@/shared/api/hooks";
+import { EmployeeBanner } from "./employee-banner";
 import { formatShipmentDate, SHIPMENT_STATUS } from "./shipment-status";
 import { formatMoney } from "./money";
 
@@ -22,7 +24,15 @@ export function ShipmentsPage() {
   const status = params.get("status") ?? "";
   const search = params.get("search") ?? "";
   const [searchInput, setSearchInput] = useState(search);
-  const { data: shipmentsPage, isLoading } = useShipments(status, search);
+  const { data: me } = useMe();
+  const isAdmin = me?.role === "admin";
+  // Админ может оставить в списке заявки одного сотрудника: его номер живёт
+  // в адресе (?employee=N), ссылку можно переслать. Менеджеру отбор не
+  // показываем — сервер на такой запрос всё равно ответит 403.
+  const employeeParam = Number(params.get("employee"));
+  const employeeId =
+    isAdmin && Number.isInteger(employeeParam) && employeeParam > 0 ? employeeParam : null;
+  const { data: shipmentsPage, isLoading } = useShipments(status, search, employeeId);
   const shipments = shipmentsPage?.items ?? [];
   const totals = shipmentsPage?.totals;
 
@@ -46,16 +56,19 @@ export function ShipmentsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchInput]);
 
+  /** Меняет один параметр адреса, не трогая остальные. */
+  function setFilter(key: string, value: string) {
+    const next = new URLSearchParams(params);
+    if (value) next.set(key, value);
+    else next.delete(key);
+    setParams(next);
+  }
+
   const statusFilter = (
     <select
       className="h-8 rounded-[3px] border border-odoo-border bg-odoo-surface-sunken px-2 text-[13px] text-odoo-text-muted outline-none transition-colors hover:border-odoo-border focus:border-odoo-focus/40"
       value={status}
-      onChange={(e) => {
-        const next = new URLSearchParams(params);
-        if (e.target.value) next.set("status", e.target.value);
-        else next.delete("status");
-        setParams(next);
-      }}
+      onChange={(e) => setFilter("status", e.target.value)}
     >
       <option value="">Все статусы</option>
       {Object.entries(SHIPMENT_STATUS).map(([k, v]) => (
@@ -74,9 +87,28 @@ export function ShipmentsPage() {
         count={shipmentsPage?.total ?? 0}
         search={searchInput}
         onSearch={setSearchInput}
+        searchSuggestions={
+          isAdmin ? (
+            <BoardSuggestions
+              query={searchInput}
+              excludeUserId={employeeId}
+              actionLabel="показать заявки"
+              onPick={(userId) => {
+                // Строку поиска очищаем: фамилия была нужна только чтобы
+                // выбрать сотрудника из подсказок.
+                setSearchInput("");
+                setFilter("employee", String(userId));
+              }}
+            />
+          ) : undefined
+        }
       />
 
       <ListLimitNotice data={shipmentsPage} noun="заявок" />
+
+      {employeeId !== null && (
+        <EmployeeBanner userId={employeeId} onLeave={() => setFilter("employee", "")} />
+      )}
 
       <div className="flex-1 overflow-auto">
         <table className="w-full border-collapse text-[13px]">

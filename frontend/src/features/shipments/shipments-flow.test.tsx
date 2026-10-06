@@ -24,6 +24,26 @@ const ME = {
   is_active: true,
 };
 
+const ADMIN = {
+  id: 99,
+  email: "admin@crmdetroid.ru",
+  first_name: "Анна",
+  last_name: "Смирнова",
+  role: "admin" as const,
+  is_active: true,
+};
+
+const USERS = [
+  {
+    id: 2,
+    email: "kuznetsov@crmdetroid.ru",
+    first_name: "Денис",
+    last_name: "Кузнецов",
+    role: "manager" as const,
+    is_active: true,
+  },
+];
+
 const SHIPMENTS = [
   {
     id: 101,
@@ -149,6 +169,9 @@ describe("Сценарий: список заявок", () => {
     const before = server.calls.filter((call) => call.url.includes("/shipments")).length;
     await user.type(screen.getByPlaceholderText(/Поиск/i), "Ромашка");
 
+    // Менеджеру подсказки о сотрудниках не показываются — отбор админский.
+    expect(screen.queryByText("Сотрудники")).not.toBeInTheDocument();
+
     // Сразу после ввода новый запрос ещё не ушёл — это и есть дебаунс.
     expect(server.calls.filter((call) => call.url.includes("/shipments")).length).toBe(before);
 
@@ -183,5 +206,41 @@ describe("Сценарий: список заявок", () => {
     );
 
     expect(await screen.findByRole("status")).toHaveTextContent(/Показаны первые 1 заявок из 240/);
+  });
+
+  it("админ находит заявки сотрудника через общий поиск", async () => {
+    setAccessToken("токен");
+    server = startFakeApi([
+      { path: "/auth/me", response: ADMIN },
+      { path: "/admin/users", response: USERS },
+      { path: "/shipments", response: { ...page(SHIPMENTS), totals: TOTALS } },
+    ]);
+
+    const user = userEvent.setup();
+    renderWithProviders(<ShipmentsPage />, { route: "/shipments" });
+    await screen.findByText("ООО Ромашка", undefined, { timeout: 5000 });
+
+    // Набираем фамилию — под полем поиска появляются подсказки, как на доске.
+    await user.type(screen.getByPlaceholderText(/Поиск/i), "Кузнецов");
+    const suggestion = await screen.findByRole("button", { name: /Кузнецов Денис/ });
+    expect(suggestion).toBeVisible();
+
+    // Клик — список перезагружается заявками сотрудника, поиск очищается.
+    await user.click(suggestion);
+    await waitFor(
+      () => expect(server?.calls.some((call) => call.url.includes("assigned_to=2"))).toBe(true),
+      { timeout: 3000 },
+    );
+    expect(await screen.findByText(/Заявки сотрудника: Кузнецов Денис/)).toBeVisible();
+    expect((screen.getByPlaceholderText(/Поиск/i) as HTMLInputElement).value).toBe("");
+
+    // «Показать все» снимает отбор сотрудника.
+    await user.click(screen.getByRole("button", { name: /показать все/ }));
+    await waitFor(() => {
+      const calls = server?.calls.filter((call) => call.url.includes("/shipments")) ?? [];
+      const last = calls[calls.length - 1];
+      expect(last && !last.url.includes("assigned_to=")).toBe(true);
+    });
+    expect(screen.queryByText(/Заявки сотрудника/)).not.toBeInTheDocument();
   });
 });

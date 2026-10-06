@@ -245,7 +245,7 @@ export function KanbanPage() {
           isAdmin ? (
             <BoardSuggestions
               query={searchInput}
-              boardUserId={boardUserId}
+              excludeUserId={boardUserId}
               onPick={(userId) => {
                 // Строку поиска очищаем: на чужой доске отбор по фамилии
                 // сотрудника не нужен.

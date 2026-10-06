@@ -29,14 +29,14 @@ vi.mock("@/shared/api/hooks", () => ({ useUsers: () => ({ data: USERS }) }));
 
 describe("Доски сотрудников", () => {
   it("молчит, пока в поиске меньше двух букв", () => {
-    renderWithProviders(<BoardSuggestions query="К" boardUserId={null} onPick={vi.fn()} />);
+    renderWithProviders(<BoardSuggestions query="К" excludeUserId={null} onPick={vi.fn()} />);
     expect(screen.queryByText("Сотрудники")).not.toBeInTheDocument();
   });
 
   it("предлагает сотрудника по фамилии и отдаёт его номер", async () => {
     const user = userEvent.setup();
     const onPick = vi.fn();
-    renderWithProviders(<BoardSuggestions query="кузн" boardUserId={null} onPick={onPick} />);
+    renderWithProviders(<BoardSuggestions query="кузн" excludeUserId={null} onPick={onPick} />);
 
     expect(screen.queryByText("Петрова Ольга")).not.toBeInTheDocument();
     await user.click(screen.getByText("Кузнецов Денис"));
