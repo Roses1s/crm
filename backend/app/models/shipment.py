@@ -12,6 +12,7 @@ from sqlalchemy import (
     Date,
     Enum,
     ForeignKey,
+    Index,
     Numeric,
     String,
     Table,
@@ -73,6 +74,15 @@ _TAX_RATE_PERCENT: dict[TaxRate, Decimal] = {
 }
 
 
+def net_divisor(tax: TaxRate) -> Decimal:
+    """На что делить цену с НДС, чтобы получить цену без НДС: 1 + ставка/100.
+
+    Публичная, потому что нужна и в Python (``net_amount``), и в SQL-выражении
+    итогов списка заявок (``services/shipments.py``) — делитель один и тот же.
+    """
+    return Decimal(1) + _TAX_RATE_PERCENT[tax] / Decimal(100)
+
+
 def net_amount(price: Decimal | None, tax: TaxRate) -> Decimal | None:
     """Цена без НДС: price / (1 + ставка/100).
 
@@ -84,7 +94,7 @@ def net_amount(price: Decimal | None, tax: TaxRate) -> Decimal | None:
     rate = _TAX_RATE_PERCENT[tax]
     if rate == 0:
         return price
-    return price / (Decimal(1) + rate / Decimal(100))
+    return price / net_divisor(tax)
 
 
 def visible_margin(
@@ -116,7 +126,11 @@ class Shipment(Base, TimestampMixin):
     # Составной ключ нужен дочерним строкам заявки: timeline/attachments
     # обязаны ссылаться не просто на существующую заявку, а на ту же пару
     # «заявка + лид». Так БД сама не допускает рассинхронизацию lead_id.
-    __table_args__ = (UniqueConstraint("id", "lead_id", name="uq_shipments_id_lead_id"),)
+    # Индекс под сортировку списка (created_at DESC) — см. М-03 ревью 06.10.
+    __table_args__ = (
+        UniqueConstraint("id", "lead_id", name="uq_shipments_id_lead_id"),
+        Index("ix_shipments_created_at", "created_at"),
+    )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     # Номер заявки — видимый пользователю идентификатор, который можно

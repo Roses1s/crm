@@ -7,6 +7,7 @@ from sqlalchemy import (
     CheckConstraint,
     Column,
     ForeignKey,
+    Index,
     Integer,
     String,
     Table,
@@ -78,9 +79,11 @@ class Lead(Base, TimestampMixin):
     """Лид — карточка потенциального клиента."""
 
     __tablename__ = "leads"
+    # Индекс под сортировку списков (updated_at DESC) — см. М-03 ревью 06.10.
     __table_args__ = (
         CheckConstraint("priority BETWEEN 0 AND 3", name="priority_range"),
         CheckConstraint("length(inn) IN (10, 12)", name="inn_length"),
+        Index("ix_leads_updated_at", "updated_at"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)

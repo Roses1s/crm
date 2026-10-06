@@ -588,6 +588,42 @@ async def test_shipments_list_margin_and_totals(auth_client: AsyncClient, seeded
     assert Decimal(empty["totals"]["margin"]) == Decimal("0.00")
 
 
+async def test_shipments_totals_match_row_margins(auth_client: AsyncClient, seeded: dict) -> None:
+    """Итоги считаются в SQL (Б-26), но обязаны сходиться со значениями в
+    строках до копейки при любых ставках НДС — в том числе НДС 0% и без НДС."""
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+
+    cases = [
+        ("10000", "vat_22", "5000", "no_vat"),
+        ("1000.05", "vat_0", "333.35", "no_vat"),
+        ("500", "no_vat", "122.00", "vat_22"),
+    ]
+    for customer_price, customer_tax, carrier_price, carrier_tax in cases:
+        await auth_client.post(
+            "/api/v1/shipments",
+            json={
+                "lead_id": lead_id,
+                "customer_price": customer_price,
+                "customer_tax": customer_tax,
+                "carrier_price": carrier_price,
+                "carrier_tax": carrier_tax,
+            },
+        )
+
+    page = (await auth_client.get("/api/v1/shipments?page_size=3")).json()
+    rows_margin = sum(
+        (Decimal(row["margin"]) for row in page["results"] if row["margin"] is not None),
+        Decimal("0"),
+    )
+    rows_total = sum(
+        (Decimal(row["customer_total"]) for row in page["results"] if row["customer_total"]),
+        Decimal("0"),
+    )
+
+    assert Decimal(page["totals"]["margin"]) == rows_margin
+    assert Decimal(page["totals"]["customer_total"]) == rows_total
+
+
 async def test_shipments_filter_by_employee(auth_client: AsyncClient, seeded: dict) -> None:
     """Фильтр «заявки сотрудника» — инструмент администратора.
 

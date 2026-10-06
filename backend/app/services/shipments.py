@@ -5,15 +5,21 @@ from __future__ import annotations
 from decimal import Decimal
 from typing import Any
 
-from sqlalchemy import or_, select, update
+from sqlalchemy import Numeric, case, func, literal, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import selectinload
+from sqlalchemy.orm import noload, selectinload
 
 from app.core.errors import AppError, NotFoundError, PermissionDeniedError
 from app.core.logging import get_logger
 from app.core.pagination import PageParams, build_page, paginate
 from app.models.crm import Lead
-from app.models.shipment import Shipment, ShipmentStatus, visible_margin
+from app.models.shipment import (
+    MARGIN_DEDUCTION_RATE,
+    Shipment,
+    ShipmentStatus,
+    TaxRate,
+    net_divisor,
+)
 from app.models.timeline import SHIPMENT_STAGE_LABEL, Attachment, EntryType, TimelineEntry
 from app.models.user import Role, User
 from app.schemas.crm import NoteCreate, NoteUpdate
@@ -94,29 +100,52 @@ async def _filter_totals(session: AsyncSession, stmt: Any) -> dict[str, Decimal]
 
     Список отдаёт первую страницу записей, а строка итогов внизу таблицы
     обязана показывать сумму по всему результату — иначе при числе заявок
-    больше размера страницы итог занижался бы молча. Считаем теми же
-    функциями, что и значения в колонках, чтобы сумма сходилась с видимыми
-    числами до копейки.
+    больше размера страницы итог занижался бы молча.
+
+    Считает база одним агрегатным запросом (SUM + CASE, Б-26 ревью 06.10):
+    раньше все строки фильтра выгружались в Python и суммировались циклом —
+    каждая открытая страница списка стоила O(N) памяти и времени. Формула в
+    CASE повторяет ``visible_margin`` до копейки: цена без НДС — деление на
+    точную ставку, у каждой строки округление до копеек, NULL-цены дают
+    NULL-маржу и в сумму не попадают.
     """
-    rows = (
+
+    def net_price(price: Any, tax_col: Any) -> Any:
+        # CASE подставляет делитель «1 + ставка/100» по значению ставки —
+        # как net_divisor() в Python, те же константы.
+        return price / case(
+            *((tax_col == rate.value, literal(net_divisor(rate), Numeric)) for rate in TaxRate)
+        )
+
+    margin_expr = func.round(
+        (
+            net_price(Shipment.customer_price, Shipment.customer_tax)
+            - net_price(Shipment.carrier_price, Shipment.carrier_tax)
+        )
+        * (Decimal(1) - MARGIN_DEDUCTION_RATE),
+        2,
+    )
+    row = (
         await session.execute(
             stmt.with_only_columns(
-                Shipment.customer_price,
-                Shipment.customer_tax,
-                Shipment.carrier_price,
-                Shipment.carrier_tax,
+                # ROUND вокруг SUM — не только про копейки: в SQLite суммы
+                # идут через float, и округление убирает двоичные хвосты.
+                func.round(func.coalesce(func.sum(margin_expr), 0), 2),
+                func.round(func.coalesce(func.sum(Shipment.customer_price), 0), 2),
             ).order_by(None)
         )
-    ).all()
-    margin_sum = Decimal("0.00")
-    customer_sum = Decimal("0.00")
-    for row in rows:
-        margin = visible_margin(row[0], row[1], row[2], row[3])
-        if margin is not None:
-            margin_sum += margin
-        if row[0] is not None:
-            customer_sum += row[0]
-    return {"margin": margin_sum, "customer_total": customer_sum}
+    ).one()
+    return {
+        "margin": _coerce_decimal(row[0]),
+        "customer_total": _coerce_decimal(row[1]),
+    }
+
+
+def _coerce_decimal(value: Any) -> Decimal:
+    """SQLite (тесты) возвращает суммы как float — Decimal без двоичных хвостов."""
+    if isinstance(value, Decimal):
+        return value
+    return Decimal(str(value))
 
 
 async def list_shipments(
@@ -150,7 +179,19 @@ async def list_shipments(
                 Shipment.carrier_name.ilike(pattern, escape=LIKE_ESCAPE),
             )
         )
-    items, total = await paginate(session, stmt, params)
+    items, total = await paginate(
+        session,
+        # В таблице списка из связей лида нужны только название и продавец:
+        # этап, причина проигрыша и теги лида не показываются — не тянем их
+        # в каждый запрос страницы (Б-23 ревью 06.10). Теги самой заявки
+        # остаются в ответе, поэтому их не трогаем.
+        stmt.options(
+            noload(Shipment.lead).noload(Lead.stage),
+            noload(Shipment.lead).noload(Lead.loss_reason),
+            noload(Shipment.lead).noload(Lead.tags),
+        ),
+        params,
+    )
     page = build_page(items, total, params)
     # Итоги «Итого» — по всему фильтру, а не только по открытой странице.
     page["totals"] = await _filter_totals(session, stmt)
