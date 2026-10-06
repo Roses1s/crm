@@ -222,7 +222,7 @@ async def test_scan_backups_orders_by_freshness(
     monkeypatch: pytest.MonkeyPatch, tmp_path: Path
 ) -> None:
     """Список копий: свежие сверху, размер и время берутся одним stat (И-10)."""
-    from app.api.v1.admin import _scan_backups
+    from app.services.admin import scan_backups as _scan_backups
 
     old = tmp_path / "crm-2026-10-01.dump"
     new = tmp_path / "crm-2026-10-06.dump"
