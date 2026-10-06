@@ -1,6 +1,8 @@
 import { Trash2 } from "lucide-react";
 import { useState } from "react";
 
+import { Modal } from "@/shared/ui/modal";
+
 import { useBackups, useDeleteBackup, useLoginAttempts, useRunBackup } from "@/shared/api/hooks";
 import { Button } from "@/shared/ui/button";
 import { formatSize } from "@/shared/ui/file-preview-utils";
@@ -131,8 +133,8 @@ export function SecurityPage() {
       </div>
 
       {pendingDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-odoo-overlay/30 p-4">
-          <div className="w-full max-w-md rounded-lg bg-odoo-surface p-4 shadow-lg">
+        <Modal label="Удаление резервной копии" onClose={() => setPendingDelete(null)}>
+          <div>
             <h3 className="text-[15px] font-semibold text-odoo-text">Удалить резервную копию?</h3>
             <p className="mt-2 text-[13px] leading-relaxed text-odoo-text-muted">
               Файл «{pendingDelete}» будет удалён с сервера безвозвратно. Новые копии ночная задача
@@ -161,7 +163,7 @@ export function SecurityPage() {
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
     </div>
   );

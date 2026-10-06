@@ -2,6 +2,7 @@ import { Search } from "lucide-react";
 import { useMemo, useState } from "react";
 
 import { useColleagues, type Colleague } from "@/shared/api/hooks";
+import { Modal } from "@/shared/ui/modal";
 
 /**
  * Передача лида другому продавцу.
@@ -37,8 +38,8 @@ export function TransferDialog({
   }, [colleagues, query]);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-odoo-overlay/30 p-4">
-      <div className="w-full max-w-md rounded-lg bg-odoo-surface p-4 shadow-lg">
+    <Modal label="Передача лида" onClose={onCancel}>
+      <div>
         {chosen ? (
           <>
             <h3 className="text-[15px] font-semibold text-odoo-text">Передать лид?</h3>
@@ -117,6 +118,6 @@ export function TransferDialog({
           </>
         )}
       </div>
-    </div>
+    </Modal>
   );
 }

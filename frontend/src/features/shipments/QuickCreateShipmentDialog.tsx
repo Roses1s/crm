@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { Modal } from "@/shared/ui/modal";
+
 import { ApiError } from "@/shared/api/client";
 import { useSaveShipment } from "@/shared/api/hooks";
 import { TokenField } from "./TokenField";
@@ -73,9 +75,9 @@ export function QuickCreateShipmentDialog({
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-odoo-overlay/30 p-4">
+    <Modal label="Новая заявка" onClose={onClose}>
       <form
-        className="w-full max-w-md rounded-lg bg-odoo-surface p-4 shadow-lg"
+        className="w-full"
         onSubmit={(e) => {
           e.preventDefault();
           submit();
@@ -201,6 +203,6 @@ export function QuickCreateShipmentDialog({
           </button>
         </div>
       </form>
-    </div>
+    </Modal>
   );
 }

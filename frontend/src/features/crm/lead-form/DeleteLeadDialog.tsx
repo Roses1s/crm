@@ -6,6 +6,8 @@
  * заявки, переписка и файлы. Поэтому отдельное окно в стиле CRM с явным
  * предупреждением и кнопкой, окрашенной как опасное действие.
  */
+import { Modal } from "@/shared/ui/modal";
+
 export function DeleteLeadDialog({
   leadName,
   pending,
@@ -20,8 +22,8 @@ export function DeleteLeadDialog({
   onConfirm: () => void;
 }) {
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-odoo-overlay/30 p-4">
-      <div className="w-full max-w-md rounded-lg bg-odoo-surface p-4 shadow-lg">
+    <Modal label="Удаление лида" onClose={onCancel}>
+      <div>
         <h3 className="text-[15px] font-semibold text-odoo-text">Удалить лид без возврата?</h3>
         <p className="mt-2 text-[13px] leading-relaxed text-odoo-text-muted">
           Карточка «{leadName}», её заявки, документы и переписка будут удалены навсегда.
@@ -46,6 +48,6 @@ export function DeleteLeadDialog({
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

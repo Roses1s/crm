@@ -4,6 +4,8 @@ import { CSS } from "@dnd-kit/utilities";
 import { MoreHorizontal } from "lucide-react";
 import { useCallback, useState } from "react";
 
+import { Modal } from "@/shared/ui/modal";
+
 import { useDeleteStage, useUpdateStage } from "@/shared/api/hooks";
 import type { Lead, Stage } from "@/shared/types";
 import { LeadCard } from "./LeadCard";
@@ -215,8 +217,12 @@ export function Column({
         </div>
       </div>
       {confirmDelete && (
-        <div className="fixed inset-0 z-50 flex items-center justify-center bg-odoo-overlay/30 p-4">
-          <div className="w-full max-w-sm rounded-lg bg-odoo-surface p-4 shadow-lg">
+        <Modal
+          label="Удаление этапа"
+          onClose={() => setConfirmDelete(false)}
+          panelClassName="w-full max-w-sm"
+        >
+          <div>
             <h3 className="text-[15px] font-semibold text-odoo-text">
               Удалить этап «{stage.name}»?
             </h3>
@@ -271,7 +277,7 @@ export function Column({
               </button>
             </div>
           </div>
-        </div>
+        </Modal>
       )}
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain [scrollbar-gutter:stable]">

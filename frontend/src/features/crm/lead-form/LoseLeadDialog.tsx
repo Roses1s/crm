@@ -1,6 +1,7 @@
 import { useState } from "react";
 
 import { useLossReasons } from "@/shared/api/hooks";
+import { Modal } from "@/shared/ui/modal";
 
 /**
  * Отметить лид проигранным — причина обязательна.
@@ -26,8 +27,8 @@ export function LoseLeadDialog({
   const [chosen, setChosen] = useState<number | null>(null);
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-odoo-overlay/30 p-4">
-      <div className="w-full max-w-md rounded-lg bg-odoo-surface p-4 shadow-lg">
+    <Modal label="Отметка проигрыша" onClose={onCancel}>
+      <div>
         <h3 className="text-[15px] font-semibold text-odoo-text">Отметить проигрышем?</h3>
         <p className="mt-1 text-[13px] text-odoo-text-muted">
           Карточка «{leadName}» уйдёт с доски. Она останется в базе — любой сотрудник сможет
@@ -83,6 +84,6 @@ export function LoseLeadDialog({
           </button>
         </div>
       </div>
-    </div>
+    </Modal>
   );
 }

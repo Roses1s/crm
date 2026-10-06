@@ -1,6 +1,8 @@
 import { useState } from "react";
 import { useNavigate } from "react-router-dom";
 
+import { Modal } from "@/shared/ui/modal";
+
 import { ApiError } from "@/shared/api/client";
 import { useCreateLead, useCustomersByInn, useStages } from "@/shared/api/hooks";
 
@@ -74,9 +76,9 @@ export function QuickCreateLeadDialog({ onClose }: { onClose: () => void }) {
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-odoo-overlay/30 p-4">
+    <Modal label="Новый лид" onClose={onClose}>
       <form
-        className="w-full max-w-md rounded-lg bg-odoo-surface p-4 shadow-lg"
+        className="w-full"
         onSubmit={(e) => {
           e.preventDefault();
           submit();
@@ -170,6 +172,6 @@ export function QuickCreateLeadDialog({ onClose }: { onClose: () => void }) {
           </button>
         </div>
       </form>
-    </div>
+    </Modal>
   );
 }

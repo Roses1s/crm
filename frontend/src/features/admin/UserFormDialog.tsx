@@ -1,5 +1,7 @@
 import { useState } from "react";
 
+import { Modal } from "@/shared/ui/modal";
+
 import { useCreateUser, useUpdateUser } from "@/shared/api/hooks";
 import { ApiError } from "@/shared/api/client";
 import type { Role, User } from "@/shared/types";
@@ -93,9 +95,9 @@ export function UserFormDialog({ user, onClose }: { user?: User; onClose: () => 
   }
 
   return (
-    <div className="fixed inset-0 z-50 flex items-center justify-center bg-odoo-overlay/30 p-4">
+    <Modal label="Карточка сотрудника" onClose={onClose}>
       <form
-        className="w-full max-w-md rounded-lg bg-odoo-surface p-4 shadow-lg"
+        className="w-full"
         onSubmit={(e) => {
           e.preventDefault();
           submit();
@@ -193,6 +195,6 @@ export function UserFormDialog({ user, onClose }: { user?: User; onClose: () => 
           </Button>
         </div>
       </form>
-    </div>
+    </Modal>
   );
 }
