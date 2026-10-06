@@ -20,6 +20,8 @@
   --color-odoo-primary-hover: rgb(var(--odoo-primary-hover));
   --color-odoo-primary-soft: rgb(var(--odoo-primary-soft));
   --color-odoo-primary-soft-text: rgb(var(--odoo-primary-soft-text));
+  --color-odoo-tag: rgb(var(--odoo-tag));
+  --color-odoo-tag-text: rgb(var(--odoo-tag-text));
   --color-odoo-secondary: rgb(var(--odoo-secondary));
 
   /* Фиксированные цвета фирменного тёмного фона (экран логина). */
@@ -97,6 +99,11 @@
   --odoo-primary-soft: 234 221 231; /* #EADDE7 — светло-сиреневая «таблетка» */
   --odoo-primary-soft-text: 113 75 103; /* #714B67 — фиолетовый текст на «таблетке» */
   --odoo-secondary: 0 143 132; /* #008F84 */
+
+  /* Зелёные «таблетки» тегов (города, способ погрузки) — по образцу зелёных
+     тегов Odoo 17; отличаются от фирменного фиолетового primary-soft. */
+  --odoo-tag: 223 240 228; /* #DFF0E4 — светло-зелёный фон «таблетки» */
+  --odoo-tag-text: 30 110 64; /* #1E6E40 — тёмно-зелёный текст на «таблетке» */
 
   --odoo-bg: 247 246 248; /* #F7F6F8 */
   --odoo-surface: 255 255 255; /* #FFFFFF */
@@ -183,6 +190,10 @@
   --odoo-primary-soft: 58 43 55; /* #3A2B37 — приглушённая мовная «таблетка» */
   --odoo-primary-soft-text: 214 166 198; /* #D6A6C6 — светло-фиолетовый текст на «таблетке» */
   --odoo-secondary: 31 166 160; /* #1FA6A0 — приглушённый бирюзовый под образец Odoo */
+
+  /* Зелёные «таблетки» тегов — тёмный вариант. */
+  --odoo-tag: 37 54 44; /* #25362C — приглушённо-зелёный фон «таблетки» */
+  --odoo-tag-text: 138 204 166; /* #8ACCA6 — светло-зелёный текст на «таблетке» */
 
   --odoo-bg: 27 29 38; /* #1B1D26 — прежний тёмный фон приложения (по просьбе владельца) */
   --odoo-surface: 38 42 54; /* #262A36 — лист/панель/поле */

@@ -1,5 +1,8 @@
 // Свободные теги (чипы с крестиком) — города погрузки/выгрузки, способ погрузки.
 // Значения хранятся списком строк; ввод завершается Enter или запятой.
+// «Таблетки» зелёные (по просьбе владельца, под теги Odoo 17): цвета —
+// токены --odoo-tag/--odoo-tag-text, контейнер поля остаётся в общем стиле
+// заполненных полей карточки.
 import { X } from "lucide-react";
 import { useState } from "react";
 
@@ -33,7 +36,7 @@ export function TokenField({
       {value.map((tag) => (
         <span
           key={tag}
-          className="inline-flex max-w-[220px] items-center gap-1 rounded-full bg-odoo-primary-soft px-2 py-0.5 text-[11px] leading-[16px] text-odoo-primary-soft-text"
+          className="inline-flex max-w-[220px] items-center gap-1 rounded-full bg-odoo-tag px-2 py-0.5 text-[11px] leading-[16px] text-odoo-tag-text"
         >
           <span className="truncate" title={tag}>
             {tag}
