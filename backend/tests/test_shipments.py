@@ -2,6 +2,8 @@
 
 from __future__ import annotations
 
+from decimal import Decimal
+
 from httpx import AsyncClient
 
 from tests.conftest import TEST_PASSWORD
@@ -477,3 +479,75 @@ async def test_colleague_can_view_but_not_change_shipment_of_lost_lead(
         f"/api/v1/shipments/{shipment['id']}/status", json={"status": "checked"}, headers=headers
     )
     assert changed.status_code == 404
+
+
+async def test_shipments_list_margin_and_totals(auth_client: AsyncClient, seeded: dict) -> None:
+    """Колонки «Маржа» и «Всего»: сервер считает значения в каждой строке и
+    итоги по всему фильтру — не только по открытой странице списка."""
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+
+    # Заказчик 244 000 с НДС 22% (без НДС — 200 000), перевозчик 100 000 без
+    # НДС: маржа = (200 000 − 100 000) × 0,75 = 75 000.
+    first = (
+        await auth_client.post(
+            "/api/v1/shipments",
+            json={
+                "lead_id": lead_id,
+                "customer_price": "244000",
+                "customer_tax": "vat_22",
+                "carrier_price": "100000",
+                "carrier_tax": "no_vat",
+            },
+        )
+    ).json()
+
+    # Заказчик 122 000 с НДС 22% (без НДС — 100 000), перевозчик 80 000 без
+    # НДС: маржа = 15 000.
+    second = (
+        await auth_client.post(
+            "/api/v1/shipments",
+            json={
+                "lead_id": lead_id,
+                "customer_price": "122000",
+                "customer_tax": "vat_22",
+                "carrier_price": "80000",
+                "carrier_tax": "no_vat",
+            },
+        )
+    ).json()
+
+    # Третья заявка без цен: в колонках прочерк, в итоги не входит.
+    unpriced = (await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})).json()
+
+    page = (await auth_client.get("/api/v1/shipments")).json()
+    by_id = {item["id"]: item for item in page["results"]}
+    assert Decimal(by_id[first["id"]]["margin"]) == Decimal("75000.00")
+    assert Decimal(by_id[first["id"]]["customer_total"]) == Decimal("244000.00")
+    assert Decimal(by_id[first["id"]]["customer_total_net"]) == Decimal("200000.00")
+    assert by_id[unpriced["id"]]["margin"] is None
+    assert by_id[unpriced["id"]]["customer_total"] is None
+    assert by_id[unpriced["id"]]["customer_total_net"] is None
+
+    # Итоги: 75 000 + 15 000 = 90 000 маржи; 366 000 и 300 000 заказчику.
+    totals = page["totals"]
+    assert Decimal(totals["margin"]) == Decimal("90000.00")
+    assert Decimal(totals["customer_total"]) == Decimal("366000.00")
+    assert Decimal(totals["customer_total_net"]) == Decimal("300000.00")
+
+    # Итоги честны при маленькой странице: в results одна заявка, в totals — все.
+    paged = (await auth_client.get("/api/v1/shipments?page_size=1")).json()
+    assert len(paged["results"]) == 1
+    assert Decimal(paged["totals"]["margin"]) == Decimal("90000.00")
+
+    # Итоги следуют фильтру, а не смешивают все заявки подряд.
+    await auth_client.patch(
+        f"/api/v1/shipments/{second['id']}", json={"carrier_name": "Итог-Перевозчик"}
+    )
+    filtered = (await auth_client.get("/api/v1/shipments?search=Итог-Перевозчик")).json()
+    assert filtered["count"] == 1
+    assert Decimal(filtered["totals"]["margin"]) == Decimal("15000.00")
+    assert Decimal(filtered["totals"]["customer_total"]) == Decimal("122000.00")
+
+    empty = (await auth_client.get("/api/v1/shipments?search=несуществующий-текст")).json()
+    assert empty["count"] == 0
+    assert Decimal(empty["totals"]["margin"]) == Decimal("0.00")

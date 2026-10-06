@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import enum
 from datetime import date
-from decimal import Decimal
+from decimal import ROUND_HALF_UP, Decimal
 from typing import TYPE_CHECKING
 
 from sqlalchemy import (
@@ -57,6 +57,52 @@ class TaxRate(enum.StrEnum):
     vat_22 = "vat_22"  # НДС 22%
     no_vat = "no_vat"  # Без НДС
     vat_0 = "vat_0"  # НДС 0%
+
+
+# Маржа «видимого» значения урезана на фиксированную долю — решение владельца
+# (доп. расходы/комиссия, не связанные с НДС). Копия константы живёт на
+# фронтенде (MARGIN_DEDUCTION_RATE в ShipmentFormPage.tsx) для живого
+# пересчёта в карточке — менять только в обоих местах сразу.
+MARGIN_DEDUCTION_RATE = Decimal("0.25")
+
+# Проценты действующих ставок НДС.
+_TAX_RATE_PERCENT: dict[TaxRate, Decimal] = {
+    TaxRate.vat_22: Decimal("22"),
+    TaxRate.no_vat: Decimal("0"),
+    TaxRate.vat_0: Decimal("0"),
+}
+
+
+def net_amount(price: Decimal | None, tax: TaxRate) -> Decimal | None:
+    """Цена без НДС: price / (1 + ставка/100).
+
+    Промежуточных округлений нет — до копеек округляется только итог
+    (margin и customer_total_net), как в живом расчёте карточки.
+    """
+    if price is None:
+        return None
+    rate = _TAX_RATE_PERCENT[tax]
+    if rate == 0:
+        return price
+    return price / (Decimal(1) + rate / Decimal(100))
+
+
+def visible_margin(
+    customer_price: Decimal | None,
+    customer_tax: TaxRate,
+    carrier_price: Decimal | None,
+    carrier_tax: TaxRate,
+) -> Decimal | None:
+    """Маржа для показа: разница цен без НДС за вычетом фиксированной доли.
+
+    Нет любой из цен — маржи нет (в списке покажем прочерк).
+    """
+    customer_net = net_amount(customer_price, customer_tax)
+    carrier_net = net_amount(carrier_price, carrier_tax)
+    if customer_net is None or carrier_net is None:
+        return None
+    exact = (customer_net - carrier_net) * (Decimal(1) - MARGIN_DEDUCTION_RATE)
+    return exact.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
 
 
 def _enum(kind: type[enum.Enum]) -> Enum:
@@ -175,3 +221,24 @@ class Shipment(Base, TimestampMixin):
         if start and end:
             return f"{start} → {end}"
         return start or end or "—"
+
+    # --- Расчёты для списка: колонки «Маржа» и «Всего» считает сервер,
+    # чтобы фронтенд не дублировал формулу (единый источник правды). ---
+    @property
+    def margin(self) -> Decimal | None:
+        return visible_margin(
+            self.customer_price, self.customer_tax, self.carrier_price, self.carrier_tax
+        )
+
+    @property
+    def customer_total(self) -> Decimal | None:
+        """Цена заказчика как введена — с НДС (верхнее число колонки «Всего»)."""
+        return self.customer_price
+
+    @property
+    def customer_total_net(self) -> Decimal | None:
+        """Цена заказчика без НДС (нижнее число колонки «Всего»)."""
+        net = net_amount(self.customer_price, self.customer_tax)
+        if net is None:
+            return None
+        return net.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)

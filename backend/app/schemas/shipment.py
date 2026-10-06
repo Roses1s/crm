@@ -6,6 +6,7 @@ from typing import ClassVar
 
 from pydantic import BaseModel, Field, field_validator
 
+from app.core.pagination import Page
 from app.models.shipment import ShipmentStatus, TaxRate, TransportType
 from app.schemas.common import ORMModel, PatchModel
 from app.schemas.crm import TagRead
@@ -257,3 +258,26 @@ class ShipmentListItem(ORMModel):
     route: str
     carrier_name: str
     created_at: datetime
+    # Колонки «Маржа» и «Всего» — расчёт на стороне сервера (models/shipment.py):
+    # формула живёт в одном месте, а не дублируется на фронтенде.
+    margin: Decimal | None
+    customer_total: Decimal | None  # цена заказчика как введена (с НДС)
+    customer_total_net: Decimal | None  # цена заказчика без НДС
+
+
+class ShipmentTotals(BaseModel):
+    """Итоги для строки «Итого» внизу таблицы заявок.
+
+    Считаются по всем заявкам, подходящим под фильтр, а не только по текущей
+    странице: список показывает первые N записей, а итоги обязаны быть честными.
+    """
+
+    margin: Decimal
+    customer_total: Decimal
+    customer_total_net: Decimal
+
+
+class ShipmentPage(Page[ShipmentListItem]):
+    """Страница списка заявок с итогами по всему фильтру."""
+
+    totals: ShipmentTotals

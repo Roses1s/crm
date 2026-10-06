@@ -10,13 +10,14 @@ from typing import Annotated, Any
 from fastapi import APIRouter, Depends, Query, status
 
 from app.api.deps import CurrentUser, SessionDep
-from app.core.pagination import Page, PageParams, page_params
+from app.core.pagination import PageParams, page_params
 from app.models.shipment import Shipment, ShipmentStatus
 from app.models.timeline import TimelineEntry
 from app.schemas.crm import NoteCreate, NoteUpdate, TimelineEntryRead
 from app.schemas.shipment import (
     ShipmentCreate,
     ShipmentListItem,
+    ShipmentPage,
     ShipmentRead,
     ShipmentStatusUpdate,
     ShipmentUpdate,
@@ -29,7 +30,7 @@ router = APIRouter(tags=["заявки"])
 PageParamsDep = Annotated[PageParams, Depends(page_params)]
 
 
-@router.get("/shipments", response_model=Page[ShipmentListItem], summary="Список заявок")
+@router.get("/shipments", response_model=ShipmentPage, summary="Список заявок")
 async def list_shipments(
     session: SessionDep,
     user: CurrentUser,
