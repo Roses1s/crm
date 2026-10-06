@@ -524,6 +524,9 @@ function LeadForm({ id }: { id?: string }) {
             current={form.stage_id}
             disabled={saving || readOnly}
             onSelect={selectStage}
+            // Шесть этапов показываем сразу; «…» остаётся для большего
+            // количества (его меню чинится в этом же коммите).
+            visibleCount={6}
             left={
               !isNew ? (
                 <>

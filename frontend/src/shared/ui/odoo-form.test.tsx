@@ -69,7 +69,14 @@ describe("Статусбар карточки", () => {
 
     expect(screen.getByRole("button", { name: "Этап 4" })).toHaveAttribute("aria-current", "step");
     fireEvent.click(screen.getByRole("button", { name: "Предыдущие этапы" }));
-    fireEvent.click(screen.getByRole("button", { name: "Этап 1" }));
+
+    // Регрессия: меню должно жить ВНЕ полосы с прокруткой — внутри неё оно
+    // обрезается невидимой границей, и в браузере клик по «…» выглядел как
+    // «ничего не происходит» (в jsdom layout нет, тест раньше этого не видел).
+    const hiddenStage = screen.getByRole("button", { name: "Этап 1" });
+    expect(hiddenStage.closest(".overflow-x-auto")).toBeNull();
+
+    fireEvent.click(hiddenStage);
     expect(onSelect).toHaveBeenCalledWith(1);
 
     fireEvent.click(screen.getByRole("button", { name: "Следующие этапы" }));

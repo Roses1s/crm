@@ -191,39 +191,44 @@ export function FormStatusbar({
             </span>
           );
         })}
-
-        {moreOpen && (
-          <>
-            <button
-              type="button"
-              className="fixed inset-0 z-10"
-              aria-label="Закрыть"
-              onClick={() => setMoreOpen(null)}
-            />
-            <div
-              className={`absolute top-[38px] z-50 max-h-[260px] min-w-[220px] overflow-auto rounded-[3px] border border-odoo-border bg-odoo-surface py-1 shadow-lg ${
-                moreOpen === "before" ? "left-0" : "right-0"
-              }`}
-            >
-              {moreItems.map((item) => (
-                <button
-                  key={item.id}
-                  type="button"
-                  className={`block w-full px-3 py-1.5 text-left text-[13px] hover:bg-odoo-bg ${
-                    item.id === current ? "font-semibold text-odoo-text" : "text-odoo-text"
-                  }`}
-                  onClick={() => {
-                    setMoreOpen(null);
-                    onSelect(item.id);
-                  }}
-                >
-                  {item.name}
-                </button>
-              ))}
-            </div>
-          </>
-        )}
       </div>
+
+      {/* Меню скрытых этапов — ВНЕ полосы с прокруткой. Внутри неё список
+          обрезался невидимой границей прокрутки (overflow-x-auto режет и по
+          вертикали), и клик по «…» выглядел как «ничего не происходит».
+          Родитель — прилипающая панель, она ничего не режет; список
+          открывается сразу под ней. */}
+      {moreOpen && (
+        <>
+          <button
+            type="button"
+            className="fixed inset-0 z-10"
+            aria-label="Закрыть"
+            onClick={() => setMoreOpen(null)}
+          />
+          <div
+            className={`absolute top-full z-50 max-h-[260px] min-w-[220px] overflow-auto rounded-[3px] border border-odoo-border bg-odoo-surface py-1 shadow-lg ${
+              moreOpen === "before" ? "left-0" : "right-0"
+            }`}
+          >
+            {moreItems.map((item) => (
+              <button
+                key={item.id}
+                type="button"
+                className={`block w-full px-3 py-1.5 text-left text-[13px] hover:bg-odoo-bg ${
+                  item.id === current ? "font-semibold text-odoo-text" : "text-odoo-text"
+                }`}
+                onClick={() => {
+                  setMoreOpen(null);
+                  onSelect(item.id);
+                }}
+              >
+                {item.name}
+              </button>
+            ))}
+          </div>
+        </>
+      )}
     </div>
   );
 }
