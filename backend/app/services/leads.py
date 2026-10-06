@@ -17,7 +17,7 @@ from starlette.concurrency import run_in_threadpool
 from app.core.errors import AppError, NotFoundError, PermissionDeniedError
 from app.core.logging import get_logger
 from app.core.pagination import PageParams, build_page, paginate
-from app.models.crm import Lead, LossReason, lead_tags
+from app.models.crm import Lead, LossReason, Stage, lead_tags
 from app.models.timeline import LEAD_STAGE_LABEL, Attachment, EntryType, TimelineEntry
 from app.models.user import Role, User
 from app.schemas.crm import LeadCreate, LeadLose, LeadTransfer, LeadUpdate, NoteCreate, NoteUpdate
@@ -449,65 +449,59 @@ async def lead_pager(session: AsyncSession, user: User, lead_id: int) -> dict[st
     Диапазон листания дополнительно сужен до доски того сотрудника, чей лид
     открыт (``assigned_to_id`` самого лида). Для менеджера это ничего не
     меняет — он и так видит только свои карточки, — а для администратора
-    избавляет от неожиданного перескока на лида другого менеджера: без этого
-    сужения листалка считала позицию и соседей по всей базе сразу, вперемешку
-    по всем сотрудникам.
+    избавляет от неожиданного перескока на лида другого менеджера.
+
+    Порядок листания — как читается доска: колонки по порядку (этапы по
+    ``sequence``, при равенстве — по номеру этапа), внутри колонки карточки
+    по номеру. Верхняя левая карточка доски всегда первая. Раньше порядок
+    брался по времени изменения — он не совпадал с доской, и первая карточка
+    показывалась, например, «4 из 6».
     """
     lead = await get_lead_or_404(session, lead_id, user)
 
     base = visible_only(select(Lead).where(Lead.is_archived.is_(False)), user).where(
         Lead.assigned_to_id == lead.assigned_to_id
     )
+    # Этап нужен для порядка «колонка за колонкой»; соединение один-к-одному,
+    # поэтому строки не размножаются и счёт остаётся честным.
+    board = base.with_only_columns(Lead.id).join(Stage, Lead.stage_id == Stage.id)
 
     total = int(
-        (
-            await session.execute(
-                select(func.count()).select_from(base.with_only_columns(Lead.id).subquery())
-            )
-        ).scalar_one()
+        (await session.execute(select(func.count()).select_from(board.subquery()))).scalar_one()
     )
 
-    # Порядок тот же, что в списке: сначала недавно изменённые. Время у двух
-    # карточек может совпасть до миллисекунды, поэтому при равенстве сравниваем
-    # ещё и номер — иначе запись находит сама себя как соседнюю.
-    # Время берём подзапросом, а не из объекта: SQLite хранит дату без часового
-    # пояса, и сравнение с «питоновским» значением уводило запрос в никуда —
-    # запись находила сама себя как соседнюю.
-    marker = select(Lead.updated_at).where(Lead.id == lead.id).scalar_subquery()
-    after = or_(
-        Lead.updated_at < marker,
-        and_(Lead.updated_at == marker, Lead.id < lead.id),
-    )
+    # «Выше в порядке чтения» — меньшая тройка (этап, номер этапа, номер лида).
+    sequence, stage_pk = lead.stage.sequence, lead.stage.id
     before = or_(
-        Lead.updated_at > marker,
-        and_(Lead.updated_at == marker, Lead.id > lead.id),
+        Stage.sequence < sequence,
+        and_(Stage.sequence == sequence, Stage.id < stage_pk),
+        and_(Stage.sequence == sequence, Stage.id == stage_pk, Lead.id < lead.id),
+    )
+    after = or_(
+        Stage.sequence > sequence,
+        and_(Stage.sequence == sequence, Stage.id > stage_pk),
+        and_(Stage.sequence == sequence, Stage.id == stage_pk, Lead.id > lead.id),
     )
 
     newer = int(
         (
-            await session.execute(
-                select(func.count()).select_from(
-                    base.with_only_columns(Lead.id).where(before).subquery()
-                )
-            )
+            await session.execute(select(func.count()).select_from(board.where(before).subquery()))
         ).scalar_one()
     )
 
+    # Предыдущий — самый «нижний» из стоящих выше, следующий — самый «верхний»
+    # из стоящих ниже.
     prev_id = (
         await session.execute(
-            base.with_only_columns(Lead.id)
-            .where(before)
-            .order_by(Lead.updated_at, Lead.id)
+            board.where(before)
+            .order_by(Stage.sequence.desc(), Stage.id.desc(), Lead.id.desc())
             .limit(1)
         )
     ).scalar_one_or_none()
 
     next_id = (
         await session.execute(
-            base.with_only_columns(Lead.id)
-            .where(after)
-            .order_by(Lead.updated_at.desc(), Lead.id.desc())
-            .limit(1)
+            board.where(after).order_by(Stage.sequence, Stage.id, Lead.id).limit(1)
         )
     ).scalar_one_or_none()
 

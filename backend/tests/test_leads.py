@@ -330,9 +330,66 @@ async def test_admin_pager_does_not_leak_into_another_managers_board(
     pager = (await auth_client.get(f"/api/v1/crm/leads/{admin_lead_id}/pager")).json()
     assert pager["total"] == 2  # только два лида админа, лид менеджера не считается
     assert manager_lead["id"] not in (pager["prev_id"], pager["next_id"])
-    # Открытый лид — самый старый из двух своих, поэтому сосед — второй лид
-    # админа (более новый по времени изменения), а не лид менеджера.
-    assert pager["prev_id"] == second_admin_lead["id"]
+    # Оба лида админа в одном этапе; открытый — старше по номеру, поэтому он
+    # первый, а сосед — второй лид админа, а не лид менеджера.
+    assert pager["position"] == 1
+    assert pager["prev_id"] is None
+    assert pager["next_id"] == second_admin_lead["id"]
+
+
+async def test_pager_follows_board_reading_order(auth_client: AsyncClient, seeded: dict) -> None:
+    """Листалка идёт по доске: колонка за колонкой, внутри колонки — по номеру.
+
+    Раньше позиция считалась по времени изменения и не совпадала с доской:
+    верхняя карточка показывалась, например, «4 из 6».
+    """
+    stage_new = seeded["stage_new"].id  # type: ignore[attr-defined]
+    stage_talks = seeded["stage_talks"].id  # type: ignore[attr-defined]
+
+    # Лид в «Переговорах» создаём РАНЬШЕ лида в «Новом»: по доске он всё равно
+    # дальше — колонка «Новый» стоит первой.
+    in_talks = (
+        await auth_client.post(
+            "/api/v1/crm/leads",
+            json={"name": "ООО «Ранний, но дальний»", "inn": "5404123455", "stage_id": stage_talks},
+        )
+    ).json()
+    in_new = (
+        await auth_client.post(
+            "/api/v1/crm/leads",
+            json={"name": "ООО «Поздний, но ближний»", "inn": "7447112236", "stage_id": stage_new},
+        )
+    ).json()
+
+    # Все три лида на доске админа; порядок чтения: сид-лид (Новый),
+    # «Поздний» (Новый), «Ранний» (Переговоры).
+    first_id = seeded["lead"].id  # type: ignore[attr-defined]
+
+    # Проверяем каждый: позиция и соседи обязаны следовать порядку доски,
+    # а не времени создания (у «Раннего» номер меньше, чем у «Позднего»).
+    seeded_pager = (await auth_client.get(f"/api/v1/crm/leads/{first_id}/pager")).json()
+    assert seeded_pager == {
+        "position": 1,
+        "total": 3,
+        "prev_id": None,
+        "next_id": in_new["id"],
+    }
+
+    new_pager = (await auth_client.get(f"/api/v1/crm/leads/{in_new['id']}/pager")).json()
+    assert new_pager == {
+        "position": 2,
+        "total": 3,
+        "prev_id": first_id,
+        "next_id": in_talks["id"],
+    }
+
+    talks_pager = (await auth_client.get(f"/api/v1/crm/leads/{in_talks['id']}/pager")).json()
+    assert talks_pager == {
+        "position": 3,
+        "total": 3,
+        "prev_id": in_new["id"],
+        "next_id": None,
+    }
 
 
 async def test_missing_lead_is_404(auth_client: AsyncClient) -> None:
