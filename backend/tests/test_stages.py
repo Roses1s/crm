@@ -201,6 +201,17 @@ async def test_delete_stage_moves_leads_to_fallback(
     card = await auth_client.get(f"/api/v1/crm/leads/{lead.id}")  # type: ignore[attr-defined]
     assert card.json()["stage_id"] == stage_to.id  # type: ignore[attr-defined]
 
+    # Перенос виден в ленте карточки: смена колонки не происходит молча (Б-18).
+    timeline = await auth_client.get(f"/api/v1/crm/leads/{lead.id}/timeline")  # type: ignore[attr-defined]
+    moved = [
+        entry
+        for entry in timeline.json()
+        if entry["field_label"] == "Этапы лидов" and entry["old_value"] == stage_from.name
+    ]
+    assert len(moved) == 1
+    assert moved[0]["new_value"] == stage_to.name
+    assert moved[0]["is_stage_change"] is True
+
     stages = await auth_client.get("/api/v1/crm/stages")
     assert stage_from.id not in [s["id"] for s in stages.json()]  # type: ignore[attr-defined]
 

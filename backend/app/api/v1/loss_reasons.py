@@ -57,9 +57,7 @@ async def delete_loss_reason(reason_id: int, session: SessionDep, _: AdminUser) 
     # можно удалить свободно.
     in_use = int(
         (
-            await session.execute(
-                select(func.count()).where(Lead.loss_reason_id == reason.id)
-            )
+            await session.execute(select(func.count()).where(Lead.loss_reason_id == reason.id))
         ).scalar_one()
     )
     if in_use:

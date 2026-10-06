@@ -9,10 +9,16 @@ from sqlalchemy import select
 
 from app.api.deps import CurrentUser, SessionDep
 from app.core.errors import AppError, NotFoundError, PermissionDeniedError
-from app.models.crm import Lead, Stage
+from app.models.crm import Stage
 from app.models.user import Role
 from app.schemas.crm import StageCreate, StageRead, StageReorder, StageUpdate
-from app.services.stages import ensure_default_stages, owned_stage
+from app.services.stages import (
+    delete_stage as service_delete_stage,
+)
+from app.services.stages import (
+    ensure_default_stages,
+    owned_stage,
+)
 
 router = APIRouter(prefix="/crm/stages", tags=["crm: этапы"])
 
@@ -116,30 +122,4 @@ async def delete_stage(
     fallback_stage_id: int | None = None,
 ) -> None:
     """Удаление возможно, только если лиды из этапа есть куда перенести."""
-    stage = await owned_stage(session, stage_id, user)
-
-    leads = list(
-        (await session.execute(select(Lead).where(Lead.stage_id == stage_id))).unique().scalars()
-    )
-    if leads:
-        if fallback_stage_id is None or fallback_stage_id == stage_id:
-            raise AppError(
-                "В этапе есть лиды — укажите fallback_stage_id для их переноса",
-                code="stage_not_empty",
-            )
-        # Переносить можно только в этап той же доски, иначе лид уедет к коллеге.
-        fallback = await session.get(Stage, fallback_stage_id)
-        if fallback is None or fallback.owner_id != stage.owner_id:
-            raise NotFoundError(f"Этап {fallback_stage_id} не найден на этой доске")
-        for lead in leads:
-            lead.stage_id = fallback_stage_id
-        # ВАЖНО: записываем перенос в базу ДО удаления этапа. Без этого
-        # SQLAlchemy при удалении родителя сам «отцепляет» его лиды —
-        # выставляет leads.stage_id = NULL, — и база отвергает запись
-        # (колонка обязательная). Снаружи это выглядело как ошибка
-        # «Запись с такими данными уже существует» на обычном удалении
-        # непустой колонки канбана.
-        await session.flush()
-
-    await session.delete(stage)
-    await session.commit()
+    await service_delete_stage(session, user, stage_id, fallback_stage_id)

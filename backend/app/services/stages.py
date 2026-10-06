@@ -11,8 +11,9 @@ from __future__ import annotations
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 
-from app.core.errors import NotFoundError, PermissionDeniedError
-from app.models.crm import Stage
+from app.core.errors import AppError, NotFoundError, PermissionDeniedError
+from app.models.crm import Lead, Stage
+from app.models.timeline import LEAD_STAGE_LABEL, EntryType, TimelineEntry
 from app.models.user import Role, User
 
 # Набор, с которого начинает каждый менеджер. Дальше он правит его под себя:
@@ -68,6 +69,56 @@ async def owned_stage(session: AsyncSession, stage_id: int, user: User) -> Stage
     if stage.owner_id != user.id and user.role != Role.admin:
         raise PermissionDeniedError("Этап принадлежит другому сотруднику")
     return stage
+
+
+async def delete_stage(
+    session: AsyncSession, user: User, stage_id: int, fallback_stage_id: int | None
+) -> None:
+    """Удаление этапа: карточки из него обязаны переехать на другую колонку.
+
+    Живёт в сервисе (а не в роутере), потому что это транзакция из трёх
+    шагов: перенос лидов, запись переноса в их ленту и удаление самой
+    колонки (ревью 03.10, Б-18 и Б-24).
+    """
+    stage = await owned_stage(session, stage_id, user)
+
+    leads = list(
+        (await session.execute(select(Lead).where(Lead.stage_id == stage_id))).unique().scalars()
+    )
+    if leads:
+        if fallback_stage_id is None or fallback_stage_id == stage_id:
+            raise AppError(
+                "В этапе есть лиды — укажите fallback_stage_id для их переноса",
+                code="stage_not_empty",
+            )
+        # Переносить можно только в этап той же доски, иначе лид уедет к коллеге.
+        fallback = await session.get(Stage, fallback_stage_id)
+        if fallback is None or fallback.owner_id != stage.owner_id:
+            raise NotFoundError(f"Этап {fallback_stage_id} не найден на этой доске")
+        for lead in leads:
+            lead.stage_id = fallback_stage_id
+            # Перенос попадает в ленту карточки: без записи смена колонки
+            # происходила бы молча и её было бы не найти в истории (Б-18).
+            session.add(
+                TimelineEntry(
+                    lead_id=lead.id,
+                    author_id=user.id,
+                    type=EntryType.history,
+                    field_label=LEAD_STAGE_LABEL,
+                    old_value=stage.name,
+                    new_value=fallback.name,
+                )
+            )
+        # ВАЖНО: записываем перенос в базу ДО удаления этапа. Без этого
+        # SQLAlchemy при удалении родителя сам «отцепляет» его лиды —
+        # выставляет leads.stage_id = NULL, — и база отвергает запись
+        # (колонка обязательная). Снаружи это выглядело как ошибка
+        # «Запись с такими данными уже существует» на обычном удалении
+        # непустой колонки канбана.
+        await session.flush()
+
+    await session.delete(stage)
+    await session.commit()
 
 
 async def stage_on_board(session: AsyncSession, stage_id: int, board_owner_id: int) -> Stage:
