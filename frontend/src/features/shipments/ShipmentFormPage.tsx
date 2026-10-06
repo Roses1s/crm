@@ -17,6 +17,7 @@ import {
   useEditShipmentNote,
   useLeads,
   useMe,
+  useMeta,
   useSaveShipment,
   useSetShipmentStatus,
   useShipment,
@@ -136,10 +137,6 @@ function fromDatetimeLocal(value: string): string {
   return new Date(value).toISOString();
 }
 
-// Маржа показывается не «как есть», а за вычетом фиксированной доли —
-// так попросил владелец бизнеса.
-const MARGIN_DEDUCTION_RATE = 0.25;
-
 /** Вкладка «Позиции заказа»: одна фиксированная строка услуги с ценой
  * заказчика и перевозчика, у каждой свой НДС, плюс итоговая маржа. */
 function OrderLinesTab({
@@ -147,6 +144,7 @@ function OrderLinesTab({
   customerTax,
   carrierPrice,
   carrierTax,
+  deductionRate,
   onCustomerPriceChange,
   onCustomerTaxChange,
   onCarrierPriceChange,
@@ -156,6 +154,8 @@ function OrderLinesTab({
   customerTax: string;
   carrierPrice: string;
   carrierTax: string;
+  /** Ставку вычета знает только сервер (GET /meta) — локальной копии нет (Т-08). */
+  deductionRate: number | null;
   onCustomerPriceChange: (value: string) => void;
   onCustomerTaxChange: (value: string) => void;
   onCarrierPriceChange: (value: string) => void;
@@ -163,11 +163,12 @@ function OrderLinesTab({
 }) {
   const customerNet = netAmount(customerPrice, customerTax);
   const carrierNet = netAmount(carrierPrice, carrierTax);
-  // Из получившейся разницы дополнительно вычитаем 25% — по требованию
-  // владельца бизнеса (доп. расходы/комиссия, не связанные с НДС).
+  // Из получившейся разницы дополнительно вычитаем долю доп. расходов —
+  // по требованию владельца бизнеса (не связанные с НДС). Пока константа
+  // не приехала с сервера, живой пересчёт не показываем.
   const margin =
-    customerNet != null && carrierNet != null
-      ? (customerNet - carrierNet) * (1 - MARGIN_DEDUCTION_RATE)
+    deductionRate != null && customerNet != null && carrierNet != null
+      ? (customerNet - carrierNet) * (1 - deductionRate)
       : null;
 
   const th = "whitespace-nowrap px-3 py-2 text-left font-semibold";
@@ -206,6 +207,7 @@ function OrderLinesTab({
                   type="number"
                   step="0.01"
                   placeholder="0.00"
+                  aria-label="Цена для заказчика"
                   value={customerPrice}
                   onChange={(e) => onCustomerPriceChange(e.target.value)}
                 />
@@ -231,6 +233,7 @@ function OrderLinesTab({
                   type="number"
                   step="0.01"
                   placeholder="0.00"
+                  aria-label="Цена для перевозчика"
                   value={carrierPrice}
                   onChange={(e) => onCarrierPriceChange(e.target.value)}
                 />
@@ -348,6 +351,8 @@ function ShipmentForm({ id }: { id?: string }) {
   const [searchParams] = useSearchParams();
 
   const { data: currentUser } = useMe();
+  // Ставка вычета маржи — с сервера, единственная копия в бэкенде (Т-08).
+  const { data: meta } = useMeta();
   const { data: shipment, isLoading } = useShipment(id);
   const { data: leadsPage } = useLeads();
   const leads = leadsPage?.items ?? [];
@@ -963,6 +968,7 @@ function ShipmentForm({ id }: { id?: string }) {
                             customerTax={form.customer_tax}
                             carrierPrice={form.carrier_price}
                             carrierTax={form.carrier_tax}
+                            deductionRate={meta ? Number(meta.margin_deduction_rate) : null}
                             onCustomerPriceChange={(v) => set("customer_price", v)}
                             onCustomerTaxChange={(v) => set("customer_tax", v)}
                             onCarrierPriceChange={(v) => set("carrier_price", v)}

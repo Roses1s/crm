@@ -13,6 +13,7 @@ import type {
   LauncherApp,
   Lead,
   LossReason,
+  Meta,
   Pager,
   Shipment,
   ShipmentTotals,
@@ -68,6 +69,7 @@ function leadsQueryString(filters: LeadFilters): string {
 const keys = {
   me: ["me"] as const,
   apps: ["launcher"] as const,
+  meta: ["meta"] as const,
   stages: ["stages"] as const,
   tags: ["tags"] as const,
   lossReasons: ["loss-reasons"] as const,
@@ -148,6 +150,18 @@ export function useStages(ownerId?: number | null) {
   return useQuery({
     queryKey: [...keys.stages, ownerId ?? "me"],
     queryFn: () => api<Stage[]>(`/crm/stages${ownerId ? `?owner_id=${ownerId}` : ""}`),
+    ...REFERENCE_DATA,
+  });
+}
+
+/**
+ * Служебные константы с сервера (ставка вычета маржи и т.п.) — единый
+ * источник вместо продублированных чисел в коде фронтенда (Т-08).
+ */
+export function useMeta() {
+  return useQuery({
+    queryKey: keys.meta,
+    queryFn: () => api<Meta>("/meta"),
     ...REFERENCE_DATA,
   });
 }

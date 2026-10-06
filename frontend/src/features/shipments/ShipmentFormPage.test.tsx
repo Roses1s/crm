@@ -51,6 +51,7 @@ afterEach(() => {
 function commonRoutes() {
   return [
     { path: "/auth/me", response: ME },
+    { path: "/meta", response: { margin_deduction_rate: "0.25" } },
     { path: "/shipments/101/attachments", response: [] },
     { path: "/shipments/101/timeline", response: [] },
     { path: "/shipments/101", response: SHIPMENT },
@@ -107,5 +108,31 @@ it("изменённая дата создания уходит на серве�
   const patch = server.calls.find((c) => c.method === "PATCH" && c.url.includes("/shipments/101"));
   expect((patch?.body as { created_at?: string })?.created_at).toBe(
     new Date("2025-12-01T00:00").toISOString(),
+  );
+});
+
+it("маржа на вкладке «Позиции заказа» считается по ставке с сервера (Т-08)", async () => {
+  setAccessToken("токен");
+  // Ставку вычета форма знает только из ответа /meta — локальной копии нет.
+  server = startFakeApi(commonRoutes());
+
+  const user = userEvent.setup();
+  renderShipment();
+
+  await user.click(await screen.findByRole("button", { name: "Позиции заказа" }));
+  await user.type(await screen.findByLabelText("Цена для заказчика"), "122000");
+  // У перевозчика НДС нет: «Без НДС» выбираем во втором налоговом списке
+  // (первый — у заказчика; на странице есть и другие выпадающие списки).
+  const noVatOptions = screen.getAllByRole("option", { name: "Без НДС" });
+  const carrierTaxSelect = noVatOptions[1].closest("select");
+  expect(carrierTaxSelect).not.toBeNull();
+  await user.selectOptions(carrierTaxSelect!, "no_vat");
+  await user.type(await screen.findByLabelText("Цена для перевозчика"), "80000");
+
+  // 122 000 с НДС 22% — это 100 000 без НДС; (100 000 − 80 000) × 0,75 = 15 000.
+  // ru-RU группирует разряды неразрывным пробелом (U+00A0) — сравниваем сами.
+  await screen.findByText(
+    (_content, element) =>
+      element?.tagName === "SPAN" && element.textContent?.replace(/\u00A0/g, " ") === "15 000,00",
   );
 });

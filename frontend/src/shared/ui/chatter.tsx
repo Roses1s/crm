@@ -572,19 +572,19 @@ export function Chatter({
                         entry.type === "note" &&
                         entry.author_id != null &&
                         entry.author_id === currentUserId && (
-                        <button
-                          type="button"
-                          aria-label="Изменить примечание"
-                          title="Изменить"
-                          onClick={() => {
-                            setEditingId(Number(entry.id));
-                            setEditText(entry.body);
-                          }}
-                          className="inline-flex h-6 w-6 items-center justify-center rounded-sm text-odoo-text-muted transition-colors hover:bg-odoo-bg hover:text-odoo-text"
-                        >
-                          <Pencil className="h-3.5 w-3.5" />
-                        </button>
-                      )}
+                          <button
+                            type="button"
+                            aria-label="Изменить примечание"
+                            title="Изменить"
+                            onClick={() => {
+                              setEditingId(Number(entry.id));
+                              setEditText(entry.body);
+                            }}
+                            className="inline-flex h-6 w-6 items-center justify-center rounded-sm text-odoo-text-muted transition-colors hover:bg-odoo-bg hover:text-odoo-text"
+                          >
+                            <Pencil className="h-3.5 w-3.5" />
+                          </button>
+                        )}
                       {onDeleteEntry && (
                         <button
                           type="button"

@@ -15,7 +15,9 @@ async def manager_headers(client: AsyncClient) -> dict[str, str]:
     return {"Authorization": f"Bearer {login.json()['access_token']}"}
 
 
-async def test_manager_creates_but_cannot_delete_tag(auth_client: AsyncClient, seeded: dict) -> None:
+async def test_manager_creates_but_cannot_delete_tag(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
     """Создавать теги можно всем, а удалять — только администратору:
     тег общий, одно нажатие снимает его со всех карточек компании."""
     headers = await manager_headers(auth_client)

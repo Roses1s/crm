@@ -11,6 +11,11 @@ export interface User {
   is_active: boolean;
 }
 
+/** Служебные константы с сервера: см. GET /api/v1/meta. */
+export interface Meta {
+  margin_deduction_rate: string;
+}
+
 export interface LauncherApp {
   id: number;
   slug: string;

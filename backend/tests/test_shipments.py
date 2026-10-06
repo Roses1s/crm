@@ -677,3 +677,10 @@ async def test_shipments_filter_by_employee(auth_client: AsyncClient, seeded: di
     own = (await auth_client.get("/api/v1/shipments", headers=headers)).json()
     assert own["count"] == 1
     assert own["results"][0]["lead_id"] == manager_lead["id"]
+
+
+async def test_meta_returns_margin_rate(auth_client: AsyncClient) -> None:
+    """Ставка вычета маржи приходит с сервера — фронтенд не хранит копию (Т-08)."""
+    response = await auth_client.get("/api/v1/meta")
+    assert response.status_code == 200
+    assert Decimal(response.json()["margin_deduction_rate"]) == Decimal("0.25")

@@ -139,9 +139,7 @@ async def test_history_entry_cannot_be_edited(auth_client: AsyncClient, seeded: 
     assert bad.status_code == 400
 
 
-async def test_note_can_be_edited_only_by_author(
-    auth_client: AsyncClient, seeded: dict
-) -> None:
+async def test_note_can_be_edited_only_by_author(auth_client: AsyncClient, seeded: dict) -> None:
     """Править примечание может только его автор — даже администратору нельзя (Б-11).
 
     Строка ленты подписана именем автора: правка чужого текста выглядела бы
@@ -160,7 +158,9 @@ async def test_note_can_be_edited_only_by_author(
 
     entry_id = (
         await auth_client.post(
-            f"/api/v1/crm/leads/{lead_id}/notes", json={"body": "заметка менеджера"}, headers=headers
+            f"/api/v1/crm/leads/{lead_id}/notes",
+            json={"body": "заметка менеджера"},
+            headers=headers,
         )
     ).json()["id"]
 
