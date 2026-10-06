@@ -551,3 +551,58 @@ async def test_shipments_list_margin_and_totals(auth_client: AsyncClient, seeded
     empty = (await auth_client.get("/api/v1/shipments?search=несуществующий-текст")).json()
     assert empty["count"] == 0
     assert Decimal(empty["totals"]["margin"]) == Decimal("0.00")
+
+
+async def test_shipments_filter_by_employee(auth_client: AsyncClient, seeded: dict) -> None:
+    """Фильтр «заявки сотрудника» — инструмент администратора.
+
+    Админ получает заявки конкретного человека (итоги — тоже только его),
+    менеджеру параметр отвечает 403: чужие заявки ему смотреть нельзя.
+    """
+    admin_id = seeded["admin"].id  # type: ignore[attr-defined]
+    manager_id = seeded["manager"].id  # type: ignore[attr-defined]
+
+    # Заявка админа на его же лиде (цены — чтобы проверить итоги фильтра).
+    await auth_client.post(
+        "/api/v1/shipments",
+        json={"lead_id": seeded["lead"].id, "customer_price": "100000", "carrier_price": "80000"},
+    )
+
+    # Лид и заявка менеджера: создаёт сам менеджер на своей доске.
+    headers = await manager_headers(auth_client)
+    stages = (await auth_client.get("/api/v1/crm/stages", headers=headers)).json()
+    manager_lead = (
+        await auth_client.post(
+            "/api/v1/crm/leads",
+            json={
+                "name": "ООО «Менеджер-Клиент»",
+                "inn": "5404123455",
+                "stage_id": stages[0]["id"],
+            },
+            headers=headers,
+        )
+    ).json()
+    await auth_client.post(
+        "/api/v1/shipments",
+        json={"lead_id": manager_lead["id"], "customer_price": "50000"},
+        headers=headers,
+    )
+
+    # Админ видит заявки каждого сотрудника по отдельности.
+    managers_list = (await auth_client.get(f"/api/v1/shipments?assigned_to={manager_id}")).json()
+    assert managers_list["count"] == 1
+    assert managers_list["results"][0]["lead_id"] == manager_lead["id"]
+    assert Decimal(managers_list["totals"]["customer_total"]) == Decimal("50000.00")
+
+    admins_list = (await auth_client.get(f"/api/v1/shipments?assigned_to={admin_id}")).json()
+    assert admins_list["count"] == 1
+    assert admins_list["results"][0]["lead_id"] == seeded["lead"].id
+
+    # Менеджеру чужие заявки по фильтру не отдают — явный отказ, не пустой список.
+    forbidden = await auth_client.get(f"/api/v1/shipments?assigned_to={admin_id}", headers=headers)
+    assert forbidden.status_code == 403
+
+    # Без параметра менеджер и так видит только свои заявки.
+    own = (await auth_client.get("/api/v1/shipments", headers=headers)).json()
+    assert own["count"] == 1
+    assert own["results"][0]["lead_id"] == manager_lead["id"]

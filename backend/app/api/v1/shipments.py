@@ -37,9 +37,17 @@ async def list_shipments(
     params: PageParamsDep,
     status_filter: Annotated[ShipmentStatus | None, Query(alias="status")] = None,
     search: Annotated[str | None, Query(alias="search")] = None,
+    assigned_to: Annotated[
+        int | None, Query(description="Чьи заявки показать — только для администратора")
+    ] = None,
 ) -> dict[str, Any]:
     return await service.list_shipments(
-        session, user, params, status_filter=status_filter, search=search
+        session,
+        user,
+        params,
+        status_filter=status_filter,
+        search=search,
+        assigned_to=assigned_to,
     )
 
 

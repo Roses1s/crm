@@ -9,7 +9,7 @@ from sqlalchemy import or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 
-from app.core.errors import AppError, NotFoundError
+from app.core.errors import AppError, NotFoundError, PermissionDeniedError
 from app.core.logging import get_logger
 from app.core.pagination import PageParams, build_page, paginate
 from app.models.crm import Lead
@@ -134,8 +134,17 @@ async def list_shipments(
     *,
     status_filter: ShipmentStatus | None = None,
     search: str | None = None,
+    assigned_to: int | None = None,
 ) -> dict[str, Any]:
     stmt = visible_shipments(select(Shipment).order_by(Shipment.created_at.desc()), user)
+    if assigned_to is not None:
+        # Фильтр «заявки сотрудника» — инструмент администратора: менеджер
+        # и без него видит только свои заявки, чужие ему смотреть нельзя.
+        if user.role != Role.admin:
+            raise PermissionDeniedError("Заявки сотрудника может смотреть только администратор")
+        stmt = stmt.where(
+            Shipment.lead_id.in_(select(Lead.id).where(Lead.assigned_to_id == assigned_to))
+        )
     if status_filter is not None:
         stmt = stmt.where(Shipment.status == status_filter)
     if search and search.strip():
