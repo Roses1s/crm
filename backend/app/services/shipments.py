@@ -2,7 +2,7 @@
 
 from __future__ import annotations
 
-from decimal import ROUND_HALF_UP, Decimal
+from decimal import Decimal
 from typing import Any
 
 from sqlalchemy import or_, select, update
@@ -13,7 +13,7 @@ from app.core.errors import AppError, NotFoundError, PermissionDeniedError
 from app.core.logging import get_logger
 from app.core.pagination import PageParams, build_page, paginate
 from app.models.crm import Lead
-from app.models.shipment import Shipment, ShipmentStatus, net_amount, visible_margin
+from app.models.shipment import Shipment, ShipmentStatus, visible_margin
 from app.models.timeline import SHIPMENT_STAGE_LABEL, Attachment, EntryType, TimelineEntry
 from app.models.user import Role, User
 from app.schemas.crm import NoteCreate, NoteUpdate
@@ -110,21 +110,13 @@ async def _filter_totals(session: AsyncSession, stmt: Any) -> dict[str, Decimal]
     ).all()
     margin_sum = Decimal("0.00")
     customer_sum = Decimal("0.00")
-    customer_net_sum = Decimal("0.00")
     for row in rows:
         margin = visible_margin(row[0], row[1], row[2], row[3])
         if margin is not None:
             margin_sum += margin
         if row[0] is not None:
             customer_sum += row[0]
-        customer_net = net_amount(row[0], row[1])
-        if customer_net is not None:
-            customer_net_sum += customer_net.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
-    return {
-        "margin": margin_sum,
-        "customer_total": customer_sum,
-        "customer_total_net": customer_net_sum,
-    }
+    return {"margin": margin_sum, "customer_total": customer_sum}
 
 
 async def list_shipments(

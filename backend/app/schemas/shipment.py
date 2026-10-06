@@ -262,7 +262,6 @@ class ShipmentListItem(ORMModel):
     # формула живёт в одном месте, а не дублируется на фронтенде.
     margin: Decimal | None
     customer_total: Decimal | None  # цена заказчика как введена (с НДС)
-    customer_total_net: Decimal | None  # цена заказчика без НДС
 
 
 class ShipmentTotals(BaseModel):
@@ -274,7 +273,6 @@ class ShipmentTotals(BaseModel):
 
     margin: Decimal
     customer_total: Decimal
-    customer_total_net: Decimal
 
 
 class ShipmentPage(Page[ShipmentListItem]):

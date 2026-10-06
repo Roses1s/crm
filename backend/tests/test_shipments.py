@@ -523,16 +523,13 @@ async def test_shipments_list_margin_and_totals(auth_client: AsyncClient, seeded
     by_id = {item["id"]: item for item in page["results"]}
     assert Decimal(by_id[first["id"]]["margin"]) == Decimal("75000.00")
     assert Decimal(by_id[first["id"]]["customer_total"]) == Decimal("244000.00")
-    assert Decimal(by_id[first["id"]]["customer_total_net"]) == Decimal("200000.00")
     assert by_id[unpriced["id"]]["margin"] is None
     assert by_id[unpriced["id"]]["customer_total"] is None
-    assert by_id[unpriced["id"]]["customer_total_net"] is None
 
-    # Итоги: 75 000 + 15 000 = 90 000 маржи; 366 000 и 300 000 заказчику.
+    # Итоги: 75 000 + 15 000 = 90 000 маржи; 366 000 заказчику.
     totals = page["totals"]
     assert Decimal(totals["margin"]) == Decimal("90000.00")
     assert Decimal(totals["customer_total"]) == Decimal("366000.00")
-    assert Decimal(totals["customer_total_net"]) == Decimal("300000.00")
 
     # Итоги честны при маленькой странице: в results одна заявка, в totals — все.
     paged = (await auth_client.get("/api/v1/shipments?page_size=1")).json()

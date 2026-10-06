@@ -57,14 +57,12 @@ const SHIPMENTS = [
     created_at: "2026-09-30T10:00:00+03:00",
     margin: "1500.00",
     customer_total: "122000.00",
-    customer_total_net: "100000.00",
   },
 ];
 
 const TOTALS = {
   margin: "1500.00",
   customer_total: "122000.00",
-  customer_total_net: "100000.00",
 };
 
 /**
@@ -112,9 +110,10 @@ describe("Сценарий: список заявок", () => {
 
     // Маржа и «Всего» приходят с сервера готовыми — фронтенд только
     // форматирует. Каждая сумма видна дважды: в строке заявки и в «Итого».
+    // Суммы «без НДС» на экране нет — владелец попросил убрать.
     expect(screen.getAllByText(formatMoney(1500))).toHaveLength(2);
     expect(screen.getAllByText(formatMoney(122000))).toHaveLength(2);
-    expect(screen.getAllByText(`без НДС ${formatMoney(100000)}`)).toHaveLength(2);
+    expect(screen.queryByText(/без НДС/)).not.toBeInTheDocument();
     expect(screen.getByText("Итого")).toBeVisible();
 
     // Но и вся строка кликабельна — клик по любой другой ячейке тоже ведёт

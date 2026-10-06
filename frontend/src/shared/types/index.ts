@@ -114,7 +114,6 @@ export interface TimelineEntry {
 export interface ShipmentTotals {
   margin: string;
   customer_total: string;
-  customer_total_net: string;
 }
 
 export interface Shipment {
@@ -148,7 +147,6 @@ export interface Shipment {
   // фронтенд только форматирует (features/shipments/money.ts).
   margin?: string | null;
   customer_total?: string | null;
-  customer_total_net?: string | null;
 
   // Заказчик (шапка).
   customer_address?: string;

@@ -183,11 +183,7 @@ export function ShipmentsPage() {
                     {formatMoney(s.margin)}
                   </td>
                   <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-odoo-text">
-                    <span className="block">{formatMoney(s.customer_total)}</span>
-                    {/* Второй строкой — цена без НДС, приглушённо. */}
-                    <span className="block text-[11px] text-odoo-text-muted">
-                      без НДС {formatMoney(s.customer_total_net)}
-                    </span>
+                    {formatMoney(s.customer_total)}
                   </td>
                 </tr>
               );
@@ -208,11 +204,8 @@ export function ShipmentsPage() {
                 <td className="whitespace-nowrap px-3 py-2 text-right font-semibold tabular-nums text-odoo-text">
                   {formatMoney(totals?.margin)}
                 </td>
-                <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-odoo-text">
-                  <span className="block font-semibold">{formatMoney(totals?.customer_total)}</span>
-                  <span className="block text-[11px] text-odoo-text-muted">
-                    без НДС {formatMoney(totals?.customer_total_net)}
-                  </span>
+                <td className="whitespace-nowrap px-3 py-2 text-right font-semibold tabular-nums text-odoo-text">
+                  {formatMoney(totals?.customer_total)}
                 </td>
               </tr>
             </tfoot>

@@ -77,7 +77,7 @@ def net_amount(price: Decimal | None, tax: TaxRate) -> Decimal | None:
     """Цена без НДС: price / (1 + ставка/100).
 
     Промежуточных округлений нет — до копеек округляется только итог
-    (margin и customer_total_net), как в живом расчёте карточки.
+    (margin), как в живом расчёте карточки.
     """
     if price is None:
         return None
@@ -232,13 +232,5 @@ class Shipment(Base, TimestampMixin):
 
     @property
     def customer_total(self) -> Decimal | None:
-        """Цена заказчика как введена — с НДС (верхнее число колонки «Всего»)."""
+        """Цена заказчика как введена — с НДС (колонка «Всего")."""
         return self.customer_price
-
-    @property
-    def customer_total_net(self) -> Decimal | None:
-        """Цена заказчика без НДС (нижнее число колонки «Всего»)."""
-        net = net_amount(self.customer_price, self.customer_tax)
-        if net is None:
-            return None
-        return net.quantize(Decimal("0.01"), rounding=ROUND_HALF_UP)
