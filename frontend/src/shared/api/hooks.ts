@@ -908,6 +908,17 @@ export function useRunBackup() {
   });
 }
 
+export function useDeleteBackup() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (name: string) =>
+      api<void>(`/admin/backups/${encodeURIComponent(name)}`, { method: "DELETE" }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: keys.backups });
+    },
+  });
+}
+
 export function useLoginAttempts() {
   return useQuery({
     queryKey: keys.loginAttempts,

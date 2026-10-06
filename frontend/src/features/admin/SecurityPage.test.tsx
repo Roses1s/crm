@@ -6,10 +6,15 @@
  * список копий показывается.
  */
 import { screen } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { describe, expect, it, vi } from "vitest";
 
 import { SecurityPage } from "@/features/admin/SecurityPage";
 import { renderWithProviders } from "@/test/utils";
+
+// Заготовка под проверку вызова удаления: vi.hoisted поднимает её выше
+// vi.mock, чтобы фабрика мока могла на неё сослаться.
+const { deleteMock } = vi.hoisted(() => ({ deleteMock: vi.fn() }));
 
 vi.mock("@/shared/api/hooks", () => ({
   useBackups: () => ({
@@ -33,6 +38,7 @@ vi.mock("@/shared/api/hooks", () => ({
     ],
   }),
   useRunBackup: () => ({ mutate: vi.fn(), isPending: false, isSuccess: false }),
+  useDeleteBackup: () => ({ mutate: deleteMock, isPending: false, isError: false }),
 }));
 
 describe("Раздел «Безопасность»", () => {
@@ -51,5 +57,24 @@ describe("Раздел «Безопасность»", () => {
     // Данные доезжают до экрана: копия в списке, попытка в таблице.
     expect(screen.getByText("crm-2026-10-05.dump")).toBeVisible();
     expect(screen.getByText("unknown@crmdetroid.ru")).toBeVisible();
+  });
+
+  it("удаляет копию только после подтверждения", async () => {
+    const user = userEvent.setup();
+    renderWithProviders(<SecurityPage />);
+    await screen.findByText("crm-2026-10-05.dump");
+
+    // Клик по корзине сам по себе ничего не удаляет — сначала подтверждение.
+    await user.click(screen.getByRole("button", { name: "Удалить crm-2026-10-05.dump" }));
+    expect(screen.getByText("Удалить резервную копию?")).toBeVisible();
+    expect(deleteMock).not.toHaveBeenCalled();
+
+    await user.click(screen.getByRole("button", { name: "Отмена" }));
+    expect(screen.queryByText("Удалить резервную копию?")).not.toBeInTheDocument();
+
+    // Повторяем и подтверждаем — удаление уходит с именем файла.
+    await user.click(screen.getByRole("button", { name: "Удалить crm-2026-10-05.dump" }));
+    await user.click(screen.getByRole("button", { name: "Удалить" }));
+    expect(deleteMock).toHaveBeenCalledWith("crm-2026-10-05.dump", expect.anything());
   });
 });

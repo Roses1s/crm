@@ -2,9 +2,13 @@
 
 from __future__ import annotations
 
+from pathlib import Path
+
+import pytest
 from httpx import AsyncClient
 from sqlalchemy.ext.asyncio import AsyncSession
 
+from app.core.config import settings
 from tests.conftest import TEST_PASSWORD
 
 
@@ -73,6 +77,60 @@ async def test_backups_report_counts_uploaded_files(
     storage = response.json()["storage"]
     assert storage["files"] == 1
     assert storage["bytes"] == len(payload)
+
+
+async def test_admin_can_delete_any_backup(
+    auth_client: AsyncClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Админ удаляет копию — файл исчезает и из каталога, и из списка."""
+    (tmp_path / "crm-2026-10-05.dump").write_bytes(b"old")
+    (tmp_path / "crm-2026-10-06.dump").write_bytes(b"new")
+    monkeypatch.setattr(settings, "backup_dir", str(tmp_path))
+
+    response = await auth_client.delete("/api/v1/admin/backups/crm-2026-10-05.dump")
+    assert response.status_code == 204
+    assert not (tmp_path / "crm-2026-10-05.dump").exists()
+    assert (tmp_path / "crm-2026-10-06.dump").exists()
+
+    names = [f["name"] for f in (await auth_client.get("/api/v1/admin/backups")).json()["results"]]
+    assert names == ["crm-2026-10-06.dump"]
+
+
+async def test_delete_backup_rejects_foreign_names(
+    auth_client: AsyncClient, monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Мимо шаблона имён и каталога копий удалить ничего нельзя."""
+    monkeypatch.setattr(settings, "backup_dir", str(tmp_path))
+    for name in (
+        "notes.txt",  # не похоже на имя копии
+        "crm-dump",  # нет расширения .dump
+        "crm-2026.dump.bak",  # постороннее расширение
+        "crm-missing.dump",  # подходящее имя, но файла нет
+        "%2E%2E%2Fcrm-secret.dump",  # попытка выйти из каталога
+    ):
+        response = await auth_client.delete(f"/api/v1/admin/backups/{name}")
+        assert response.status_code == 404, name
+    assert list(tmp_path.iterdir()) == []
+
+
+async def test_delete_backup_is_admin_only(
+    client: AsyncClient, seeded: dict[str, object], monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Менеджеру удаление копий недоступно, файл остаётся на месте."""
+    (tmp_path / "crm-x.dump").write_bytes(b"x")
+    monkeypatch.setattr(settings, "backup_dir", str(tmp_path))
+    login = await client.post(
+        "/api/v1/auth/login",
+        json={"email": "manager@crmdetroid.ru", "password": TEST_PASSWORD},
+    )
+    token = login.json()["access_token"]
+
+    response = await client.delete(
+        "/api/v1/admin/backups/crm-x.dump",
+        headers={"Authorization": f"Bearer {token}"},
+    )
+    assert response.status_code == 403
+    assert (tmp_path / "crm-x.dump").exists()
 
 
 async def test_deleting_user_moves_leads_to_admin(

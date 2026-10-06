@@ -3,10 +3,11 @@
 from __future__ import annotations
 
 from datetime import UTC, datetime
+from fnmatch import fnmatch
 from pathlib import Path
 from typing import Any
 
-from fastapi import APIRouter, status
+from fastapi import APIRouter, Response, status
 from sqlalchemy import func, select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
@@ -206,6 +207,26 @@ async def run_backup(_: AdminUser) -> dict[str, str]:
     task = celery.send_task("app.worker.tasks.backup_database")
     log.info("backup.queued", task_id=task.id)
     return {"task_id": task.id, "detail": "Задача поставлена в очередь"}
+
+
+@router.delete("/backups/{name}", status_code=status.HTTP_204_NO_CONTENT, summary="Удалить копию")
+async def delete_backup(name: str, admin: AdminUser) -> Response:
+    """Удаляет файл резервной копии из каталога бэкапов.
+
+    Принимаются только настоящие имена из списка копий (шаблон ``crm-*.dump``,
+    без обходных путей) — удалить что-либо вне каталога копий невозможно.
+    Какую копию удалять, решает администратор (в том числе самую свежую):
+    ночная задача продолжит создавать новые, место освобождается сразу.
+    """
+    if not fnmatch(name, "crm-*.dump") or "/" in name or "\\" in name:
+        raise NotFoundError(f"Резервная копия {name} не найдена")
+    directory = Path(settings.backup_dir).resolve()
+    path = (directory / name).resolve()
+    if path.parent != directory or not path.is_file():
+        raise NotFoundError(f"Резервная копия {name} не найдена")
+    await run_in_threadpool(path.unlink)
+    log.info("backup.deleted", name=name, by=admin.id)
+    return Response(status_code=status.HTTP_204_NO_CONTENT)
 
 
 @router.get("/login-attempts", summary="Неудачные попытки входа")

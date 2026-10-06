@@ -1,4 +1,7 @@
-import { useBackups, useLoginAttempts, useRunBackup } from "@/shared/api/hooks";
+import { Trash2 } from "lucide-react";
+import { useState } from "react";
+
+import { useBackups, useDeleteBackup, useLoginAttempts, useRunBackup } from "@/shared/api/hooks";
 import { Button } from "@/shared/ui/button";
 import { formatSize } from "@/shared/ui/file-preview-utils";
 
@@ -13,6 +16,10 @@ export function SecurityPage() {
   const { data: backups } = useBackups();
   const { data: attempts = [] } = useLoginAttempts();
   const run = useRunBackup();
+  const del = useDeleteBackup();
+  // Имя копии, которую администратор собирается удалить: пока оно задано,
+  // показываем окно подтверждения — удаление безвозвратное.
+  const [pendingDelete, setPendingDelete] = useState<string | null>(null);
 
   const files = backups?.results ?? [];
 
@@ -101,14 +108,61 @@ export function SecurityPage() {
 
         <ul className="text-sm">
           {files.map((file) => (
-            <li key={file.name} className="border-b border-odoo-border-light py-1.5">
-              {file.name}{" "}
-              <span className="text-odoo-text-muted">({Math.round(file.size / 1024)} КБ)</span>
+            <li
+              key={file.name}
+              className="flex items-center justify-between gap-2 border-b border-odoo-border-light py-1.5"
+            >
+              <span className="min-w-0 truncate">
+                {file.name}{" "}
+                <span className="text-odoo-text-muted">({Math.round(file.size / 1024)} КБ)</span>
+              </span>
+              <button
+                type="button"
+                aria-label={`Удалить ${file.name}`}
+                onClick={() => setPendingDelete(file.name)}
+                className="shrink-0 rounded-[4px] p-1 text-odoo-text-muted transition-colors hover:bg-odoo-danger/10 hover:text-odoo-danger"
+              >
+                <Trash2 className="h-4 w-4" />
+              </button>
             </li>
           ))}
           {files.length === 0 && <li className="text-odoo-text-muted">Файлов нет</li>}
         </ul>
       </div>
+
+      {pendingDelete && (
+        <div className="fixed inset-0 z-50 flex items-center justify-center bg-odoo-overlay/30 p-4">
+          <div className="w-full max-w-md rounded-lg bg-odoo-surface p-4 shadow-lg">
+            <h3 className="text-[15px] font-semibold text-odoo-text">Удалить резервную копию?</h3>
+            <p className="mt-2 text-[13px] leading-relaxed text-odoo-text-muted">
+              Файл «{pendingDelete}» будет удалён с сервера безвозвратно. Новые копии ночная задача
+              продолжит создавать как обычно.
+            </p>
+            {del.isError && (
+              <p className="mt-3 text-[13px] text-odoo-danger">Не удалось удалить копию.</p>
+            )}
+            <div className="mt-4 flex justify-end gap-2">
+              <button
+                type="button"
+                onClick={() => setPendingDelete(null)}
+                className="h-8 rounded-[4px] border border-odoo-border px-3 text-sm text-odoo-text hover:bg-odoo-bg"
+              >
+                Отмена
+              </button>
+              <button
+                type="button"
+                disabled={del.isPending}
+                onClick={() =>
+                  del.mutate(pendingDelete, { onSuccess: () => setPendingDelete(null) })
+                }
+                className="h-8 rounded-[4px] bg-odoo-danger px-3 text-sm font-medium text-white transition-opacity hover:opacity-90 disabled:opacity-60"
+              >
+                {del.isPending ? "Удаляем…" : "Удалить"}
+              </button>
+            </div>
+          </div>
+        </div>
+      )}
     </div>
   );
 }
