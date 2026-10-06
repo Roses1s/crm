@@ -107,6 +107,16 @@ export interface TimelineEntry {
   author_initials?: string;
 }
 
+/**
+ * Итоги списка заявок для строки «Итого» внизу таблицы.
+ * Сервер считает их по ВСЕМУ фильтру, а не только по показанной странице.
+ */
+export interface ShipmentTotals {
+  margin: string;
+  customer_total: string;
+  customer_total_net: string;
+}
+
 export interface Shipment {
   id: number;
   number: string;
@@ -133,6 +143,12 @@ export interface Shipment {
   customer_tax?: string;
   carrier_price?: string | null;
   carrier_tax?: string;
+
+  // Колонки списка заявок «Маржа» и «Всего» — расчёт делает сервер,
+  // фронтенд только форматирует (features/shipments/money.ts).
+  margin?: string | null;
+  customer_total?: string | null;
+  customer_total_net?: string | null;
 
   // Заказчик (шапка).
   customer_address?: string;

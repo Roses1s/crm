@@ -45,6 +45,7 @@ import {
 } from "@/shared/ui/odoo-form";
 import { FormSkeleton } from "@/shared/ui/skeleton";
 import { useToast } from "@/shared/ui/toast-context";
+import { formatMoney } from "./money";
 import { TokenField } from "./TokenField";
 
 // Наша компания — статичная шапка бланка.
@@ -117,10 +118,6 @@ function netAmount(price: string, tax: string): number | null {
   const value = Number(price);
   if (!price || Number.isNaN(value)) return null;
   return value / (1 + taxRatePercent(tax) / 100);
-}
-
-function formatMoney(value: number): string {
-  return value.toLocaleString("ru-RU", { minimumFractionDigits: 2, maximumFractionDigits: 2 });
 }
 
 /** ISO-строка с сервера -> локальное время для <input type="datetime-local">

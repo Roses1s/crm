@@ -15,6 +15,7 @@ import type {
   LossReason,
   Pager,
   Shipment,
+  ShipmentTotals,
   Stage,
   Tag,
   TimelineEntry,
@@ -703,6 +704,9 @@ export async function downloadAttachment(attachment: Attachment): Promise<void> 
 }
 
 // --- заявки ------------------------------------------------------------------
+/** Ответ списка заявок: обычная страница плюс итоги по всему фильтру. */
+type ShipmentsPageData = Page<Shipment> & { totals: ShipmentTotals };
+
 export function useShipments(status = "", search = "") {
   return useQuery({
     queryKey: keys.shipments(status, search),
@@ -710,9 +714,9 @@ export function useShipments(status = "", search = "") {
       const params = new URLSearchParams({ page_size: String(LIST_LIMIT) });
       if (status) params.set("status", status);
       if (search) params.set("search", search);
-      return api<Page<Shipment>>(`/shipments?${params.toString()}`);
+      return api<ShipmentsPageData>(`/shipments?${params.toString()}`);
     },
-    select: (page) => toListResult(page, LIST_LIMIT),
+    select: (page) => ({ ...toListResult(page, LIST_LIMIT), totals: page.totals }),
   });
 }
 

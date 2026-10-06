@@ -5,6 +5,7 @@ import { AppShell, ControlPanel } from "@/app/layout/AppShell";
 import { ListLimitNotice } from "@/shared/ui/list-limit-notice";
 import { useShipments } from "@/shared/api/hooks";
 import { formatShipmentDate, SHIPMENT_STATUS } from "./shipment-status";
+import { formatMoney } from "./money";
 
 /** Инициалы продавца для аватарки (до двух букв). */
 function initials(name: string | null | undefined): string {
@@ -23,6 +24,7 @@ export function ShipmentsPage() {
   const [searchInput, setSearchInput] = useState(search);
   const { data: shipmentsPage, isLoading } = useShipments(status, search);
   const shipments = shipmentsPage?.items ?? [];
+  const totals = shipmentsPage?.totals;
 
   // Поиск дебаунсим на 300мс и пишем в адресную строку с replace — как на
   // «Лидах» и «Клиентах» (KanbanPage/CustomersPage): иначе запрос к API
@@ -86,15 +88,16 @@ export function ShipmentsPage() {
               </th>
               <th className="whitespace-nowrap px-3 py-2.5 text-left font-semibold">Продавец</th>
               <th className="whitespace-nowrap px-3 py-2.5 text-left font-semibold">Клиент</th>
-              <th className="whitespace-nowrap px-3 py-2.5 text-left font-semibold">Маршрут</th>
               <th className="whitespace-nowrap px-3 py-2.5 text-left font-semibold">Перевозчик</th>
               <th className="whitespace-nowrap px-3 py-2.5 text-left font-semibold">Статус</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-right font-semibold">Маржа</th>
+              <th className="whitespace-nowrap px-3 py-2.5 text-right font-semibold">Всего</th>
             </tr>
           </thead>
           <tbody>
             {!isLoading && shipments.length === 0 && (
               <tr>
-                <td colSpan={7} className="px-3 py-8 text-center text-odoo-text-muted">
+                <td colSpan={8} className="px-3 py-8 text-center text-odoo-text-muted">
                   Заявок нет.
                 </td>
               </tr>
@@ -132,7 +135,6 @@ export function ShipmentsPage() {
                     </span>
                   </td>
                   <td className="px-3 py-2 text-odoo-text">{s.lead_name}</td>
-                  <td className="whitespace-nowrap px-3 py-2 text-odoo-text-muted">{s.route}</td>
                   <td className="whitespace-nowrap px-3 py-2 text-odoo-text-muted">
                     {s.carrier_name || "—"}
                   </td>
@@ -143,10 +145,46 @@ export function ShipmentsPage() {
                       {st.label}
                     </span>
                   </td>
+                  {/* Маржу и «Всего» считает сервер — фронтенд только
+                      форматирует (см. money.ts и models/shipment.py). */}
+                  <td className="whitespace-nowrap px-3 py-2 text-right font-medium tabular-nums text-odoo-text">
+                    {formatMoney(s.margin)}
+                  </td>
+                  <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-odoo-text">
+                    <span className="block">{formatMoney(s.customer_total)}</span>
+                    {/* Второй строкой — цена без НДС, приглушённо. */}
+                    <span className="block text-[11px] text-odoo-text-muted">
+                      без НДС {formatMoney(s.customer_total_net)}
+                    </span>
+                  </td>
                 </tr>
               );
             })}
           </tbody>
+          {/* Строка итогов: суммы по всему текущему отбору (считает сервер по
+              фильтру, а не по показанной странице — см. ShipmentTotals).
+              Приклеена к низу прокрутки, чтобы итоги были видны всегда. */}
+          {shipments.length > 0 && (
+            <tfoot className="sticky bottom-0 z-10 border-t border-odoo-border bg-odoo-surface-sunken">
+              <tr>
+                <td
+                  colSpan={6}
+                  className="whitespace-nowrap px-3 py-2 text-left font-semibold text-odoo-text-muted"
+                >
+                  Итого
+                </td>
+                <td className="whitespace-nowrap px-3 py-2 text-right font-semibold tabular-nums text-odoo-text">
+                  {formatMoney(totals?.margin)}
+                </td>
+                <td className="whitespace-nowrap px-3 py-2 text-right tabular-nums text-odoo-text">
+                  <span className="block font-semibold">{formatMoney(totals?.customer_total)}</span>
+                  <span className="block text-[11px] text-odoo-text-muted">
+                    без НДС {formatMoney(totals?.customer_total_net)}
+                  </span>
+                </td>
+              </tr>
+            </tfoot>
+          )}
         </table>
       </div>
     </AppShell>
