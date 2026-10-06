@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from datetime import UTC, datetime
 from fnmatch import fnmatch
 from pathlib import Path
@@ -170,10 +171,23 @@ async def delete_user(user_id: int, session: SessionDep, current: AdminUser) -> 
 
 # --- безопасность ------------------------------------------------------------
 def _scan_backups(directory: Path) -> tuple[list[dict[str, Any]], float | None]:
-    """Синхронное чтение каталога бэкапов — вызывается в пуле потоков."""
-    files = sorted(directory.glob("crm-*.dump"), key=lambda f: f.stat().st_mtime, reverse=True)
-    results: list[dict[str, Any]] = [{"name": f.name, "size": f.stat().st_size} for f in files]
-    last_mtime = files[0].stat().st_mtime if files else None
+    """Синхронное чтение каталога бэкапов — вызывается в пуле потоков.
+
+    Один stat() на файл (И-10 ревью 06.10): раньше по каждому файлу звали
+    stat дважды — при сортировке и при сборе размера. Файл, исчезнувший
+    между списком каталога и stat (ночная уборка), просто пропускаем.
+    """
+    entries: list[tuple[Path, os.stat_result]] = []
+    for path in directory.glob("crm-*.dump"):
+        try:
+            entries.append((path, path.stat()))
+        except OSError:
+            continue
+    entries.sort(key=lambda item: item[1].st_mtime, reverse=True)
+    results: list[dict[str, Any]] = [
+        {"name": path.name, "size": stat.st_size} for path, stat in entries
+    ]
+    last_mtime = entries[0][1].st_mtime if entries else None
     return results, last_mtime
 
 

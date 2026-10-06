@@ -2,6 +2,7 @@
 
 from __future__ import annotations
 
+import os
 from pathlib import Path
 
 import pytest
@@ -215,3 +216,29 @@ async def test_admin_can_step_down_when_there_is_another_admin(
         json={"role": "manager"},
     )
     assert response.status_code == 200, response.text
+
+
+async def test_scan_backups_orders_by_freshness(
+    monkeypatch: pytest.MonkeyPatch, tmp_path: Path
+) -> None:
+    """Список копий: свежие сверху, размер и время берутся одним stat (И-10)."""
+    from app.api.v1.admin import _scan_backups
+
+    old = tmp_path / "crm-2026-10-01.dump"
+    new = tmp_path / "crm-2026-10-06.dump"
+    old.write_bytes(b"x" * 10)
+    new.write_bytes(b"y" * 20)
+    os.utime(old, (1_000_000, 1_000_000))
+    os.utime(new, (2_000_000, 2_000_000))
+
+    results, last_mtime = _scan_backups(tmp_path)
+
+    assert [r["name"] for r in results] == ["crm-2026-10-06.dump", "crm-2026-10-01.dump"]
+    assert results[0]["size"] == 20
+    assert last_mtime == 2_000_000.0
+    # Чужие файлы каталога в список копий не попадают.
+    (tmp_path / "notes.txt").write_text("мусор")
+    assert [r["name"] for r in _scan_backups(tmp_path)[0]] == [
+        "crm-2026-10-06.dump",
+        "crm-2026-10-01.dump",
+    ]

@@ -228,9 +228,12 @@ volumes:
   attachments:
 
 networks:
-  # internal — без выхода наружу: база, кеш, воркеры
+  # internal — действительно без выхода в интернет (флаг internal): база,
+  # кеш и воркеры наружу не ходят, им достаточно друг друга (И-08 ревью).
+  # Бэкенду наружу может понадобиться (Sentry), поэтому он ещё и в edge.
   internal:
     name: crm_internal
+    internal: true
   # edge — nginx, фронтенд и API
   edge:
     name: crm_edge
