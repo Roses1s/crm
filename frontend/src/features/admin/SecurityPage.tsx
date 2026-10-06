@@ -16,41 +16,10 @@ export function SecurityPage() {
 
   const files = backups?.results ?? [];
 
+  // Порядок блоков — по просьбе владельца: сначала то, что смотрят чаще
+  // (вложения и попытки входа), бэкапы — внизу.
   return (
     <div className="space-y-8">
-      <div>
-        <div className="mb-3 flex items-center justify-between">
-          <h2>Бэкапы</h2>
-          <Button onClick={() => run.mutate()} disabled={run.isPending}>
-            {run.isPending ? "Запуск…" : "Запустить бэкап"}
-          </Button>
-        </div>
-
-        {run.isSuccess && (
-          <p className="mb-3 text-sm text-odoo-text-muted">
-            Задача поставлена в очередь — файл появится через несколько секунд.
-          </p>
-        )}
-        {backups?.is_stale && (
-          <p
-            role="alert"
-            className="mb-3 rounded-[4px] border border-odoo-danger/40 bg-odoo-danger/10 px-3 py-2 text-sm text-odoo-danger"
-          >
-            {staleMessage(backups.age_hours)}
-          </p>
-        )}
-
-        <ul className="text-sm">
-          {files.map((file) => (
-            <li key={file.name} className="border-b border-odoo-border-light py-1.5">
-              {file.name}{" "}
-              <span className="text-odoo-text-muted">({Math.round(file.size / 1024)} КБ)</span>
-            </li>
-          ))}
-          {files.length === 0 && <li className="text-odoo-text-muted">Файлов нет</li>}
-        </ul>
-      </div>
-
       <div>
         <h2 className="mb-3">Вложения</h2>
         <div className="grid grid-cols-1 gap-3 text-sm md:grid-cols-3">
@@ -106,6 +75,39 @@ export function SecurityPage() {
             ))}
           </tbody>
         </table>
+      </div>
+
+      <div>
+        <div className="mb-3 flex items-center justify-between">
+          <h2>Бэкапы</h2>
+          <Button onClick={() => run.mutate()} disabled={run.isPending}>
+            {run.isPending ? "Запуск…" : "Запустить бэкап"}
+          </Button>
+        </div>
+
+        {run.isSuccess && (
+          <p className="mb-3 text-sm text-odoo-text-muted">
+            Задача поставлена в очередь — файл появится через несколько секунд.
+          </p>
+        )}
+        {backups?.is_stale && (
+          <p
+            role="alert"
+            className="mb-3 rounded-[4px] border border-odoo-danger/40 bg-odoo-danger/10 px-3 py-2 text-sm text-odoo-danger"
+          >
+            {staleMessage(backups.age_hours)}
+          </p>
+        )}
+
+        <ul className="text-sm">
+          {files.map((file) => (
+            <li key={file.name} className="border-b border-odoo-border-light py-1.5">
+              {file.name}{" "}
+              <span className="text-odoo-text-muted">({Math.round(file.size / 1024)} КБ)</span>
+            </li>
+          ))}
+          {files.length === 0 && <li className="text-odoo-text-muted">Файлов нет</li>}
+        </ul>
       </div>
     </div>
   );
