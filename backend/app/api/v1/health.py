@@ -11,6 +11,9 @@ from sqlalchemy import text
 
 from app.api.deps import SessionDep
 from app.core.config import settings
+from app.core.logging import get_logger
+
+log = get_logger(__name__)
 
 router = APIRouter(tags=["health"])
 
@@ -22,21 +25,29 @@ async def health() -> dict[str, str]:
 
 @router.get("/health/ready", summary="Готов ли сервис принимать трафик")
 async def readiness(session: SessionDep) -> JSONResponse:
-    checks: dict[str, Any] = {}
+    """Статус без подробностей: ручка доступна снаружи через общий прокси
+    ``/api/``, и текст исключения (строка подключения, адрес базы) не должен
+    покидать сервер — детали смотрят в журнале (ревью 03.10, Б-12)."""
 
-    try:
-        await session.execute(text("SELECT 1"))
-        checks["database"] = "ok"
-    except Exception as exc:
-        checks["database"] = f"error: {exc}"
+    async def probe(name: str, check: Any) -> str:
+        try:
+            await check()
+        except Exception as exc:
+            log.error("health.probe_failed", probe=name, error=str(exc))
+            return "error"
+        return "ok"
 
-    try:
+    async def valkey_ping() -> None:
         client = aioredis.from_url(settings.valkey_url)  # type: ignore[no-untyped-call]
-        await client.ping()
-        await client.aclose()
-        checks["valkey"] = "ok"
-    except Exception as exc:
-        checks["valkey"] = f"error: {exc}"
+        try:
+            await client.ping()
+        finally:
+            await client.aclose()
+
+    checks: dict[str, str] = {
+        "database": await probe("database", lambda: session.execute(text("SELECT 1"))),
+        "valkey": await probe("valkey", valkey_ping),
+    }
 
     ready = all(v == "ok" for v in checks.values())
     return JSONResponse(

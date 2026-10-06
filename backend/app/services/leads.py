@@ -9,7 +9,7 @@ from __future__ import annotations
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import Select, and_, func, or_, select
+from sqlalchemy import Select, and_, func, or_, select, true
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from starlette.concurrency import run_in_threadpool
@@ -465,9 +465,15 @@ async def lead_pager(session: AsyncSession, user: User, lead_id: int) -> dict[st
     """
     lead = await get_lead_or_404(session, lead_id, user)
 
-    base = visible_only(select(Lead).where(Lead.is_archived.is_(False)), user).where(
-        Lead.assigned_to_id == lead.assigned_to_id
+    # Через API карточку «ничьей» оставить нельзя (в LeadUpdate нет
+    # ответственного, передача — отдельной ручкой), но на случай прямых
+    # правок базы листание не ломается: сравнение с NULL в SQL всегда ложно,
+    # поэтому у лида без ответственного диапазон просто не сужается его
+    # доской (Б-27).
+    board_filter = (
+        Lead.assigned_to_id == lead.assigned_to_id if lead.assigned_to_id is not None else true()
     )
+    base = visible_only(select(Lead).where(Lead.is_archived.is_(False)), user).where(board_filter)
     # Этап нужен для порядка «колонка за колонкой»; соединение один-к-одному,
     # поэтому строки не размножаются и счёт остаётся честным.
     board = base.with_only_columns(Lead.id).join(Stage, Lead.stage_id == Stage.id)
