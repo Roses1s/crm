@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
-from httpx import AsyncClient
+import asyncio
 
-from tests.conftest import TEST_PASSWORD
+import pytest
+from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import async_sessionmaker
+
+from app.api.deps import get_session
+from app.main import app
+from tests.conftest import TEST_DATABASE_URL, TEST_PASSWORD
 
 
 async def manager_headers(client: AsyncClient) -> dict[str, str]:
@@ -54,6 +60,59 @@ async def test_create_tag_reuses_existing_by_name_case_insensitive(
     body = resp.json()
     assert body["id"] == tag.id  # type: ignore[attr-defined]
     assert body["color"] == "#1e8449"  # цвет существующего тега не подменился
+
+
+async def test_rename_rejects_duplicate_name_ignoring_case(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    """Переименование не должно обходить проверку, которую уже делает POST."""
+    created = await auth_client.post("/api/v1/crm/tags", json={"name": "VIP"})
+    assert created.status_code == 201, created.text
+
+    tag_id = seeded["tag"].id  # type: ignore[attr-defined]
+    rejected = await auth_client.patch(f"/api/v1/crm/tags/{tag_id}", json={"name": "vIp"})
+    assert rejected.status_code == 409, rejected.text
+    assert rejected.json()["code"] == "tag_name_conflict"
+
+    tags = await auth_client.get("/api/v1/crm/tags")
+    assert sum(tag["name"].casefold() == "vip" for tag in tags.json()) == 1
+
+
+async def test_tag_can_be_renamed_with_only_case_changed(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    tag_id = seeded["tag"].id  # type: ignore[attr-defined]
+    renamed = await auth_client.patch(f"/api/v1/crm/tags/{tag_id}", json={"name": "КРУПНЫЙ КЛИЕНТ"})
+    assert renamed.status_code == 200, renamed.text
+    assert renamed.json()["name"] == "КРУПНЫЙ КЛИЕНТ"
+    assert renamed.json()["id"] == tag_id
+
+
+@pytest.mark.skipif(TEST_DATABASE_URL.startswith("sqlite"), reason="Проверка блокировки PostgreSQL")
+async def test_concurrent_tag_creation_reuses_case_insensitive_name(
+    auth_client: AsyncClient, engine
+) -> None:
+    """Два одновременных запроса с разным регистром создают один тег."""
+    maker = async_sessionmaker(bind=engine, expire_on_commit=False)
+
+    async def independent_session():
+        async with maker() as session:
+            yield session
+
+    previous_override = app.dependency_overrides[get_session]
+    app.dependency_overrides[get_session] = independent_session
+    try:
+        first, second = await asyncio.gather(
+            auth_client.post("/api/v1/crm/tags", json={"name": "СРОЧНО"}),
+            auth_client.post("/api/v1/crm/tags", json={"name": "срочно"}),
+        )
+        assert first.status_code == second.status_code == 201
+        assert first.json()["id"] == second.json()["id"]
+
+        tags = await auth_client.get("/api/v1/crm/tags")
+        assert sum(tag["name"].casefold() == "срочно" for tag in tags.json()) == 1
+    finally:
+        app.dependency_overrides[get_session] = previous_override
 
 
 async def test_update_tag_name_and_color(auth_client: AsyncClient, seeded: dict) -> None:

@@ -87,6 +87,37 @@ it("«Отмена» откатывает уже автосохранённый 
 
 const current0 = { id: 1, name: "Важное", color: "#112233" };
 
+it("объясняет отказ, если новое название тега уже занято", async () => {
+  server = startFakeApi([
+    {
+      method: "GET",
+      path: "/crm/tags",
+      response: [current0, { id: 2, name: "Срочно", color: "#abcdef" }],
+    },
+    {
+      method: "PATCH",
+      path: "/crm/tags/1",
+      status: 409,
+      response: { detail: "Тег уже существует", code: "tag_name_conflict" },
+    },
+  ]);
+
+  renderWithProviders(<Harness />);
+  const user = userEvent.setup();
+
+  await screen.findByText("Важное");
+  await user.click(screen.getByRole("button", { name: "Теги" }));
+  await user.click(await screen.findByRole("button", { name: "Изменить тег Важное" }));
+  const name = screen.getByPlaceholderText("Название тега");
+  await user.clear(name);
+  await user.type(name, "Срочно");
+  await user.click(screen.getByRole("button", { name: "Сохранить" }));
+
+  expect(await screen.findByRole("alert")).toHaveTextContent(
+    "Такой тег уже есть. Выберите другое название.",
+  );
+});
+
 it("корзину удаления тега видит только администратор (Б-16)", async () => {
   server = startFakeApi([{ method: "GET", path: "/crm/tags", response: () => [current0] }]);
 

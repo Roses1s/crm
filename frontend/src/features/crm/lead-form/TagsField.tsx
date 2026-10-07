@@ -6,6 +6,7 @@
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
 import { useEffect, useState } from "react";
 
+import { ApiError } from "@/shared/api/client";
 import { useCreateTag, useDeleteTag, useUpdateTag } from "@/shared/api/hooks";
 import type { Tag } from "@/shared/types";
 import { ColorPicker } from "@/shared/ui/color-picker";
@@ -44,6 +45,8 @@ export function TagsField({
   const createTag = useCreateTag();
   const updateTag = useUpdateTag();
   const deleteTag = useDeleteTag();
+  const duplicateNameError =
+    updateTag.error instanceof ApiError && updateTag.error.code === "tag_name_conflict";
 
   const selected = all.filter((t) => value.includes(t.id));
 
@@ -59,6 +62,7 @@ export function TagsField({
   }
 
   function startEdit(tag: Tag) {
+    updateTag.reset();
     const color = isValidHexColor(tag.color) ? tag.color : NEW_TAG_COLOR;
     setEditingId(tag.id);
     setEditName(tag.name);
@@ -168,10 +172,18 @@ export function TagsField({
                   <input
                     autoFocus
                     value={editName}
-                    onChange={(e) => setEditName(e.target.value)}
+                    onChange={(e) => {
+                      setEditName(e.target.value);
+                      if (updateTag.isError) updateTag.reset();
+                    }}
                     className="rounded-[3px] border border-odoo-border bg-odoo-surface px-1.5 py-1 text-[12px] text-odoo-text outline-none focus:border-odoo-focus"
                     placeholder="Название тега"
                   />
+                  {duplicateNameError && (
+                    <p role="alert" className="text-[11px] text-odoo-danger">
+                      Такой тег уже есть. Выберите другое название.
+                    </p>
+                  )}
                   <ColorPicker value={editColor} onChange={pickEditColor} />
                   <div className="flex justify-end gap-1">
                     <button

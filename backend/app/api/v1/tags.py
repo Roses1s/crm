@@ -22,7 +22,8 @@ from app.core.config import settings
 from app.core.errors import NotFoundError
 from app.models.crm import Tag
 from app.schemas.crm import TagCreate, TagRead, TagUpdate
-from app.services.tags import find_tag_by_name
+from app.services.tags import create_or_get_tag
+from app.services.tags import update_tag as update_tag_service
 
 router = APIRouter(prefix="/crm/tags", tags=["crm: теги"])
 
@@ -38,29 +39,17 @@ async def list_tags(session: SessionDep, _: CurrentUser) -> list[Tag]:
 
 @router.post("", response_model=TagRead, status_code=status.HTTP_201_CREATED, summary="Создать тег")
 async def create_tag(payload: TagCreate, session: SessionDep, _: CurrentUser) -> Tag:
-    # Имя уникально в базе: если тег с таким названием (без учёта регистра)
-    # уже есть, отдаём его, а не падаем ошибкой уникальности — два человека
-    # могли одновременно захотеть один и тот же тег.
-    existing = await find_tag_by_name(session, payload.name)
-    if existing is not None:
-        return existing
-    tag = Tag(**payload.model_dump())
-    session.add(tag)
-    await session.commit()
-    await session.refresh(tag)
-    await invalidate(CACHE_NS)  # список тегов изменился — сбрасываем кеш
+    # Повторное имя без учёта регистра возвращает существующий тег; сервис
+    # сериализует параллельное создание имён.
+    tag, created = await create_or_get_tag(session, name=payload.name, color=payload.color)
+    if created:
+        await invalidate(CACHE_NS)  # список тегов изменился — сбрасываем кеш
     return tag
 
 
 @router.patch("/{tag_id}", response_model=TagRead, summary="Переименовать / перекрасить тег")
 async def update_tag(tag_id: int, payload: TagUpdate, session: SessionDep, _: CurrentUser) -> Tag:
-    tag = await session.get(Tag, tag_id)
-    if tag is None:
-        raise NotFoundError(f"Тег {tag_id} не найден")
-    for key, value in payload.model_dump(exclude_unset=True).items():
-        setattr(tag, key, value)
-    await session.commit()
-    await session.refresh(tag)
+    tag = await update_tag_service(session, tag_id, payload.model_dump(exclude_unset=True))
     await invalidate(CACHE_NS)  # тег изменился — сбрасываем кеш
     return tag
 
