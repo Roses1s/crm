@@ -27,6 +27,7 @@ async def test_list_leads_is_paginated(auth_client: AsyncClient) -> None:
     lead = body["results"][0]
     assert lead["stage_name"] == "Новый"
     assert lead["assigned_to_name"] == "Артём Соколов"
+    assert lead["accountant_name"] is None
     assert [t["name"] for t in lead["tags"]] == ["Крупный клиент"]
 
 
@@ -48,10 +49,44 @@ async def test_create_lead_validates_inn(auth_client: AsyncClient, seeded: dict)
 
     ok = await auth_client.post(
         "/api/v1/crm/leads",
-        json={"name": "ООО «Ромашка»", "inn": "5404123455", "stage_id": stage_id, "priority": 2},
+        json={
+            "name": "ООО «Ромашка»",
+            "inn": "5404123455",
+            "stage_id": stage_id,
+            "priority": 2,
+            "accountant_name": "Пухова Елена Витальевна",
+        },
     )
     assert ok.status_code == 201, ok.text
     assert ok.json()["assigned_to_email"] == "admin@crmdetroid.ru"
+    assert ok.json()["accountant_name"] == "Пухова Елена Витальевна"
+
+
+async def test_accountant_can_be_changed_cleared_and_is_validated(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+
+    changed = await auth_client.patch(
+        f"/api/v1/crm/leads/{lead_id}",
+        json={"accountant_name": "Кузьмина Виктория Павловна"},
+    )
+    assert changed.status_code == 200, changed.text
+    assert changed.json()["accountant_name"] == "Кузьмина Виктория Павловна"
+
+    persisted = await auth_client.get(f"/api/v1/crm/leads/{lead_id}")
+    assert persisted.json()["accountant_name"] == "Кузьмина Виктория Павловна"
+
+    cleared = await auth_client.patch(
+        f"/api/v1/crm/leads/{lead_id}", json={"accountant_name": None}
+    )
+    assert cleared.status_code == 200, cleared.text
+    assert cleared.json()["accountant_name"] is None
+
+    invalid = await auth_client.patch(
+        f"/api/v1/crm/leads/{lead_id}", json={"accountant_name": "Неизвестный бухгалтер"}
+    )
+    assert invalid.status_code == 422
 
 
 async def test_stage_change_is_written_to_timeline(auth_client: AsyncClient, seeded: dict) -> None:

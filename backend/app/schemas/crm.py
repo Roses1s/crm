@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import ClassVar
+from typing import ClassVar, Literal
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
@@ -94,6 +94,20 @@ class LossReasonCreate(BaseModel):
 
 
 # --- лиды --------------------------------------------------------------------
+AccountantName = Literal[
+    "Пухова Елена Витальевна",
+    "Кузьмина Виктория Павловна",
+    "Белякова Ольга Александровна",
+    "Терентьева Елена Александровна",
+    "Горнагина Ирина Анатольевна",
+    "Дремова Наталья Александровна",
+    "Позднякова Лилия Усманова",
+    "Рыбина Екатерина",
+    "Гуцол Катерина Евгеньевна",
+    "Колясникова Алина",
+]
+
+
 class LeadBase(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     inn: str = Field(min_length=10, max_length=12)
@@ -109,6 +123,7 @@ class LeadCreate(LeadBase):
     stage_id: int
     assigned_to_id: int | None = None
     tag_ids: list[int] = Field(default_factory=list)
+    accountant_name: AccountantName | None = None
 
 
 class LeadTransfer(BaseModel):
@@ -118,15 +133,16 @@ class LeadTransfer(BaseModel):
 
 
 class LeadUpdate(PatchModel):
-    # Почта логиста — единственное поле карточки, которое в базе
-    # необязательное: его разрешено очистить, передав null.
-    nullable_fields: ClassVar[frozenset[str]] = frozenset({"logist_email"})
+    # Почта логиста и назначенный бухгалтер необязательны: их разрешено
+    # очистить, передав null.
+    nullable_fields: ClassVar[frozenset[str]] = frozenset({"logist_email", "accountant_name"})
 
     name: str | None = Field(default=None, min_length=1, max_length=255)
     inn: str | None = None
     logist_contact: str | None = None
     logist_phone: str | None = None
     logist_email: EmailStr | None = None
+    accountant_name: AccountantName | None = None
     priority: int | None = Field(default=None, ge=0, le=3)
     stage_id: int | None = None
     tag_ids: list[int] | None = None
@@ -150,6 +166,7 @@ class LeadRead(ORMModel):
     logist_contact: str
     logist_phone: str
     logist_email: str | None
+    accountant_name: AccountantName | None
     priority: int
     is_archived: bool
     loss_reason_id: int | None

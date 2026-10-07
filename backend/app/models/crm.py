@@ -92,6 +92,8 @@ class Lead(Base, TimestampMixin):
     logist_contact: Mapped[str] = mapped_column(String(255), default="", nullable=False)
     logist_phone: Mapped[str] = mapped_column(String(32), default="", nullable=False)
     logist_email: Mapped[str | None] = mapped_column(String(255))
+    # Назначенный бухгалтер не связан с продавцом (`assigned_to_id`): это отдельный список.
+    accountant_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     priority: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
     # Переосмыслено 01.10.2026: это поле означает «лид проигран» — название
