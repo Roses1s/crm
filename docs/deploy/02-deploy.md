@@ -10,18 +10,19 @@ nginx. Nginx заменяет присланный клиентом `X-Forwarded
                  ▼                                  │
         crm-nginx :80/:443 ── edge ──► crm-frontend :80
                  │
-                 └── crm_proxy (172.31.250.0/24) ──► crm-backend :8000
+                 └── crm_proxy (172.31.250.0/24) ──► crm-backend :8000 (.3)
                                       nginx: .2      │
                                                     │ сеть internal
                            crm-worker ──┐           ├──► crm-valkey :6379
                            crm-beat   ──┴───────────└──► crm-postgres :5432
 ```
 
-Сеть `crm_proxy` содержит только `nginx` и `backend`; адрес nginx по умолчанию
-`172.31.250.2`. Если эта подсеть пересекается с сетью сервера или VPN, задайте
-другую `CRM_PROXY_SUBNET` и адрес `CRM_NGINX_PROXY_IP` в `.env` — адрес должен
-находиться внутри подсети. Оба значения обычно уже появятся после копирования
-`.env.example`.
+Сеть `crm_proxy` содержит только `nginx` и `backend`. По умолчанию nginx всегда
+занимает `172.31.250.2`, а backend — `172.31.250.3`; закреплённые адреса не дают
+порядку запуска контейнеров вызвать конфликт. Если подсеть пересекается с сетью
+сервера или VPN, задайте свою `CRM_PROXY_SUBNET` и оба адреса
+`CRM_NGINX_PROXY_IP`/`CRM_BACKEND_PROXY_IP` в `.env`. Оба адреса должны быть
+внутри подсети и отличаться друг от друга. Примеры есть в `.env.example`.
 
 > Все команды выполняются на сервере под пользователем `deploy`
 > (`ssh crm`). Перед блоками вставки лучше разблокировать sudo: `sudo -v`.
@@ -413,6 +414,12 @@ sudo swapoff /swapfile && sudo fallocate -l 4G /swapfile && sudo chmod 600 /swap
 **`nginx: [emerg] host not found in upstream "backend"`.**
 Nginx стартовал раньше, чем бэкенд. Достаточно `docker compose up -d nginx`
 или `docker compose restart nginx` после того, как бэкенд поднялся.
+
+**`failed to set up container networking: Address already in use` при старте nginx.**
+Проверьте `crm_proxy`: адрес nginx должен быть `172.31.250.2`, backend —
+`172.31.250.3` (или разные заданные адреса из подсети). В актуальном Compose
+оба адреса закреплены. Если конфликт возник после уже применённой миграции,
+не запускайте старый backend и не откатывайте базу — исправляйте сеть/релиз вперёд.
 
 **`dependency failed to start: container crm-postgres is unhealthy`.**
 Смотрите `docker compose logs postgres --tail 30`. Если там текст

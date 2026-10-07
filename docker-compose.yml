@@ -124,7 +124,12 @@ services:
         condition: service_healthy
       valkey:
         condition: service_healthy
-    networks: [internal, proxy]
+    networks:
+      internal: {}
+      # Адреса backend и nginx закреплены, чтобы порядок запуска контейнеров
+      # не позволил backend занять адрес, зарезервированный за nginx.
+      proxy:
+        ipv4_address: ${CRM_BACKEND_PROXY_IP:-172.31.250.3}
 
   # --- фоновые задачи -------------------------------------------------------
   worker:
@@ -228,7 +233,7 @@ services:
       - frontend
     networks:
       edge:
-      # Статический адрес — единственный узел, чьи proxy-заголовки принимает API.
+      # nginx закреплён на .2; backend на .3. Gunicorn доверяет только адресу nginx.
       proxy:
         ipv4_address: ${CRM_NGINX_PROXY_IP:-172.31.250.2}
 

@@ -12,6 +12,7 @@ from uvicorn.middleware.proxy_headers import ProxyHeadersMiddleware
 
 ROOT = Path(__file__).resolve().parents[2]
 PROXY_ADDRESS = "${CRM_NGINX_PROXY_IP:-172.31.250.2}"
+BACKEND_PROXY_ADDRESS = "${CRM_BACKEND_PROXY_IP:-172.31.250.3}"
 
 
 def test_gunicorn_does_not_trust_remote_proxy_headers_by_default(monkeypatch: Any) -> None:
@@ -32,15 +33,20 @@ def test_gunicorn_accepts_the_configured_nginx_address(monkeypatch: Any) -> None
     assert settings["forwarded_allow_ips"] == "172.31.250.2"
 
 
-def test_compose_trusts_only_the_static_nginx_address() -> None:
-    """API и nginx делят отдельную сеть; других контейнеров в ней нет."""
+def test_compose_uses_distinct_fixed_backend_and_nginx_addresses() -> None:
+    """API и nginx делят сеть с разными закреплёнными адресами."""
     compose = yaml.safe_load((ROOT / "docker-compose.yml").read_text(encoding="utf-8"))
     services = compose["services"]
     backend = services["backend"]
     nginx = services["nginx"]
 
+    backend_proxy_ip = backend["networks"]["proxy"]["ipv4_address"]
+    nginx_proxy_ip = nginx["networks"]["proxy"]["ipv4_address"]
+
     assert backend["environment"]["GUNICORN_FORWARDED_ALLOW_IPS"] == PROXY_ADDRESS
-    assert nginx["networks"]["proxy"]["ipv4_address"] == PROXY_ADDRESS
+    assert backend_proxy_ip == BACKEND_PROXY_ADDRESS
+    assert nginx_proxy_ip == PROXY_ADDRESS
+    assert backend_proxy_ip != nginx_proxy_ip
 
     proxy_peers = {
         name
