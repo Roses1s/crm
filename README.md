@@ -64,7 +64,7 @@ backend/                    FastAPI
 ├── app/worker/             Celery: бэкапы базы и вложений, уборка файлов и отозванных токенов
 ├── app/cli.py              createsuperuser, seed, resetboard (сброс доски к стандартной)
 ├── alembic/                23 миграции
-└── tests/                  pytest; локально 185 прошло, 5 пропущено на SQLite
+└── tests/                  pytest; локально 187 прошло, 5 пропущено на SQLite
 
 frontend/                   React 19
 ├── src/app/                router, providers, layout (AppShell, Navbar, ControlPanel)
@@ -77,7 +77,7 @@ deploy/                     инфраструктура сервера
 ├── nginx/snippets/         TLS-параметры и заголовки безопасности
 ├── nginx/bootstrap/        временный HTTP-конфиг для первого выпуска сертификата
 ├── systemd/crm.service     автозапуск стека после перезагрузки
-├── restore-test.sh         учебное восстановление из бэкапа во временную базу
+├── restore-test.sh         восстановление бэкапа во временную базу и отчёт о дублях заявок
 └── scripts/                deploy-hook Certbot (мягкая перезагрузка nginx)
 
 .github/workflows/          автопроверки: ruff, mypy, pytest, миграции и alembic check,
@@ -149,6 +149,7 @@ cd /opt/crm && ./deploy.sh      # или на сервере
 - Автозапуск: `systemctl status crm.service`
 - Бэкапы: `pg_dump` ежедневно в 03:00, хранение 14 дней; архив вложений — еженедельно
 - Проверка бэкапа: `ssh crm "cd /opt/crm && ./deploy/restore-test.sh"` — разворачивает
-  свежую копию во временную базу и удаляет её за собой (последняя проверка — 29.09.2026)
+  свежую копию во временную базу, показывает повторы номеров заявок в ней и
+  удаляет её за собой. Последняя фактическая проверка восстановления — 29.09.2026.
 - Доступ по SSH: только по ключам, пользователь `deploy`; как добавить новый
   компьютер — в [`docs/deploy/01-server-setup.md`](docs/deploy/01-server-setup.md)
