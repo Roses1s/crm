@@ -91,7 +91,11 @@ const keys = {
   loginAttempts: ["login-attempts"] as const,
 };
 
-/** Лиды видны в CRM, клиентах, подсказках по ИНН и листалке карточек. */
+/**
+ * Обновляет CRM, клиентов, подсказки по ИНН и листалку после любого изменения
+ * лида, включая проигрыш и безвозвратное удаление. Так не остаются старые
+ * записи в списках и карточках клиентов.
+ */
 function invalidateLeadLists(qc: QueryClient): void {
   void qc.invalidateQueries({ queryKey: ["leads"] });
   void qc.invalidateQueries({ queryKey: ["customers"] });

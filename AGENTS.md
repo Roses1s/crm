@@ -58,8 +58,11 @@ CRM для транспортной компании: лиды, канбан-в�
 
 ```bash
 cd backend && .venv/bin/ruff check . && .venv/bin/ruff format --check . \
-  && .venv/bin/mypy app && .venv/bin/python -m pytest && .venv/bin/alembic check
-cd ../frontend && npm run lint && npm run format:check && npx tsc -b && npm test \
+  && .venv/bin/mypy app \
+  && .venv/bin/python -m pytest --cov=app --cov-branch --cov-report=term-missing --cov-fail-under=70 \
+  && .venv/bin/alembic check
+cd ../frontend && npm run lint && npm run format:check && npx tsc -b \
+  && npm test -- --coverage \
   && npm run build
 cd .. && python scripts/snapshot.py        # пересобрать паспорт проекта
 ```

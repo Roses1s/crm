@@ -81,6 +81,10 @@ function errorCode(payload: unknown): string | undefined {
 
 type Options = Omit<RequestInit, "body"> & { body?: unknown; auth?: boolean };
 
+/**
+ * Тип `T` проверяется только компилятором: JSON приводится к нему без
+ * проверки структуры во время работы программы (остаток Ф-09).
+ */
 export async function api<T>(path: string, options: Options = {}): Promise<T> {
   const { body, auth = true, headers, ...rest } = options;
 
@@ -116,7 +120,9 @@ export interface Page<T> {
   results: T[];
 }
 
-/** Загрузка файла: FormData, Content-Type браузер выставит сам (с boundary). */
+/** Загрузка файла: FormData, Content-Type браузер выставит сам (с boundary).
+ * Ответ тоже приводится к `T` без проверки структуры во время работы программы (Ф-09).
+ */
 export async function apiUpload<T>(path: string, file: File): Promise<T> {
   const form = new FormData();
   form.append("file", file);

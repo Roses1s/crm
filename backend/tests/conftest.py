@@ -6,6 +6,11 @@
 прогонится на этой базе — так в CI мы ловим отличия поведения PostgreSQL от
 SQLite. Схема создаётся из моделей; миграции проверяются отдельным шагом
 ``alembic upgrade head`` на настоящем PostgreSQL.
+
+Тестовый HTTP-клиент переиспользует одну ``AsyncSession`` для всех запросов
+внутри теста; в рабочем приложении зависимость создаёт отдельную сессию на
+каждый запрос. Это упрощает тестовые данные, но не проверяет жизненный цикл сессии
+и восстановление после ошибки транзакции (остаток Т-03).
 """
 
 from __future__ import annotations
@@ -24,6 +29,8 @@ _IS_SQLITE = TEST_DATABASE_URL.startswith("sqlite")
 # Вложения в тестах пишутся во временный каталог, который чистится после прогона.
 _ATTACHMENTS_TMP = tempfile.mkdtemp(prefix="crm-test-attachments-")
 
+# Тесты не подключают Valkey/Celery: кеш заменён памятью, лимитер выключен.
+# Это ускоряет обычный прогон, но оставляет интеграционные проверки Т-06.
 os.environ.update(
     DATABASE_URL=TEST_DATABASE_URL,
     ATTACHMENTS_DIR=_ATTACHMENTS_TMP,
@@ -158,6 +165,8 @@ async def seeded(session: AsyncSession) -> dict[str, object]:
 
 @pytest.fixture
 async def client(session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
+    """HTTP-клиент теста: все запросы используют одну сессию (ограничение Т-03)."""
+
     async def _override() -> AsyncGenerator[AsyncSession, None]:
         yield session
 

@@ -74,6 +74,8 @@ export function KanbanPage() {
   const view = params.get("view") === "list" ? "list" : "kanban";
 
   const [searchInput, setSearchInput] = useState(search);
+  // Остаток Ф-08: общий ключ localStorage не разделяет пользователей и доски.
+  // При исправлении ключ должен включать владельца доски и id текущей доски.
   const [folded, setFolded] = useState<number[]>(() => {
     try {
       return JSON.parse(localStorage.getItem("crm-folded-stages") ?? "[]") as number[];
