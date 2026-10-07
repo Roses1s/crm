@@ -130,15 +130,60 @@ def test_old_network_defers_compose_until_after_the_backup(tmp_path: Path) -> No
     assert not any(call.startswith("compose ") for call in calls)
 
 
+def test_internal_network_preflight_starts_core_services_and_verifies_network(
+    tmp_path: Path,
+) -> None:
+    result = run_shell(
+        """
+        TRACE_FILE="${TEST_LOG}.docker"
+        docker() {
+            printf '%s\\n' "$*" >> "$TRACE_FILE"
+            case "$1" in
+                network) echo true ;;
+                inspect)
+                    case "$3" in
+                        "{{.State.Status}}") echo running ;;
+                        "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}") echo healthy ;;
+                        *) echo "Неожиданная команда inspect: $*" >&2; return 90 ;;
+                    esac
+                    ;;
+                compose)
+                    [[ "$2" == up && "$3" == -d && "$4" == postgres && "$5" == valkey ]] || {
+                        echo "Неожиданная команда Compose: $*" >&2
+                        return 91
+                    }
+                    ;;
+                *) echo "Неожиданная команда Docker: $*" >&2; return 92 ;;
+            esac
+        }
+        prepare_core_services
+        """,
+        tmp_path,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    calls = (tmp_path / "deploy.log.docker").read_text(encoding="utf-8").splitlines()
+    network_checks = [
+        index
+        for index, call in enumerate(calls)
+        if call == "network inspect --format {{.Internal}} crm_internal"
+    ]
+    assert len(network_checks) == 2
+    assert calls.index("compose up -d postgres valkey") < network_checks[1]
+    assert not any(call.startswith("compose down ") for call in calls)
+
+
 def test_network_transition_keeps_volumes_and_waits_for_core_services(tmp_path: Path) -> None:
     result = run_shell(
         """
         TRACE_FILE="${TEST_LOG}.docker"
         BACKUP_OK="${TEST_LOG}.backup-ok"
+        NETWORK_READY="${TEST_LOG}.network-ready"
         docker() {
             printf '%s\\n' "$*" >> "$TRACE_FILE"
             case "$1" in
-                network) echo false ;;
+                network)
+                    if [[ -f "$NETWORK_READY" ]]; then echo true; else echo false; fi
+                    ;;
                 inspect)
                     case "$3" in
                         "{{.State.Status}}") echo running ;;
@@ -159,6 +204,7 @@ def test_network_transition_keeps_volumes_and_waits_for_core_services(tmp_path: 
                                 echo "Сеть подготавливается не только для PostgreSQL/Valkey" >&2
                                 return 92
                             }
+                            touch "$NETWORK_READY"
                             ;;
                         *) echo "Неожиданная команда Compose: $*" >&2; return 93 ;;
                     esac
@@ -181,6 +227,8 @@ def test_network_transition_keeps_volumes_and_waits_for_core_services(tmp_path: 
     migration_index = calls.index("alembic upgrade head")
     assert calls.index(down) < up_index < migration_index
     assert calls[up_index + 1].startswith("inspect -f {{if .State.Health}}")
+    network_check = calls.index("network inspect --format {{.Internal}} crm_internal", up_index)
+    assert up_index < network_check < migration_index
 
 
 def test_backup_network_preparation_and_migration_are_ordered() -> None:

@@ -164,6 +164,13 @@ internal_network_needs_transition() {
     [[ "$internal_state" == "false" ]]
 }
 
+verify_internal_network() {
+    local internal_state
+    internal_state="$(docker network inspect --format '{{.Internal}}' crm_internal 2>/dev/null || true)"
+    [[ "$internal_state" == "true" ]] \
+        || die "Сеть crm_internal не подтверждена как internal: true; миграция не запускалась"
+}
+
 prepare_core_services() {
     if internal_network_needs_transition; then
         # Пока сеть старая, частичный `compose up postgres valkey` опасен:
@@ -180,6 +187,7 @@ prepare_core_services() {
 
     docker compose up -d postgres valkey 2>&1 | tee -a "$LOG_FILE"
     wait_core_services
+    verify_internal_network
 }
 
 recreate_internal_network_if_needed() {
@@ -194,6 +202,7 @@ recreate_internal_network_if_needed() {
         die "Не удалось поднять PostgreSQL/Valkey в новой сети. Миграция не запускалась"
     fi
     wait_core_services
+    verify_internal_network
     ok "Внутренняя сеть пересоздана, PostgreSQL и Valkey готовы"
 }
 
