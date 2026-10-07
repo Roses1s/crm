@@ -1,6 +1,6 @@
 # Этап 4. Деплой полного стека на crmdetroid.ru
 
-Что поднимаем: **PostgreSQL 18 + Valkey 8 + FastAPI (Gunicorn) + Celery worker + Celery beat + собранный React + Nginx 1.27**.
+Что поднимаем: **PostgreSQL 18 + Valkey 8 + FastAPI (Gunicorn) + Celery worker + Celery beat + собранный React + Nginx 1.30**.
 Наружу по-прежнему смотрит только nginx на портах 80/443 — всё остальное живёт внутри docker-сетей.
 
 ```
@@ -29,8 +29,11 @@ df -h /
 free -h
 ```
 
-Для сборки нужно **минимум 4 ГБ свободного места** на диске. Если меньше — сначала
-почистите Docker: `docker system prune -af`.
+`deploy.sh` проверяет, чтобы после оценки дампа оставалось не меньше 2 ГБ.
+Если свободно 3–5 ГБ — перед выкаткой очистите только кеш сборки:
+`ssh crm "docker builder prune -f && df -h / | tail -1"`. При запасе больше 5 ГБ
+чистить не нужно; `docker system prune -af` не используйте — он удаляет образы,
+нужные для быстрого отката.
 
 ---
 
@@ -53,7 +56,7 @@ sudo mkdir -p /opt/crm && sudo chown deploy:deploy /opt/crm
 ```
 
 ```bash
-git clone -b arena/2749a700-crm https://github.com/Roses1s/crm.git /opt/crm
+git clone -b arena/6d4bde73-crm https://github.com/Roses1s/crm.git /opt/crm
 ```
 
 > Если сервер уже настроен и `/opt/crm` клонировался с прежней рабочей ветки,
@@ -61,7 +64,7 @@ git clone -b arena/2749a700-crm https://github.com/Roses1s/crm.git /opt/crm
 > клон на новую ветку:
 >
 > ```bash
-> ssh crm "cd /opt/crm && git fetch origin arena/2749a700-crm && git checkout -B arena/2749a700-crm --track origin/arena/2749a700-crm && git log --oneline -1"
+> ssh crm "cd /opt/crm && git fetch origin arena/6d4bde73-crm && git checkout -B arena/6d4bde73-crm --track origin/arena/6d4bde73-crm && git log --oneline -1"
 > ```
 >
 > После этого `ssh crm /opt/crm/deploy.sh` работает как раньше.
@@ -421,12 +424,16 @@ Nginx стартовал раньше, чем бэкенд. Достаточно
 Пользователь создан в другой базе (например, до `docker compose down -v`).
 Создайте администратора заново командой из шага 6.
 
-**Кончается место на диске.**
+**Кончается место на диске.** Сначала посмотрите расход и очистите только кеш
+сборки — он не содержит данные базы и образы для быстрого отката:
 ```bash
 docker system df
-docker system prune -af
-docker volume ls          # volume pgdata НЕ удалять — в нём база
+docker builder prune -f
+df -h /
 ```
+`docker system prune -af` не используйте: он удаляет предыдущие образы.
+Тома не удаляйте; особенно `pgdata`, в нём база. Если после чистки свободно
+меньше 3 ГБ, остановитесь и сначала разберитесь, что занимает место.
 
 **Нужно посмотреть данные в базе.**
 ```bash
