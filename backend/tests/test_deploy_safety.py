@@ -100,10 +100,97 @@ def test_preflight_stops_when_dump_would_leave_too_little_space(tmp_path: Path) 
     assert "Недостаточно места" in result.stdout
 
 
-def test_backup_and_migration_are_explicit_and_ordered() -> None:
+def test_old_network_defers_compose_until_after_the_backup(tmp_path: Path) -> None:
+    result = run_shell(
+        """
+        TRACE_FILE="${TEST_LOG}.docker"
+        docker() {
+            printf '%s\\n' "$*" >> "$TRACE_FILE"
+            case "$1" in
+                network) echo false ;;
+                inspect)
+                    case "$3" in
+                        "{{.State.Status}}") echo running ;;
+                        "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}") echo healthy ;;
+                        *) echo "Неожиданная команда inspect: $*" >&2; return 90 ;;
+                    esac
+                    ;;
+                *) echo "До проверенного дампа запрещена команда: $*" >&2; return 91 ;;
+            esac
+        }
+        prepare_core_services
+        printf 'transition=%s\\n' "$NETWORK_TRANSITION_REQUIRED"
+        """,
+        tmp_path,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    assert "transition=1" in result.stdout
+    calls = (tmp_path / "deploy.log.docker").read_text(encoding="utf-8").splitlines()
+    assert any(call.startswith("network inspect ") for call in calls)
+    assert not any(call.startswith("compose ") for call in calls)
+
+
+def test_network_transition_keeps_volumes_and_waits_for_core_services(tmp_path: Path) -> None:
+    result = run_shell(
+        """
+        TRACE_FILE="${TEST_LOG}.docker"
+        BACKUP_OK="${TEST_LOG}.backup-ok"
+        docker() {
+            printf '%s\\n' "$*" >> "$TRACE_FILE"
+            case "$1" in
+                network) echo false ;;
+                inspect)
+                    case "$3" in
+                        "{{.State.Status}}") echo running ;;
+                        "{{if .State.Health}}{{.State.Health.Status}}{{else}}none{{end}}") echo healthy ;;
+                        *) echo "Неожиданная команда inspect: $*" >&2; return 90 ;;
+                    esac
+                    ;;
+                compose)
+                    case "$2:$3" in
+                        down:--remove-orphans)
+                            [[ -f "$BACKUP_OK" ]] || {
+                                echo "Стек остановлен до готового дампа" >&2
+                                return 91
+                            }
+                            ;;
+                        up:-d)
+                            [[ "$4" == postgres && "$5" == valkey ]] || {
+                                echo "Сеть подготавливается не только для PostgreSQL/Valkey" >&2
+                                return 92
+                            }
+                            ;;
+                        *) echo "Неожиданная команда Compose: $*" >&2; return 93 ;;
+                    esac
+                    ;;
+                *) echo "Неожиданная команда Docker: $*" >&2; return 94 ;;
+            esac
+        }
+        prepare_core_services
+        touch "$BACKUP_OK" # Успешный pg_restore --list в настоящем деплое.
+        recreate_internal_network_if_needed
+        printf 'alembic upgrade head\\n' >> "$TRACE_FILE"
+        """,
+        tmp_path,
+    )
+    assert result.returncode == 0, result.stdout + result.stderr
+    calls = (tmp_path / "deploy.log.docker").read_text(encoding="utf-8").splitlines()
+    down = next(call for call in calls if call.startswith("compose down "))
+    assert down == "compose down --remove-orphans"  # Без -v: тома сохраняются.
+    up_index = calls.index("compose up -d postgres valkey")
+    migration_index = calls.index("alembic upgrade head")
+    assert calls.index(down) < up_index < migration_index
+    assert calls[up_index + 1].startswith("inspect -f {{if .State.Health}}")
+
+
+def test_backup_network_preparation_and_migration_are_ordered() -> None:
     deploy = DEPLOY.read_text(encoding="utf-8")
     main = deploy.split("# --- 2. Preflight", maxsplit=1)[1]
-    assert main.index("create_pre_deploy_backup") < main.index("alembic upgrade head")
+    assert main.index("prepare_core_services") < main.index("create_pre_deploy_backup")
+    assert main.index("create_pre_deploy_backup") < main.index(
+        "recreate_internal_network_if_needed"
+    )
+    assert main.index("recreate_internal_network_if_needed") < main.index("alembic upgrade head")
     assert "pg_dump" in deploy
     assert "pg_restore --list" in deploy
 

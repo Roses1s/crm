@@ -35,6 +35,9 @@ DO_BUILD=1
 MODE="deploy"
 SCHEMA_CHANGED=0
 PRE_DEPLOY_BACKUP=""
+# При старой сети нельзя частично пересоздать Compose-сеть до резервной копии:
+# другие работающие сервисы ещё держат её endpoints.
+NETWORK_TRANSITION_REQUIRED=0
 
 # --- вывод -------------------------------------------------------------------
 if [[ -t 1 ]]; then
@@ -153,6 +156,45 @@ wait_core_services() {
         sleep 2
     done
     die "PostgreSQL/Valkey не стали healthy за ${HEALTH_TIMEOUT}с"
+}
+
+internal_network_needs_transition() {
+    local internal_state
+    internal_state="$(docker network inspect --format '{{.Internal}}' crm_internal 2>/dev/null || true)"
+    [[ "$internal_state" == "false" ]]
+}
+
+prepare_core_services() {
+    if internal_network_needs_transition; then
+        # Пока сеть старая, частичный `compose up postgres valkey` опасен:
+        # Compose остановил бы БД и не смог бы удалить сеть из-под app endpoints.
+        if [[ "$(container_state crm-postgres)" != "running" || \
+            "$(container_state crm-valkey)" != "running" ]]; then
+            die "Сеть crm_internal ещё не изолирована, а PostgreSQL/Valkey не запущены. Стек не меняли; сначала восстановите основные контейнеры и повторите деплой"
+        fi
+        wait_core_services
+        NETWORK_TRANSITION_REQUIRED=1
+        ok "PostgreSQL и Valkey работают; смена сети отложена до проверенного дампа"
+        return
+    fi
+
+    docker compose up -d postgres valkey 2>&1 | tee -a "$LOG_FILE"
+    wait_core_services
+}
+
+recreate_internal_network_if_needed() {
+    [[ "$NETWORK_TRANSITION_REQUIRED" -eq 1 ]] || return 0
+
+    step "Безопасное переключение внутренней сети"
+    # Именованные тома сохраняются: нельзя добавлять `-v`, иначе исчезнет база.
+    if ! docker compose down --remove-orphans 2>&1 | tee -a "$LOG_FILE"; then
+        die "Не удалось остановить стек для переключения crm_internal. База не мигрирована"
+    fi
+    if ! docker compose up -d postgres valkey 2>&1 | tee -a "$LOG_FILE"; then
+        die "Не удалось поднять PostgreSQL/Valkey в новой сети. Миграция не запускалась"
+    fi
+    wait_core_services
+    ok "Внутренняя сеть пересоздана, PostgreSQL и Valkey готовы"
 }
 
 preflight_space() {
@@ -377,10 +419,9 @@ fi
 
 # --- 2. Preflight --------------------------------------------------------------
 step "Проверка PostgreSQL, Valkey и свободного места"
-# На первом развёртывании создаём только инфраструктуру. На рабочем сервере эта
-# команда ничего не пересоздаёт и не трогает ещё работающий backend.
-docker compose up -d postgres valkey 2>&1 | tee -a "$LOG_FILE"
-wait_core_services
+# Если сеть уже устаревшая, Compose не должен частично пересоздавать её,
+# пока работающие контейнеры приложения удерживают endpoints.
+prepare_core_services
 preflight_space
 
 # --- 3. Сборка -----------------------------------------------------------------
@@ -412,8 +453,16 @@ HEAD_COUNT="$(printf '%s\n' "$NEW_IMAGE_HEAD" | grep -c . || true)"
     || die "Не удалось однозначно определить целевую ревизию нового backend-образа"
 log "Схема базы до миграции: $DB_REVISION_BEFORE; цель нового образа: $NEW_IMAGE_HEAD"
 
-step "Остановка процессов, которые пишут в базу"
-docker compose stop backend worker beat 2>&1 | tee -a "$LOG_FILE"
+# При смене параметров сети останавливаем стек только после проверенного дампа;
+# затем поднимаем базу и кеш в новой сети до запуска миграции.
+recreate_internal_network_if_needed
+
+if [[ "$NETWORK_TRANSITION_REQUIRED" -eq 1 ]]; then
+    ok "Приложение уже остановлено для переключения сети"
+else
+    step "Остановка процессов, которые пишут в базу"
+    docker compose stop backend worker beat 2>&1 | tee -a "$LOG_FILE"
+fi
 
 step "Миграция базы отдельным шагом"
 if ! docker compose run --rm --no-deps -T backend alembic upgrade head \
