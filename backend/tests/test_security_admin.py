@@ -148,11 +148,12 @@ async def test_deleting_user_moves_leads_to_admin(
     stages = (await client.get("/api/v1/crm/stages", headers=headers)).json()
     # «Новый» есть и у администратора — карточка должна попасть в одноимённый этап.
     new_stage = next(s for s in stages if s["name"] == "Новый")
-    await client.post(
+    created = await client.post(
         "/api/v1/crm/leads",
         json={"name": "ООО «Сирень»", "inn": "7451234565", "stage_id": new_stage["id"]},
         headers=headers,
     )
+    assert created.status_code == 201, created.text
 
     removed = await auth_client.delete(f"/api/v1/admin/users/{manager_id}")
     assert removed.status_code == 204
@@ -163,6 +164,16 @@ async def test_deleting_user_moves_leads_to_admin(
 
     admin_stages = (await auth_client.get("/api/v1/crm/stages")).json()
     assert moved["stage_id"] in [s["id"] for s in admin_stages]
+
+    timeline = (await auth_client.get(f"/api/v1/crm/leads/{moved['id']}/timeline")).json()
+    assert len(timeline) == 1
+    transfer = timeline[0]
+    assert transfer["type"] == "history"
+    assert transfer["field_label"] == "Продавец"
+    assert transfer["old_value"] == seeded["manager"].full_name  # type: ignore[attr-defined]
+    assert transfer["new_value"] == seeded["admin"].full_name  # type: ignore[attr-defined]
+    assert transfer["author_id"] == seeded["admin"].id  # type: ignore[attr-defined]
+    assert transfer["author_name"] == seeded["admin"].full_name  # type: ignore[attr-defined]
 
 
 async def test_last_admin_cannot_demote_himself(
