@@ -36,6 +36,7 @@ from app.core.security import (
     hash_password,
     verify_password,
 )
+from app.db.locks import advisory_xact_lock
 from app.models.security import LoginAttempt, RevokedToken
 from app.models.user import User
 from app.schemas.auth import AccessToken, LoginRequest
@@ -55,6 +56,7 @@ COOKIE_PATH = "/api/v1/auth"
 # одновременно (разные запросы получили 401 в одну секунду). Без окна второй
 # из них увидел бы «Сессия завершена» и выбросил человека на страницу входа.
 REFRESH_GRACE_SECONDS = 15
+REFRESH_LOCK_NAMESPACE = 4229
 
 # Заведомо несовпадающий хеш: сверяем пароль с ним, когда пользователя нет,
 # чтобы время ответа не выдавало существование учётной записи.
@@ -141,14 +143,23 @@ async def refresh(
     try:
         data = decode_token(crm_refresh, "refresh")
         user_id = int(data["sub"])
+        jti = data.get("jti")
+        if not isinstance(jti, str) or not jti:
+            raise ValueError("у refresh-токена нет идентификатора")
     except (jwt.PyJWTError, KeyError, ValueError) as exc:
         raise HTTPException(
             status_code=status.HTTP_401_UNAUTHORIZED, detail="Недействительный refresh-токен"
         ) from exc
 
+    # Два запроса с одной кукой (обычно из разных вкладок) могут одновременно
+    # пройти проверку и вставить одну строку в revoked_tokens. PostgreSQL
+    # сериализует их по jti; второй после ожидания увидит свежую ротацию и
+    # попадёт в окно снисхождения вместо ошибки уникальности.
+    await advisory_xact_lock(session, namespace=REFRESH_LOCK_NAMESPACE, key=jti)
+
     # Токен, по которому уже вышли из системы, продлевать нельзя — даже если
     # срок его жизни ещё не истёк и кто-то успел его перехватить.
-    if await _is_revoked_beyond_grace(session, data.get("jti")):
+    if await _is_revoked_beyond_grace(session, jti):
         raise HTTPException(status_code=status.HTTP_401_UNAUTHORIZED, detail="Сессия завершена")
 
     user = await session.get(User, user_id)
@@ -169,11 +180,6 @@ async def _revoked_entry(session: SessionDep, jti: str | None) -> RevokedToken |
         return None
     found = await session.execute(select(RevokedToken).where(RevokedToken.jti == jti))
     return found.scalar_one_or_none()
-
-
-async def _is_revoked(session: SessionDep, jti: str | None) -> bool:
-    """Проверяет, не отозван ли токен с таким идентификатором."""
-    return await _revoked_entry(session, jti) is not None
 
 
 async def _is_revoked_beyond_grace(session: SessionDep, jti: str | None) -> bool:
@@ -198,8 +204,18 @@ async def _is_revoked_beyond_grace(session: SessionDep, jti: str | None) -> bool
 async def _revoke(session: SessionDep, payload: dict[str, Any], reason: str) -> None:
     """Заносит обновляющий токен в чёрный список (до его собственного срока)."""
     jti = str(payload.get("jti") or "")
-    if not jti or await _is_revoked(session, jti):
+    if not jti:
         return
+
+    existing = await _revoked_entry(session, jti)
+    if existing is not None:
+        # Выход перекрывает короткое окно снисхождения, если успел начаться
+        # одновременно с ротацией той же куки: токен сразу становится недействительным.
+        if reason == "logout" and existing.reason != "logout":
+            existing.reason = "logout"
+        await session.commit()
+        return
+
     try:
         expires_at = datetime.fromtimestamp(int(payload["exp"]), tz=UTC)
     except (KeyError, ValueError, TypeError, OSError):
@@ -223,7 +239,11 @@ async def logout(
     if crm_refresh:
         # Негодный токен отзывать нечего — просто стираем куку.
         with contextlib.suppress(jwt.PyJWTError):
-            await _revoke(session, decode_token(crm_refresh, "refresh"), reason="logout")
+            data = decode_token(crm_refresh, "refresh")
+            jti = data.get("jti")
+            if isinstance(jti, str) and jti:
+                await advisory_xact_lock(session, namespace=REFRESH_LOCK_NAMESPACE, key=jti)
+            await _revoke(session, data, reason="logout")
 
     response.delete_cookie(REFRESH_COOKIE, path=COOKIE_PATH)
 

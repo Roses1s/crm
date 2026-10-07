@@ -66,7 +66,7 @@ backend/
 │   │   ├── rate_limit.py  slowapi: защита /auth/login от перебора (2-й рубеж после nginx)
 │   │   ├── errors.py      единый формат ошибок {detail, code, request_id}
 │   │   └── pagination.py  {count, next, previous, results}
-│   ├── db/                Base с naming_convention, async engine, сессия-зависимость
+│   ├── db/                Base, async engine, сессия-зависимость, advisory-блокировки PostgreSQL
 │   ├── models/            User · Stage · Tag · Lead · LossReason · Shipment · TimelineEntry ·
 │   │                      Attachment · LoginAttempt · RevokedToken
 │   ├── schemas/           Pydantic v2: запросы и ответы
@@ -150,7 +150,11 @@ PostgreSQL.
 
 **Сессия.** Обновляющий токен уходит в куку `HttpOnly` с путём `/api/v1/auth` —
 скрипты страницы его не прочитают. В теле ответа только короткий токен доступа
-(30 минут), фронтенд держит его в памяти вкладки.
+(30 минут), фронтенд держит его в памяти вкладки. Сервер сериализует запросы
+продления с одной кукой PostgreSQL advisory-блокировкой по `jti`: второй запрос
+видит свежую ротацию и проходит в пределах 15-секундного окна, не упираясь в
+уникальность чёрного списка. Выход использует ту же блокировку и сразу
+переводит отметку в состояние `logout`.
 
 **Формат ответов.** Списки отдаются как `{count, next, previous, results}` —
 ровно то, что уже умеет читать фронтенд. Ошибки всегда `{detail, code, request_id}`.
