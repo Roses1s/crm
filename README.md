@@ -64,7 +64,7 @@ backend/                    FastAPI
 ├── app/worker/             Celery: бэкапы базы и вложений, уборка файлов и отозванных токенов
 ├── app/cli.py              createsuperuser, seed, resetboard (сброс доски к стандартной)
 ├── alembic/                26 миграций
-└── tests/                  pytest; локально 190 прошло, 5 пропущено на SQLite
+└── tests/                  pytest; локально 191 прошло, 5 пропущено на SQLite
 
 frontend/                   React 19
 ├── src/app/                router, providers, layout (AppShell, Navbar, ControlPanel)
