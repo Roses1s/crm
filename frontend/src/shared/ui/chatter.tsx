@@ -100,6 +100,8 @@ interface ChatterProps {
    * собственных примечаний — чужие менять может только их автор (Б-11).
    */
   currentUserId?: number;
+  /** Проигранную карточку можно читать, но нельзя менять до восстановления. */
+  readOnly?: boolean;
 }
 
 export function Chatter({
@@ -115,6 +117,7 @@ export function Chatter({
   onEditNote,
   onDeleteEntry,
   currentUserId,
+  readOnly = false,
 }: ChatterProps) {
   const [text, setText] = useState("");
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -225,6 +228,7 @@ export function Chatter({
           <input
             ref={panelInput}
             type="file"
+            disabled={readOnly}
             className="hidden"
             onChange={(e) => {
               const file = e.target.files?.[0];
@@ -234,7 +238,7 @@ export function Chatter({
           />
           <button
             type="button"
-            disabled={uploading || !onUpload}
+            disabled={readOnly || uploading || !onUpload}
             onClick={() => panelInput.current?.click()}
             className="mb-1 inline-flex h-7 items-center gap-1 rounded-[4px] border border-odoo-border bg-odoo-surface px-2 text-[13px] text-odoo-text transition-colors hover:bg-odoo-bg disabled:opacity-60"
           >
@@ -271,7 +275,7 @@ export function Chatter({
                   >
                     <Download className="h-3.5 w-3.5" />
                   </button>
-                  {onDelete && (
+                  {onDelete && !readOnly && (
                     <button
                       type="button"
                       aria-label={`Удалить ${file.name}`}
@@ -317,7 +321,7 @@ export function Chatter({
         className="shrink-0 border-b border-odoo-chatter-divider py-3"
         onSubmit={(event) => {
           event.preventDefault();
-          if (!onSubmit) return;
+          if (readOnly || !onSubmit) return;
           if (!text.trim() && pending.length === 0) return;
           onSubmit(text.trim(), pending);
           setText("");
@@ -336,6 +340,7 @@ export function Chatter({
               ref={composerText}
               rows={1}
               aria-label="Текст внутреннего примечания"
+              disabled={readOnly}
               value={text}
               onChange={(e) => setText(e.target.value)}
               onPaste={(e) => {
@@ -367,6 +372,7 @@ export function Chatter({
                     <button
                       type="button"
                       aria-label={`Убрать ${file.name}`}
+                      disabled={readOnly}
                       onClick={() => setPending((list) => list.filter((_, index) => index !== i))}
                       className="text-odoo-text-muted hover:text-odoo-danger"
                     >
@@ -384,6 +390,7 @@ export function Chatter({
                 multiple
                 className="hidden"
                 aria-label="Файлы записи"
+                disabled={readOnly}
                 onChange={(e) => {
                   const chosen = Array.from(e.target.files ?? []);
                   if (chosen.length) setPending((list) => [...list, ...chosen]);
@@ -394,6 +401,7 @@ export function Chatter({
                 type="button"
                 aria-label="Прикрепить файл к записи"
                 title="Прикрепить файл к записи"
+                disabled={readOnly || uploading || !onUpload}
                 onClick={() => composerInput.current?.click()}
                 className="inline-flex h-7 w-7 items-center justify-center rounded-sm text-odoo-text-muted transition-colors hover:bg-odoo-bg hover:text-odoo-text"
               >
@@ -408,7 +416,7 @@ export function Chatter({
         >
           <button
             type="submit"
-            disabled={posting || !onSubmit || (!text.trim() && pending.length === 0)}
+            disabled={readOnly || posting || !onSubmit || (!text.trim() && pending.length === 0)}
             // Ширина минимальная, а не жёсткая: длинная надпись «Сохранение…»
             // не помещалась в кнопку шириной под слово «Лог» и вылезала за её края.
             className="h-[var(--odoo-chatter-log-button-height)] min-w-[var(--odoo-chatter-log-button-width)] whitespace-nowrap rounded-[4px] bg-odoo-primary px-2 text-[13px] font-medium text-white transition-colors hover:bg-odoo-primary-hover disabled:opacity-50"
@@ -466,6 +474,7 @@ export function Chatter({
                         rows={2}
                         autoFocus
                         aria-label="Изменить примечание"
+                        disabled={readOnly}
                         value={editText}
                         onChange={(e) => setEditText(e.target.value)}
                         className="w-full resize-none border-0 bg-transparent px-2 py-2 text-[13px] leading-[19px] text-odoo-text outline-none"
@@ -473,7 +482,7 @@ export function Chatter({
                       <div className="flex h-8 items-center gap-1 border-t border-odoo-chatter-divider px-1">
                         <button
                           type="button"
-                          disabled={!editText.trim()}
+                          disabled={readOnly || !editText.trim()}
                           onClick={() => {
                             const body = editText.trim();
                             if (body && body !== entry.body) onEditNote?.(Number(entry.id), body);
@@ -490,7 +499,7 @@ export function Chatter({
                         >
                           Отмена
                         </button>
-                        {onUpload && (
+                        {onUpload && !readOnly && (
                           <>
                             {/* Файл уходит на сервер сразу и привязывается к этой записи:
                                 он появляется под примечанием, не дожидаясь «Сохранить». */}
@@ -564,7 +573,8 @@ export function Chatter({
                 {/* Править можно только своё примечание (Б-11), а удалить —
                     любое примечание и запись о переносе карточки между
                     этапами (решение владельца). */}
-                {editingId !== entry.id &&
+                {!readOnly &&
+                  editingId !== entry.id &&
                   ((entry.type === "note" && (onEditNote || onDeleteEntry)) ||
                     (entry.is_stage_change && onDeleteEntry)) && (
                     <div className="absolute right-0 top-1.5 flex items-center gap-0.5 opacity-0 transition-opacity group-hover:opacity-100">

@@ -91,8 +91,8 @@
 
 ## Тесты
 
-- бэкенд (pytest): **166** тест-функций
-- фронтенд (vitest): **89** тестов
+- бэкенд (pytest): **168** тест-функций
+- фронтенд (vitest): **90** тестов
 - сценарные (подменяется только сеть, остальное настоящее):
   - `frontend/src/features/auth/login-flow.test.tsx`
   - `frontend/src/features/crm/kanban-flow.test.tsx`

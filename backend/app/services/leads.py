@@ -43,10 +43,11 @@ async def get_lead_or_404(
 ) -> Lead:
     """Карточка лида с проверкой доступа.
 
-    `allow_lost=True` — для операций ЧТЕНИЯ (карточка, лента, заявки,
-    вложения): проигранный лид открыт любому сотруднику, чтобы его можно было
-    посмотреть и забрать себе (см. `restore_lead`). Изменять его при этом
-    всё равно нельзя — все мутации идут через строгую проверку (по умолчанию).
+    `allow_lost=True` разрешает любому сотруднику читать проигранную карточку,
+    ленту и вложения. Проверка состояния для изменений вынесена в
+    `get_editable_lead`: до восстановления проигранный лид доступен только для
+    чтения. Восстановление и передача используют эту функцию напрямую, потому
+    что сами возвращают карточку в работу.
     """
     # populate_existing перезаписывает уже загруженные связи: без него после
     # смены этапа в ответе оставался бы старый stage из identity map.
@@ -65,6 +66,18 @@ async def get_lead_or_404(
     forbidden = user is not None and user.role != Role.admin and lead.assigned_to_id != user.id
     if forbidden and not (allow_lost and lead.is_archived):
         raise NotFoundError(f"Лид {lead_id} не найден")
+    return lead
+
+
+async def get_editable_lead(session: AsyncSession, lead_id: int, user: User) -> Lead:
+    """Доступный для изменения лид; проигранный сначала нужно восстановить."""
+    lead = await get_lead_or_404(session, lead_id, user)
+    if lead.is_archived:
+        raise AppError(
+            "Сначала восстановите проигранный лид, затем редактируйте его",
+            code="lead_lost",
+            status_code=409,
+        )
     return lead
 
 
@@ -154,7 +167,7 @@ async def create_lead(session: AsyncSession, user: User, payload: LeadCreate) ->
 
 
 async def update_lead(session: AsyncSession, user: User, lead_id: int, payload: LeadUpdate) -> Lead:
-    lead = await get_lead_or_404(session, lead_id, user)
+    lead = await get_editable_lead(session, lead_id, user)
     data = payload.model_dump(exclude_unset=True)
     tag_ids = data.pop("tag_ids", None)
 
@@ -201,7 +214,7 @@ async def lose_lead(session: AsyncSession, user: User, lead_id: int, payload: Le
     строгая проверка доступа. Запись в ленту повторяет вид, в котором это
     всегда показывал Odoo: «Активный: Да → Нет» и «Причина проигрыша: — → …».
     """
-    lead = await get_lead_or_404(session, lead_id, user)
+    lead = await get_editable_lead(session, lead_id, user)
     reason = await session.get(LossReason, payload.reason_id)
     if reason is None:
         raise NotFoundError(f"Причина {payload.reason_id} не найдена")
@@ -399,7 +412,7 @@ async def _get_entry_or_404(session: AsyncSession, lead_id: int, entry_id: int) 
 async def add_note(
     session: AsyncSession, user: User, lead_id: int, payload: NoteCreate
 ) -> TimelineEntry:
-    await get_lead_or_404(session, lead_id, user)
+    await get_editable_lead(session, lead_id, user)
     entry = TimelineEntry(
         lead_id=lead_id, author_id=user.id, type=EntryType.note, body=payload.body
     )
@@ -412,7 +425,7 @@ async def add_note(
 async def update_timeline_entry(
     session: AsyncSession, user: User, lead_id: int, entry_id: int, payload: NoteUpdate
 ) -> TimelineEntry:
-    await get_lead_or_404(session, lead_id, user)
+    await get_editable_lead(session, lead_id, user)
     entry = await _get_entry_or_404(session, lead_id, entry_id)
     if entry.type is not EntryType.note:
         raise AppError("Изменять можно только примечания", code="not_editable")
@@ -431,7 +444,7 @@ async def update_timeline_entry(
 async def delete_timeline_entry(
     session: AsyncSession, user: User, lead_id: int, entry_id: int
 ) -> None:
-    await get_lead_or_404(session, lead_id, user)
+    await get_editable_lead(session, lead_id, user)
     entry = await _get_entry_or_404(session, lead_id, entry_id)
     # История передач и проигрыша — системный аудит, а не пользовательская
     # заметка: она остаётся неизменяемой даже при прямом вызове API.

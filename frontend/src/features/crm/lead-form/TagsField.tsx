@@ -4,7 +4,7 @@
 // администратор: тег общий, и одно нажатие снимает его со всех карточек
 // компании (см. backend app/api/v1/tags.py).
 import { Check, Pencil, Plus, Trash2, X } from "lucide-react";
-import { useState } from "react";
+import { useEffect, useState } from "react";
 
 import { useCreateTag, useDeleteTag, useUpdateTag } from "@/shared/api/hooks";
 import type { Tag } from "@/shared/types";
@@ -19,12 +19,15 @@ export function TagsField({
   value,
   onChange,
   canDelete = false,
+  disabled = false,
 }: {
   all: Tag[];
   value: number[];
   onChange: (ids: number[]) => void;
   /** Удалять общий тег может только администратор (Б-16). */
   canDelete?: boolean;
+  /** Нельзя менять набор тегов, когда проигранная карточка открыта только для чтения. */
+  disabled?: boolean;
 }) {
   const [open, setOpen] = useState(false);
   const [editingId, setEditingId] = useState<number | null>(null);
@@ -43,6 +46,13 @@ export function TagsField({
   const deleteTag = useDeleteTag();
 
   const selected = all.filter((t) => value.includes(t.id));
+
+  useEffect(() => {
+    if (!disabled) return;
+    setOpen(false);
+    setEditingId(null);
+    setCreating(false);
+  }, [disabled]);
 
   function toggle(id: number) {
     onChange(value.includes(id) ? value.filter((x) => x !== id) : [...value, id]);
@@ -114,7 +124,8 @@ export function TagsField({
           <button
             type="button"
             aria-label={`Убрать тег ${tag.name}`}
-            className="opacity-60 transition-opacity hover:opacity-100"
+            disabled={disabled}
+            className="opacity-60 transition-opacity hover:opacity-100 disabled:cursor-not-allowed"
             onClick={() => onChange(value.filter((x) => x !== tag.id))}
           >
             <X className="h-3 w-3" />
@@ -125,13 +136,14 @@ export function TagsField({
       <button
         type="button"
         aria-label="Теги"
-        className="inline-flex h-5 w-5 items-center justify-center rounded-full text-odoo-text-light transition-colors hover:bg-odoo-bg hover:text-odoo-text"
+        disabled={disabled}
+        className="inline-flex h-5 w-5 items-center justify-center rounded-full text-odoo-text-light transition-colors hover:bg-odoo-bg hover:text-odoo-text disabled:cursor-not-allowed disabled:opacity-50"
         onClick={() => setOpen((v) => !v)}
       >
         <Plus className="h-3.5 w-3.5" />
       </button>
 
-      {open && (
+      {open && !disabled && (
         <>
           <button
             type="button"

@@ -407,6 +407,94 @@ async def test_manager_cannot_edit_or_note_foreign_lost_lead(
     assert noted.status_code == 404
 
 
+async def test_lost_lead_is_read_only_until_restored(
+    auth_client: AsyncClient, seeded: dict, session
+) -> None:
+    manager = seeded["manager"]
+    manager_id = manager.id  # type: ignore[attr-defined]
+    manager_stage = await create_manager_stage(session, manager_id)
+    headers = await manager_headers(auth_client)
+
+    created = await auth_client.post(
+        "/api/v1/crm/leads",
+        json={
+            "name": "ООО «Ромашка»",
+            "inn": "5404123455",
+            "stage_id": manager_stage.id,
+        },
+        headers=headers,
+    )
+    assert created.status_code == 201, created.text
+    lead_id = created.json()["id"]
+
+    note = await auth_client.post(
+        f"/api/v1/crm/leads/{lead_id}/notes",
+        json={"body": "До проигрыша"},
+        headers=headers,
+    )
+    assert note.status_code == 201, note.text
+    entry_id = note.json()["id"]
+
+    lost = await auth_client.post(
+        f"/api/v1/crm/leads/{lead_id}/lose",
+        json={"reason_id": seeded["loss_reason"].id},  # type: ignore[attr-defined]
+        headers=headers,
+    )
+    assert lost.status_code == 204
+
+    admin_edit = await auth_client.patch(
+        f"/api/v1/crm/leads/{lead_id}", json={"name": "Правка администратора"}
+    )
+    assert admin_edit.status_code == 409
+    assert admin_edit.json()["code"] == "lead_lost"
+
+    owner_edit = await auth_client.patch(
+        f"/api/v1/crm/leads/{lead_id}",
+        json={"name": "Правка прежнего ответственного"},
+        headers=headers,
+    )
+    assert owner_edit.status_code == 409
+    assert owner_edit.json()["code"] == "lead_lost"
+
+    note_after_loss = await auth_client.post(
+        f"/api/v1/crm/leads/{lead_id}/notes",
+        json={"body": "Запись до восстановления"},
+        headers=headers,
+    )
+    assert note_after_loss.status_code == 409
+    assert note_after_loss.json()["code"] == "lead_lost"
+
+    edit_note_after_loss = await auth_client.patch(
+        f"/api/v1/crm/leads/{lead_id}/timeline/{entry_id}",
+        json={"body": "Исправление до восстановления"},
+        headers=headers,
+    )
+    assert edit_note_after_loss.status_code == 409
+    assert edit_note_after_loss.json()["code"] == "lead_lost"
+
+    delete_note_after_loss = await auth_client.delete(
+        f"/api/v1/crm/leads/{lead_id}/timeline/{entry_id}", headers=headers
+    )
+    assert delete_note_after_loss.status_code == 409
+    assert delete_note_after_loss.json()["code"] == "lead_lost"
+
+    restored = await auth_client.post(f"/api/v1/crm/leads/{lead_id}/restore", headers=headers)
+    assert restored.status_code == 204
+
+    edited = await auth_client.patch(
+        f"/api/v1/crm/leads/{lead_id}", json={"name": "После восстановления"}, headers=headers
+    )
+    assert edited.status_code == 200, edited.text
+    assert edited.json()["name"] == "После восстановления"
+
+    note_after_restore = await auth_client.post(
+        f"/api/v1/crm/leads/{lead_id}/notes",
+        json={"body": "Можно после восстановления"},
+        headers=headers,
+    )
+    assert note_after_restore.status_code == 201, note_after_restore.text
+
+
 async def test_admin_transfer_restores_lost_lead_to_any_employee(
     auth_client: AsyncClient, seeded: dict
 ) -> None:

@@ -257,6 +257,47 @@ async def test_colleague_can_view_but_not_upload_lost_lead_attachments(
     assert uploaded.status_code == 404
 
 
+async def test_previous_owner_cannot_change_lost_lead_attachments_until_restored(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    original = await auth_client.post(
+        f"/api/v1/crm/leads/{lead_id}/attachments",
+        files={"file": ("Договор.pdf", b"%PDF-1.4 original", "application/pdf")},
+    )
+    assert original.status_code == 201, original.text
+    attachment_id = original.json()["id"]
+
+    reason_id = seeded["loss_reason"].id  # type: ignore[attr-defined]
+    lost = await auth_client.post(
+        f"/api/v1/crm/leads/{lead_id}/lose", json={"reason_id": reason_id}
+    )
+    assert lost.status_code == 204
+
+    uploaded = await auth_client.post(
+        f"/api/v1/crm/leads/{lead_id}/attachments",
+        files={"file": ("Ещё.pdf", b"%PDF-1.4 extra", "application/pdf")},
+    )
+    assert uploaded.status_code == 409
+    assert uploaded.json()["code"] == "lead_lost"
+
+    deleted = await auth_client.delete(f"/api/v1/crm/attachments/{attachment_id}")
+    assert deleted.status_code == 409
+    assert deleted.json()["code"] == "lead_lost"
+
+    restored = await auth_client.post(f"/api/v1/crm/leads/{lead_id}/restore")
+    assert restored.status_code == 204
+
+    after_restore = await auth_client.post(
+        f"/api/v1/crm/leads/{lead_id}/attachments",
+        files={"file": ("После.pdf", b"%PDF-1.4 restored", "application/pdf")},
+    )
+    assert after_restore.status_code == 201, after_restore.text
+
+    deleted_after_restore = await auth_client.delete(f"/api/v1/crm/attachments/{attachment_id}")
+    assert deleted_after_restore.status_code == 204
+
+
 async def test_upload_is_blocked_when_disk_is_almost_full(
     auth_client: AsyncClient, seeded: dict[str, object], monkeypatch: pytest.MonkeyPatch
 ) -> None:

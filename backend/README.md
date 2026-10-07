@@ -100,7 +100,8 @@ backend/
 | GET/POST/PATCH/DELETE | `/api/v1/crm/tags` | все авторизованные (теги — рабочий инструмент, не настройка) |
 | GET | `/api/v1/crm/loss-reasons` | авторизованные; создание и удаление — admin |
 | GET/POST | `/api/v1/crm/leads` | свои лиды; админ видит все |
-| GET/PATCH | `/api/v1/crm/leads/{id}` | свой лид; чужой — 404 |
+| GET | `/api/v1/crm/leads/{id}` | свой лид или любой проигранный (прочитать можно всем) |
+| PATCH | `/api/v1/crm/leads/{id}` | свой активный; проигранный — только после восстановления; чужой активный — 404 |
 | DELETE | `/api/v1/crm/leads/{id}` | свой лид (архивация) |
 | DELETE | `/api/v1/crm/leads/{id}/permanent` | admin: стирает лид, заявки, историю и файлы безвозвратно |
 | POST | `/api/v1/crm/leads/{id}/lose` · `/restore` | проигрыш с причиной и возврат в работу |

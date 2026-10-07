@@ -51,16 +51,16 @@ afterEach(() => {
   clearTokens();
 });
 
-function commonRoutes() {
+function commonRoutes(me = ME, lead = LEAD) {
   // Важен порядок: более специфичные пути (.../timeline, .../pager, ...)
   // должны идти раньше голого "/crm/leads/10" — у поддельного сервера
   // сопоставление через startsWith, первое совпадение побеждает.
   return [
-    { path: "/auth/me", response: ME },
+    { path: "/auth/me", response: me },
     { path: "/crm/leads/10/timeline", response: [] },
     { path: "/crm/leads/10/pager", response: { position: 1, total: 1 } },
     { path: "/crm/leads/10/attachments", response: [] },
-    { path: "/crm/leads/10", response: LEAD },
+    { path: "/crm/leads/10", response: lead },
     { path: "/crm/stages", response: STAGES },
     { path: "/crm/tags", response: [] },
     { path: "/leads/10/shipments", response: [] },
@@ -112,4 +112,38 @@ it("без совпадения по ИНН у другого лида пред�
   await screen.findAllByDisplayValue("ООО Ромашка");
   await waitFor(() => expect(server?.called("GET", "/crm/customers/by-inn")).toBe(true));
   expect(screen.queryByText(/уже есть/)).not.toBeInTheDocument();
+});
+
+it("показывает проигранную карточку прежнему ответственному только для чтения", async () => {
+  setAccessToken("токен");
+  const manager = {
+    ...ME,
+    id: 2,
+    email: "manager@example.com",
+    role: "manager",
+    first_name: "Денис",
+    last_name: "Кузнецов",
+  };
+  const lostLead = {
+    ...LEAD,
+    is_archived: true,
+    assigned_to_id: manager.id,
+    assigned_to_name: "Денис Кузнецов",
+    loss_reason_name: "Перестал возить",
+  };
+  server = startFakeApi([
+    ...commonRoutes(manager, lostLead),
+    { path: "/crm/customers/by-inn", response: [] },
+  ]);
+
+  renderLead("10");
+
+  const nameInputs = await screen.findAllByDisplayValue("ООО Ромашка");
+  expect(nameInputs).toHaveLength(2);
+  nameInputs.forEach((input) => expect(input).toBeDisabled());
+  expect(screen.getByRole("combobox")).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Теги" })).toBeDisabled();
+  expect(screen.getByRole("textbox", { name: "Текст внутреннего примечания" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Восстановить" })).toBeVisible();
+  expect(screen.getByText(/сначала восстановите карточку/i)).toBeVisible();
 });

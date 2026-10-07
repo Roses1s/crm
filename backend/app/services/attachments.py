@@ -27,7 +27,7 @@ from app.core.logging import get_logger
 from app.models.shipment import Shipment
 from app.models.timeline import Attachment, TimelineEntry
 from app.models.user import Role, User
-from app.services.leads import get_lead_or_404
+from app.services.leads import get_editable_lead, get_lead_or_404
 
 log = get_logger(__name__)
 
@@ -172,7 +172,7 @@ async def upload_lead_attachment(
     file: UploadFile,
     entry_id: int | None = None,
 ) -> Attachment:
-    await get_lead_or_404(session, lead_id, user)
+    await get_editable_lead(session, lead_id, user)
     if entry_id is not None:
         entry = await session.get(TimelineEntry, entry_id)
         if entry is None or entry.lead_id != lead_id:
@@ -290,7 +290,10 @@ async def delete_attachment(session: AsyncSession, user: User, attachment_id: in
     attachment = await session.get(Attachment, attachment_id)
     if attachment is None:
         raise NotFoundError(f"Вложение {attachment_id} не найдено")
-    await get_lead_or_404(session, attachment.lead_id, user)
+    if attachment.shipment_id is None:
+        await get_editable_lead(session, attachment.lead_id, user)
+    else:
+        await get_lead_or_404(session, attachment.lead_id, user)
 
     # Свой файл удаляет автор, чужой — только администратор.
     if attachment.uploaded_by_id != user.id and user.role != Role.admin:

@@ -152,13 +152,14 @@ function LeadForm({ id }: { id?: string }) {
 
   // Предупреждение браузера при уходе со страницы с несохранёнными правками.
   useEffect(() => {
-    if (!dirty) return;
+    if (!dirty || lead?.is_archived) return;
     const handler = (event: BeforeUnloadEvent) => event.preventDefault();
     window.addEventListener("beforeunload", handler);
     return () => window.removeEventListener("beforeunload", handler);
-  }, [dirty]);
+  }, [dirty, lead?.is_archived]);
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
+    if (lead?.is_archived) return;
     // Правка руками снимает запрет автосохранения: прошлая попытка могла
     // упасть именно из-за того, что сейчас исправляют.
     autoSaveBlocked.current = false;
@@ -176,6 +177,7 @@ function LeadForm({ id }: { id?: string }) {
   }
 
   function save(options: { manual?: boolean } = {}) {
+    if (!isNew && lead?.is_archived) return;
     if (options.manual) autoSaveBlocked.current = false;
     setError("");
     if (!form.name.trim()) {
@@ -222,11 +224,11 @@ function LeadForm({ id }: { id?: string }) {
   // Новую (ещё не созданную) карточку не трогаем — её создаёт только сам
   // пользователь явным сохранением.
   useEffect(() => {
-    if (isNew || !dirty || saving || autoSaveBlocked.current) return;
+    if (isNew || !dirty || saving || autoSaveBlocked.current || lead?.is_archived) return;
     const timer = setTimeout(() => save(), 3000);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isNew, dirty, saving, form]);
+  }, [isNew, dirty, saving, form, lead?.is_archived]);
 
   function confirmLose(reasonId: number) {
     if (!lead) return;
@@ -262,7 +264,7 @@ function LeadForm({ id }: { id?: string }) {
 
   // Смена этапа у сохранённой карточки уходит на сервер сразу — как в Odoo.
   function selectStage(stageId: number) {
-    if (stageId === form.stage_id) return;
+    if (lead?.is_archived || stageId === form.stage_id) return;
     set("stage_id", stageId);
     if (isNew) return;
     updateLead.mutate(
@@ -280,9 +282,8 @@ function LeadForm({ id }: { id?: string }) {
   const owner = lead ? ownerLabel(lead) : "";
   const ownerAvatar = lead ? ownerInitials(lead) : "—";
   const isOwner = !!lead && !!currentUser && lead.assigned_to_id === currentUser.id;
-  // Проигранный чужой лид можно посмотреть целиком, но не менять — пока не
-  // забрали его себе кнопкой «Взять себе» (админ может редактировать всегда).
-  const readOnly = !!lead && lead.is_archived && !isOwner && currentUser?.role !== "admin";
+  // Любой проигранный лид остаётся только для чтения — до явного восстановления.
+  const readOnly = !!lead?.is_archived;
   const composerInitial = (currentUser?.first_name || currentUser?.email || "Я")
     .slice(0, 1)
     .toUpperCase();
@@ -396,6 +397,7 @@ function LeadForm({ id }: { id?: string }) {
       onEditNote={(entryId, body) => editNote.mutate({ entryId, body })}
       onDeleteEntry={(entry) => deleteTimelineEntry.mutate(Number(entry.id))}
       currentUserId={currentUser?.id}
+      readOnly={readOnly}
     />
   ) : undefined;
 
@@ -406,7 +408,7 @@ function LeadForm({ id }: { id?: string }) {
         crumbs={[{ label: "Лиды", to: "/crm" }, { label: form.name || "Новый лид" }]}
         status={
           <FormStatusIndicator
-            dirty={dirty}
+            dirty={dirty && !readOnly}
             saving={saving}
             onSave={() => save({ manual: true })}
             onDiscard={discard}
@@ -529,7 +531,7 @@ function LeadForm({ id }: { id?: string }) {
             left={
               !isNew ? (
                 <>
-                  {(!lead?.is_archived || isOwner) && (
+                  {!lead?.is_archived && (
                     <button
                       type="button"
                       onClick={() => setShipmentCreateOpen(true)}
@@ -585,8 +587,7 @@ function LeadForm({ id }: { id?: string }) {
             {error && <FormAlert>{error}</FormAlert>}
             {readOnly && (
               <FormAlert tone="warning">
-                Этот лид в проигрыше у другого сотрудника — можно только посмотреть. Нажмите «Взять
-                себе» выше, чтобы редактировать.
+                Лид проигран. Чтобы менять его данные, сначала восстановите карточку.
               </FormAlert>
             )}
 
@@ -655,7 +656,7 @@ function LeadForm({ id }: { id?: string }) {
                             {/* Щелчок по имени открывает передачу лида коллеге. */}
                             <button
                               type="button"
-                              disabled={isNew || readOnly}
+                              disabled={isNew || (readOnly && currentUser?.role !== "admin")}
                               onClick={() => {
                                 setTransferError("");
                                 setTransferOpen(true);
@@ -663,8 +664,8 @@ function LeadForm({ id }: { id?: string }) {
                               title={
                                 isNew
                                   ? "Сначала сохраните лид"
-                                  : readOnly
-                                    ? "Заберите лид себе, чтобы передать его кому-то ещё"
+                                  : readOnly && currentUser?.role !== "admin"
+                                    ? "Сначала восстановите лид, чтобы передать его"
                                     : "Передать лид другому сотруднику"
                               }
                               className="flex w-full items-center gap-1.5 rounded-[4px] pt-[2px] text-left transition-colors hover:bg-odoo-bg disabled:cursor-default disabled:hover:bg-transparent"
@@ -729,6 +730,7 @@ function LeadForm({ id }: { id?: string }) {
                               value={form.tag_ids}
                               onChange={(ids) => set("tag_ids", ids)}
                               canDelete={currentUser?.role === "admin"}
+                              disabled={readOnly}
                             />
                           </Field>
                         </InnerGroup>
