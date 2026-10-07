@@ -1,12 +1,13 @@
 import { FileText } from "lucide-react";
 import {
+  useCallback,
   useEffect,
   useRef,
   useState,
   type InputHTMLAttributes,
   type TextareaHTMLAttributes,
 } from "react";
-import { Link, useNavigate, useParams, useSearchParams } from "react-router-dom";
+import { Link, useBlocker, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { AppShell, ControlPanel } from "@/app/layout/AppShell";
 import { ApiError } from "@/shared/api/client";
@@ -29,6 +30,7 @@ import {
 import type { Attachment } from "@/shared/types";
 import { Chatter } from "@/shared/ui/chatter";
 import { FilePreview } from "@/shared/ui/file-preview";
+import { UnsavedChangesDialog } from "@/shared/ui/unsaved-changes-dialog";
 import {
   Field,
   FormAlert,
@@ -382,7 +384,11 @@ function ShipmentForm({ id }: { id?: string }) {
   // Заявка из карточки лида приходит со ссылкой /shipments/new?lead=42.
   useEffect(() => {
     const leadParam = searchParams.get("lead");
-    if (isNew && leadParam) setForm((f) => ({ ...f, lead_id: Number(leadParam) }));
+    if (isNew && leadParam) {
+      const leadId = Number(leadParam);
+      setForm((f) => ({ ...f, lead_id: leadId }));
+      setPristine((p) => ({ ...p, lead_id: leadId }));
+    }
   }, [isNew, searchParams]);
 
   // Загруженную карточку кладём в форму один раз, чтобы фоновое обновление
@@ -447,12 +453,71 @@ function ShipmentForm({ id }: { id?: string }) {
     }
   }, [shipment]);
 
-  const dirty = isNew ? form.lead_id !== 0 : JSON.stringify(form) !== JSON.stringify(pristine);
+  const dirty = JSON.stringify(form) !== JSON.stringify(pristine);
   const saving = save.isPending;
   // Автосохранение выключается после неудачной попытки и включается снова,
   // когда человек что-то поправил. Без этого неудачный запрос повторялся
   // каждые 3 секунды, пока открыта вкладка.
   const autoSaveBlocked = useRef(false);
+  const bypassNextNavigation = useRef(false);
+  const proceedAfterSave = useRef(false);
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => {
+    if (bypassNextNavigation.current) {
+      bypassNextNavigation.current = false;
+      return false;
+    }
+    const locationChanges =
+      currentLocation.pathname !== nextLocation.pathname ||
+      currentLocation.search !== nextLocation.search;
+    return (dirty || saving) && locationChanges && nextLocation.pathname !== "/login";
+  });
+  const blockerRef = useRef(blocker);
+  blockerRef.current = blocker;
+  const transitionProceeded = useRef(false);
+
+  const continueBlockedNavigation = useCallback(() => {
+    const current = blockerRef.current;
+    if (current.state !== "blocked" || transitionProceeded.current) return;
+    transitionProceeded.current = true;
+    current.proceed();
+  }, []);
+
+  // Если сохранение завершилось во время перехода, продолжаем только один раз.
+  useEffect(() => {
+    if (blocker.state === "unblocked") {
+      transitionProceeded.current = false;
+      return;
+    }
+    if (blocker.state === "blocked" && !dirty && !saving) continueBlockedNavigation();
+  }, [blocker.state, continueBlockedNavigation, dirty, saving]);
+
+  function proceedAfterSavedTransition(): boolean {
+    if (!proceedAfterSave.current) return false;
+    proceedAfterSave.current = false;
+    continueBlockedNavigation();
+    return true;
+  }
+
+  function navigateWithoutPrompt(to: string, options?: { replace?: boolean }): void {
+    bypassNextNavigation.current = true;
+    navigate(to, options);
+  }
+
+  const stayOnPage = useCallback(() => {
+    proceedAfterSave.current = false;
+    transitionProceeded.current = false;
+    if (blockerRef.current.state === "blocked") blockerRef.current.reset();
+  }, []);
+
+  function leaveWithoutSaving(): void {
+    proceedAfterSave.current = false;
+    continueBlockedNavigation();
+  }
+
+  function saveAndLeave(): void {
+    proceedAfterSave.current = true;
+    if (!saving) submit({ manual: true });
+  }
 
   useEffect(() => {
     if (!dirty) return;
@@ -508,13 +573,16 @@ function ShipmentForm({ id }: { id?: string }) {
     save.mutate(payload, {
       onSuccess: (saved) => {
         if (isNew) {
-          navigate(`/shipments/${saved.id}`, { replace: true });
+          if (proceedAfterSavedTransition()) return;
+          navigateWithoutPrompt(`/shipments/${saved.id}`, { replace: true });
         } else {
           setPristine(form);
           toast.show("Сохранено");
+          proceedAfterSavedTransition();
         }
       },
       onError: (err) => {
+        proceedAfterSave.current = false;
         autoSaveBlocked.current = true;
         setError(describe(err, "Не удалось сохранить заявку"));
       },
@@ -524,7 +592,7 @@ function ShipmentForm({ id }: { id?: string }) {
   function discard() {
     setError("");
     if (isNew) {
-      navigate("/shipments");
+      navigateWithoutPrompt("/shipments");
       return;
     }
     setForm(pristine);
@@ -998,6 +1066,16 @@ function ShipmentForm({ id }: { id?: string }) {
         </main>
       </FormWorkspace>
 
+      {blocker.state === "blocked" && (
+        <UnsavedChangesDialog
+          saving={saving}
+          canSave={!!form.lead_id && (isNew || form.number.trim().length > 0)}
+          error={error}
+          onSaveAndLeave={saveAndLeave}
+          onLeaveWithoutSaving={leaveWithoutSaving}
+          onStay={stayOnPage}
+        />
+      )}
       {preview && <FilePreview file={preview} onClose={() => setPreview(null)} />}
     </AppShell>
   );

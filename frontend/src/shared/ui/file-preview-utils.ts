@@ -1,6 +1,7 @@
-import { useEffect, useState } from "react";
+import { useEffect, useState, type RefObject } from "react";
 
 import { attachmentBlob } from "@/shared/api/hooks";
+import { enqueueAttachmentLoad } from "@/shared/lib/attachment-load-queue";
 import { peekBlobUrl, rememberBlob } from "@/shared/lib/blob-cache";
 import type { Attachment } from "@/shared/types";
 
@@ -24,26 +25,33 @@ export function formatSize(bytes: number): string {
  * Скачанные файлы запоминаются на время сессии (`blob-cache.ts`), поэтому
  * повторное открытие карточки не тянет те же картинки заново.
  */
-export function useObjectUrl(file: Attachment | null): { url: string; failed: boolean } {
-  const [url, setUrl] = useState(() => (file ? peekBlobUrl(file.id) : ""));
+export function useObjectUrl(
+  file: Attachment | null,
+  enabled = true,
+): { url: string; failed: boolean } {
+  const attachmentId = file?.id;
+  const [url, setUrl] = useState(() =>
+    attachmentId !== undefined ? peekBlobUrl(attachmentId) : "",
+  );
   const [failed, setFailed] = useState(false);
 
   useEffect(() => {
-    if (!file) {
+    if (attachmentId === undefined) {
       setUrl("");
+      setFailed(false);
       return;
     }
     let active = true;
     setFailed(false);
 
-    const ready = peekBlobUrl(file.id);
+    const ready = peekBlobUrl(attachmentId);
     setUrl(ready);
-    if (ready) return;
+    if (ready || !enabled) return;
 
-    attachmentBlob(file.id)
+    enqueueAttachmentLoad(attachmentId, (signal) => attachmentBlob(attachmentId, signal))
       .then((blob) => {
         if (!active) return;
-        setUrl(rememberBlob(file.id, blob));
+        setUrl(rememberBlob(attachmentId, blob));
       })
       .catch(() => active && setFailed(true));
 
@@ -51,7 +59,37 @@ export function useObjectUrl(file: Attachment | null): { url: string; failed: bo
       // Ссылку не освобождаем: ею владеет кеш и чистит граница сессии.
       active = false;
     };
-  }, [file]);
+  }, [attachmentId, enabled]);
 
   return { url, failed };
+}
+
+/** Дожидается появления элемента рядом с видимой областью экрана. */
+export function useNearViewport<T extends Element>(ref: RefObject<T | null>): boolean {
+  const [nearViewport, setNearViewport] = useState(false);
+
+  useEffect(() => {
+    if (nearViewport) return;
+    const element = ref.current;
+    if (!element) return;
+
+    if (typeof IntersectionObserver === "undefined") {
+      setNearViewport(true);
+      return;
+    }
+
+    const observer = new IntersectionObserver(
+      ([entry]) => {
+        if (entry?.isIntersecting) {
+          setNearViewport(true);
+          observer.disconnect();
+        }
+      },
+      { rootMargin: "240px 0px", threshold: 0 },
+    );
+    observer.observe(element);
+    return () => observer.disconnect();
+  }, [nearViewport, ref]);
+
+  return nearViewport;
 }

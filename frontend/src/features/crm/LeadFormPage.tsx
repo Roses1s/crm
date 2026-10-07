@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight, FileText, Settings } from "lucide-react";
-import { useEffect, useRef, useState } from "react";
-import { Link, useNavigate, useParams } from "react-router-dom";
+import { useCallback, useEffect, useRef, useState } from "react";
+import { Link, useBlocker, useNavigate, useParams } from "react-router-dom";
 
 import { AppShell, ControlPanel } from "@/app/layout/AppShell";
 import { StarRating } from "@/features/crm/board/StarRating";
@@ -47,6 +47,7 @@ import { LostRibbon } from "@/features/crm/lead-form/LostRibbon";
 import { TransferDialog } from "@/features/crm/lead-form/TransferDialog";
 import { Chatter } from "@/shared/ui/chatter";
 import { FilePreview } from "@/shared/ui/file-preview";
+import { UnsavedChangesDialog } from "@/shared/ui/unsaved-changes-dialog";
 import {
   Field,
   FormAlert,
@@ -125,6 +126,8 @@ function LeadForm({ id }: { id?: string }) {
   // когда человек что-то поправил. Без этого форма оставалась «грязной», и
   // неудачный запрос повторялся каждые 3 секунды, пока открыта вкладка.
   const autoSaveBlocked = useRef(false);
+  const bypassNextNavigation = useRef(false);
+  const proceedAfterSave = useRef(false);
 
   // Предупреждение о дубле ИНН — некритичное, не блокирует сохранение;
   // проверяется и при создании, и при редактировании (свой же лид исключён
@@ -148,11 +151,74 @@ function LeadForm({ id }: { id?: string }) {
   useEffect(() => {
     if (isNew && stages.length && !form.stage_id) {
       setForm((f) => ({ ...f, stage_id: stages[0].id }));
+      setPristine((p) => ({ ...p, stage_id: stages[0].id }));
     }
   }, [isNew, stages, form.stage_id]);
 
-  const dirty = isNew ? form.name.trim() !== "" : normalized(form) !== normalized(pristine);
+  const dirty = normalized(form) !== normalized(pristine);
   const saving = createLead.isPending || updateLead.isPending;
+  const blocker = useBlocker(({ currentLocation, nextLocation }) => {
+    if (bypassNextNavigation.current) {
+      bypassNextNavigation.current = false;
+      return false;
+    }
+    const locationChanges =
+      currentLocation.pathname !== nextLocation.pathname ||
+      currentLocation.search !== nextLocation.search;
+    return (
+      (dirty || saving) &&
+      locationChanges &&
+      nextLocation.pathname !== "/login" &&
+      !lead?.is_archived
+    );
+  });
+  const blockerRef = useRef(blocker);
+  blockerRef.current = blocker;
+  const transitionProceeded = useRef(false);
+
+  const continueBlockedNavigation = useCallback(() => {
+    const current = blockerRef.current;
+    if (current.state !== "blocked" || transitionProceeded.current) return;
+    transitionProceeded.current = true;
+    current.proceed();
+  }, []);
+
+  // Если сохранение завершилось во время перехода, продолжаем только один раз.
+  useEffect(() => {
+    if (blocker.state === "unblocked") {
+      transitionProceeded.current = false;
+      return;
+    }
+    if (blocker.state === "blocked" && !dirty && !saving) continueBlockedNavigation();
+  }, [blocker.state, continueBlockedNavigation, dirty, saving]);
+
+  function proceedAfterSavedTransition(): boolean {
+    if (!proceedAfterSave.current) return false;
+    proceedAfterSave.current = false;
+    continueBlockedNavigation();
+    return true;
+  }
+
+  function navigateWithoutPrompt(to: string, options?: { replace?: boolean }): void {
+    bypassNextNavigation.current = true;
+    navigate(to, options);
+  }
+
+  const stayOnPage = useCallback(() => {
+    proceedAfterSave.current = false;
+    transitionProceeded.current = false;
+    if (blockerRef.current.state === "blocked") blockerRef.current.reset();
+  }, []);
+
+  function leaveWithoutSaving(): void {
+    proceedAfterSave.current = false;
+    continueBlockedNavigation();
+  }
+
+  function saveAndLeave(): void {
+    proceedAfterSave.current = true;
+    if (!saving) save({ manual: true });
+  }
 
   // Предупреждение браузера при уходе со страницы с несохранёнными правками.
   useEffect(() => {
@@ -211,8 +277,12 @@ function LeadForm({ id }: { id?: string }) {
 
     if (isNew) {
       createLead.mutate(payload, {
-        onSuccess: (created) => navigate(`/crm/leads/${created.id}`, { replace: true }),
+        onSuccess: (created) => {
+          if (proceedAfterSavedTransition()) return;
+          navigateWithoutPrompt(`/crm/leads/${created.id}`, { replace: true });
+        },
         onError: (err) => {
+          proceedAfterSave.current = false;
           autoSaveBlocked.current = true;
           setError(describe(err, "Не удалось создать лид"));
         },
@@ -232,8 +302,10 @@ function LeadForm({ id }: { id?: string }) {
             setPristine(next);
             setUpdatedAt(updated.updated_at);
             toast.show("Сохранено");
+            proceedAfterSavedTransition();
           },
           onError: (err) => {
+            proceedAfterSave.current = false;
             autoSaveBlocked.current = true;
             if (err instanceof ApiError && err.code === "lead_conflict") setLeadConflict(true);
             setError(describe(err, "Не удалось сохранить"));
@@ -246,7 +318,7 @@ function LeadForm({ id }: { id?: string }) {
   function discard() {
     setError("");
     if (isNew) {
-      navigate("/crm");
+      navigateWithoutPrompt("/crm");
       return;
     }
     setForm(pristine);
@@ -271,7 +343,7 @@ function LeadForm({ id }: { id?: string }) {
       {
         onSuccess: () => {
           setLoseOpen(false);
-          navigate("/crm");
+          navigateWithoutPrompt("/crm");
         },
         onError: (err) => setLoseError(describe(err, "Не удалось отметить лид проигранным")),
       },
@@ -290,7 +362,7 @@ function LeadForm({ id }: { id?: string }) {
     if (!lead) return;
     setDeleteError("");
     deleteLead.mutate(lead.id, {
-      onSuccess: () => navigate("/crm"),
+      onSuccess: () => navigateWithoutPrompt("/crm"),
       onError: (err) => setDeleteError(describe(err, "Не удалось удалить лид")),
     });
   }
@@ -883,6 +955,16 @@ function LeadForm({ id }: { id?: string }) {
         <QuickCreateShipmentDialog leadId={lead.id} onClose={() => setShipmentCreateOpen(false)} />
       )}
 
+      {blocker.state === "blocked" && (
+        <UnsavedChangesDialog
+          saving={saving}
+          canSave={!leadConflict && !lead?.is_archived && (!isNew || Boolean(form.name.trim()))}
+          error={error}
+          onSaveAndLeave={saveAndLeave}
+          onLeaveWithoutSaving={leaveWithoutSaving}
+          onStay={stayOnPage}
+        />
+      )}
       {preview && <FilePreview file={preview} onClose={() => setPreview(null)} />}
     </AppShell>
   );

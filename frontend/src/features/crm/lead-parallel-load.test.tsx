@@ -14,7 +14,7 @@ import { LeadFormPage } from "./LeadFormPage";
 import { clearTokens, setAccessToken } from "@/shared/api/auth";
 import { startFakeApi, type FakeServer } from "@/test/fake-api";
 import { ToastProvider } from "@/shared/ui/toast";
-import { renderWithProviders } from "@/test/utils";
+import { renderWithDataRouter } from "@/test/utils";
 
 const ME = { id: 1, email: "admin@example.com", role: "admin", first_name: "А", last_name: "Б" };
 
@@ -40,7 +40,7 @@ it("просит вложения и заявки, не дожидаясь от�
     { path: "/crm/leads/10", status: 500, response: { detail: "Сервер занят" } },
   ]);
 
-  renderWithProviders(
+  renderWithDataRouter(
     <ToastProvider>
       <Routes>
         <Route path="/crm/leads/:id" element={<LeadFormPage />} />
@@ -63,7 +63,7 @@ it("не дёргает сервер по несуществующему ном�
     { path: "/crm/tags", response: [] },
   ]);
 
-  renderWithProviders(
+  renderWithDataRouter(
     <ToastProvider>
       <Routes>
         <Route path="/crm/leads/:id" element={<LeadFormPage />} />

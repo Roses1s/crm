@@ -17,7 +17,7 @@ import { ACCOUNTANT_NAMES } from "@/features/crm/lead-form/accountant-options";
 import { clearTokens, setAccessToken } from "@/shared/api/auth";
 import { startFakeApi, type FakeServer } from "@/test/fake-api";
 import { ToastProvider } from "@/shared/ui/toast";
-import { renderWithProviders } from "@/test/utils";
+import { renderWithDataRouter } from "@/test/utils";
 
 const ME = { id: 1, email: "admin@example.com", role: "admin", first_name: "А", last_name: "Б" };
 
@@ -86,7 +86,7 @@ it("после неудачного автосохранения запрос н
   ]);
 
   const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-  renderWithProviders(
+  renderWithDataRouter(
     <ToastProvider>
       <Routes>
         <Route path="/crm/leads/:id" element={<LeadFormPage />} />
@@ -128,7 +128,7 @@ it("правка руками снова включает автосохране
   ]);
 
   const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-  renderWithProviders(
+  renderWithDataRouter(
     <ToastProvider>
       <Routes>
         <Route path="/crm/leads/:id" element={<LeadFormPage />} />
@@ -168,7 +168,7 @@ it("бухгалтера выбирают из фиксированного сп
   ]);
 
   const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-  renderWithProviders(
+  renderWithDataRouter(
     <ToastProvider>
       <Routes>
         <Route path="/crm/leads/:id" element={<LeadFormPage />} />
@@ -236,7 +236,7 @@ it("при конфликте блокирует старую форму и да
   ]);
 
   const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
-  renderWithProviders(
+  renderWithDataRouter(
     <ToastProvider>
       <Routes>
         <Route path="/crm/leads/:id" element={<LeadFormPage />} />
@@ -257,4 +257,69 @@ it("при конфликте блокирует старую форму и да
   await user.click(screen.getByRole("button", { name: "Загрузить актуальную карточку" }));
   await waitFor(() => expect(name).toHaveValue("Новое название от коллеги"));
   expect(name).toBeEnabled();
+});
+
+it("сохраняет изменённый лид перед переходом по внутренней ссылке", async () => {
+  setAccessToken("токен");
+  const saved = {
+    ...LEAD,
+    name: "ООО Ромашка!",
+    updated_at: "2026-10-01T11:00:00+03:00",
+  };
+  server = startFakeApi([...routes(), { method: "PATCH", path: "/crm/leads/10", response: saved }]);
+
+  const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+  renderWithDataRouter(
+    <ToastProvider>
+      <Routes>
+        <Route path="/crm/leads/:id" element={<LeadFormPage />} />
+        <Route path="/crm" element={<p>Доска CRM</p>} />
+      </Routes>
+    </ToastProvider>,
+    { route: "/crm/leads/10" },
+  );
+
+  const name = await screen.findByRole("textbox", { name: "Название лида" });
+  await user.type(name, "!");
+  await user.click(screen.getByRole("link", { name: "Лиды" }));
+
+  expect(await screen.findByRole("dialog", { name: "Несохранённые изменения" })).toBeVisible();
+  expect(screen.queryByText("Доска CRM")).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Сохранить и перейти" }));
+
+  expect(await screen.findByText("Доска CRM")).toBeVisible();
+  const patch = server.calls.find((call) => call.method === "PATCH");
+  expect(patch?.body).toMatchObject({ name: "ООО Ромашка!", expected_updated_at: LEAD.updated_at });
+});
+
+it("даёт остаться на форме или уйти без сохранения", async () => {
+  setAccessToken("токен");
+  server = startFakeApi(routes());
+
+  const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+  renderWithDataRouter(
+    <ToastProvider>
+      <Routes>
+        <Route path="/crm/leads/:id" element={<LeadFormPage />} />
+        <Route path="/crm" element={<p>Доска CRM</p>} />
+      </Routes>
+    </ToastProvider>,
+    { route: "/crm/leads/10" },
+  );
+
+  const name = await screen.findByRole("textbox", { name: "Название лида" });
+  await user.type(name, "!");
+  const link = screen.getByRole("link", { name: "Лиды" });
+  await user.click(link);
+  await screen.findByRole("dialog", { name: "Несохранённые изменения" });
+  await user.click(screen.getByRole("button", { name: "Остаться" }));
+
+  expect(screen.queryByRole("dialog", { name: "Несохранённые изменения" })).not.toBeInTheDocument();
+  expect(name).toHaveValue(`${LEAD.name}!`);
+  await user.click(link);
+  await screen.findByRole("dialog", { name: "Несохранённые изменения" });
+  await user.click(screen.getByRole("button", { name: "Уйти без сохранения" }));
+
+  expect(await screen.findByText("Доска CRM")).toBeVisible();
+  expect(server.calls.some((call) => call.method === "PATCH")).toBe(false);
 });

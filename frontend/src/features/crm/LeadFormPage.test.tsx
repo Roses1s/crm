@@ -4,6 +4,7 @@
  * редактируемый лид не должен «находить дубль самого себя» (exclude_id).
  */
 import { screen, waitFor } from "@testing-library/react";
+import userEvent from "@testing-library/user-event";
 import { Route, Routes } from "react-router-dom";
 import { afterEach, expect, it } from "vitest";
 
@@ -11,13 +12,14 @@ import { LeadFormPage } from "./LeadFormPage";
 import { setAccessToken, clearTokens } from "@/shared/api/auth";
 import { startFakeApi, type FakeServer } from "@/test/fake-api";
 import { ToastProvider } from "@/shared/ui/toast";
-import { renderWithProviders } from "@/test/utils";
+import { renderWithDataRouter } from "@/test/utils";
 
 function renderLead(id: string) {
-  return renderWithProviders(
+  return renderWithDataRouter(
     <ToastProvider>
       <Routes>
         <Route path="/crm/leads/:id" element={<LeadFormPage />} />
+        <Route path="/crm" element={<p>Доска CRM</p>} />
       </Routes>
     </ToastProvider>,
     { route: `/crm/leads/${id}` },
@@ -148,4 +150,17 @@ it("показывает проигранную карточку прежнем�
   expect(screen.getByRole("textbox", { name: "Текст внутреннего примечания" })).toBeDisabled();
   expect(screen.getByRole("button", { name: "Восстановить" })).toBeVisible();
   expect(screen.getByText(/сначала восстановите карточку/i)).toBeVisible();
+});
+
+it("предупреждает об уходе с новой карточки, даже если заполнен только ИНН", async () => {
+  setAccessToken("токен");
+  server = startFakeApi([...commonRoutes(), { path: "/crm/customers/by-inn", response: [] }]);
+
+  const user = userEvent.setup();
+  renderLead("new");
+
+  await user.type(await screen.findByRole("textbox", { name: "ИНН" }), "7701234567");
+  await user.click(screen.getByRole("link", { name: "Лиды" }));
+
+  expect(await screen.findByRole("dialog", { name: "Несохранённые изменения" })).toBeVisible();
 });

@@ -5,7 +5,7 @@
  * собраны в одном месте, поэтому после мутации понятно, что инвалидировать.
  */
 
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tanstack/react-query";
 
 import type {
   Attachment,
@@ -90,6 +90,20 @@ const keys = {
   colleagues: ["colleagues"] as const,
   loginAttempts: ["login-attempts"] as const,
 };
+
+/** Лиды видны в CRM, клиентах, подсказках по ИНН и листалке карточек. */
+function invalidateLeadLists(qc: QueryClient): void {
+  void qc.invalidateQueries({ queryKey: ["leads"] });
+  void qc.invalidateQueries({ queryKey: ["customers"] });
+  void qc.invalidateQueries({ queryKey: ["customers-by-inn"] });
+  void qc.invalidateQueries({ queryKey: ["pager"] });
+}
+
+/** Карточка и её лента меняются вместе при переносе, проигрыше и правке. */
+function invalidateLeadDetails(qc: QueryClient, id: string | number): void {
+  void qc.invalidateQueries({ queryKey: keys.lead(id) });
+  void qc.invalidateQueries({ queryKey: keys.timeline(id) });
+}
 
 // --- авторизация -------------------------------------------------------------
 interface AccessTokenResponse {
@@ -198,8 +212,10 @@ export function useUpdateTag() {
       void qc.invalidateQueries({ queryKey: keys.tags });
       // Название/цвет тега показаны везде, где он проставлен.
       void qc.invalidateQueries({ queryKey: ["leads"] });
+      void qc.invalidateQueries({ queryKey: ["lead"] });
       void qc.invalidateQueries({ queryKey: ["customers"] });
       void qc.invalidateQueries({ queryKey: ["shipments"] });
+      void qc.invalidateQueries({ queryKey: ["shipment"] });
     },
   });
 }
@@ -211,8 +227,10 @@ export function useDeleteTag() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.tags });
       void qc.invalidateQueries({ queryKey: ["leads"] });
+      void qc.invalidateQueries({ queryKey: ["lead"] });
       void qc.invalidateQueries({ queryKey: ["customers"] });
       void qc.invalidateQueries({ queryKey: ["shipments"] });
+      void qc.invalidateQueries({ queryKey: ["shipment"] });
     },
   });
 }
@@ -253,6 +271,8 @@ export function useUpdateStage() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.stages });
       void qc.invalidateQueries({ queryKey: ["leads"] });
+      void qc.invalidateQueries({ queryKey: ["lead"] });
+      void qc.invalidateQueries({ queryKey: ["customers"] });
     },
   });
 }
@@ -298,6 +318,10 @@ export function useDeleteStage() {
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.stages });
       void qc.invalidateQueries({ queryKey: ["leads"] });
+      void qc.invalidateQueries({ queryKey: ["lead"] });
+      void qc.invalidateQueries({ queryKey: ["timeline"] });
+      void qc.invalidateQueries({ queryKey: ["pager"] });
+      void qc.invalidateQueries({ queryKey: ["customers"] });
     },
   });
 }
@@ -395,7 +419,7 @@ export function useCreateLead() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: LeadPayload) => api<Lead>("/crm/leads", { method: "POST", body }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ["leads"] }),
+    onSuccess: () => invalidateLeadLists(qc),
   });
 }
 
@@ -405,15 +429,13 @@ export function useUpdateLead(id: string | undefined) {
     mutationFn: (body: LeadUpdatePayload) =>
       api<Lead>(`/crm/leads/${id}`, { method: "PATCH", body }),
     onSuccess: () => {
-      void qc.invalidateQueries({ queryKey: keys.lead(id ?? "") });
-      void qc.invalidateQueries({ queryKey: keys.timeline(id ?? "") });
-      void qc.invalidateQueries({ queryKey: ["leads"] });
+      invalidateLeadDetails(qc, id ?? "");
+      invalidateLeadLists(qc);
     },
     onError: (error) => {
       if (error instanceof ApiError && error.code === "lead_conflict") {
-        void qc.invalidateQueries({ queryKey: keys.lead(id ?? "") });
-        void qc.invalidateQueries({ queryKey: keys.timeline(id ?? "") });
-        void qc.invalidateQueries({ queryKey: ["leads"] });
+        invalidateLeadDetails(qc, id ?? "");
+        invalidateLeadLists(qc);
       }
     },
   });
@@ -453,15 +475,13 @@ export function useMoveLead() {
     onError: (error, variables, context) => {
       context?.snapshot.forEach(([key, data]) => qc.setQueryData(key, data));
       if (error instanceof ApiError && error.code === "lead_conflict") {
-        void qc.invalidateQueries({ queryKey: ["leads"] });
-        void qc.invalidateQueries({ queryKey: keys.lead(variables.id) });
-        void qc.invalidateQueries({ queryKey: keys.timeline(variables.id) });
+        invalidateLeadLists(qc);
+        invalidateLeadDetails(qc, variables.id);
       }
     },
     onSuccess: (_data, variables) => {
-      void qc.invalidateQueries({ queryKey: ["leads"] });
-      void qc.invalidateQueries({ queryKey: keys.lead(variables.id) });
-      void qc.invalidateQueries({ queryKey: keys.timeline(variables.id) });
+      invalidateLeadLists(qc);
+      invalidateLeadDetails(qc, variables.id);
     },
   });
 }
@@ -507,15 +527,13 @@ export function useUpdateLeadPriority() {
         qc.setQueryData(keys.lead(context.id), context.leadSnapshot);
       }
       if (error instanceof ApiError && error.code === "lead_conflict") {
-        void qc.invalidateQueries({ queryKey: ["leads"] });
-        void qc.invalidateQueries({ queryKey: keys.lead(variables.id) });
-        void qc.invalidateQueries({ queryKey: keys.timeline(variables.id) });
+        invalidateLeadLists(qc);
+        invalidateLeadDetails(qc, variables.id);
       }
     },
     onSuccess: (_data, { id }) => {
-      void qc.invalidateQueries({ queryKey: ["leads"] });
-      void qc.invalidateQueries({ queryKey: keys.lead(id) });
-      void qc.invalidateQueries({ queryKey: keys.timeline(id) });
+      invalidateLeadLists(qc);
+      invalidateLeadDetails(qc, id);
     },
   });
 }
@@ -527,9 +545,8 @@ export function useLoseLead() {
     mutationFn: ({ id, reasonId }: { id: number | string; reasonId: number }) =>
       api<void>(`/crm/leads/${id}/lose`, { method: "POST", body: { reason_id: reasonId } }),
     onSuccess: (_data, { id }) => {
-      void qc.invalidateQueries({ queryKey: ["leads"] });
-      void qc.invalidateQueries({ queryKey: keys.lead(id) });
-      void qc.invalidateQueries({ queryKey: keys.timeline(id) });
+      invalidateLeadLists(qc);
+      invalidateLeadDetails(qc, id);
     },
   });
 }
@@ -540,9 +557,8 @@ export function useRestoreLead() {
   return useMutation({
     mutationFn: (id: number | string) => api<void>(`/crm/leads/${id}/restore`, { method: "POST" }),
     onSuccess: (_data, id) => {
-      void qc.invalidateQueries({ queryKey: ["leads"] });
-      void qc.invalidateQueries({ queryKey: keys.lead(id) });
-      void qc.invalidateQueries({ queryKey: keys.timeline(id) });
+      invalidateLeadLists(qc);
+      invalidateLeadDetails(qc, id);
     },
   });
 }
@@ -554,7 +570,18 @@ export function useDeleteLead() {
   return useMutation({
     mutationFn: (id: number | string) =>
       api<void>(`/crm/leads/${id}/permanent`, { method: "DELETE" }),
-    onSuccess: () => void qc.invalidateQueries({ queryKey: ["leads"] }),
+    onSuccess: (_data, id) => {
+      invalidateLeadLists(qc);
+      void qc.invalidateQueries({ queryKey: ["shipments"] });
+      void qc.invalidateQueries({ queryKey: ["shipment"] });
+      void qc.invalidateQueries({ queryKey: ["shipment-timeline"] });
+      void qc.invalidateQueries({ queryKey: ["shipment-attachments"] });
+      qc.removeQueries({ queryKey: keys.lead(id), exact: true });
+      qc.removeQueries({ queryKey: keys.timeline(id), exact: true });
+      qc.removeQueries({ queryKey: keys.pager(id), exact: true });
+      qc.removeQueries({ queryKey: keys.attachments(id), exact: true });
+      qc.removeQueries({ queryKey: keys.leadShipments(id), exact: true });
+    },
   });
 }
 
@@ -617,9 +644,10 @@ export function useTransferLead(leadId: string | number | undefined) {
         body: { user_id: userId },
       }),
     onSuccess: () => {
-      // Карточка ушла с нашей доски — обновляем и список, и саму карточку.
-      void qc.invalidateQueries({ queryKey: ["leads"] });
-      void qc.invalidateQueries({ queryKey: keys.lead(leadId ?? "") });
+      // Перенос меняет ответственного, этап и историю — обновляем все эти экраны.
+      invalidateLeadLists(qc);
+      invalidateLeadDetails(qc, leadId ?? "");
+      void qc.invalidateQueries({ queryKey: keys.pager(leadId ?? "") });
     },
   });
 }
@@ -748,8 +776,8 @@ export function useDeleteShipmentTimelineEntry(id: string | undefined) {
 }
 
 /** Содержимое файла — для миниатюр и предпросмотра. */
-export function attachmentBlob(attachmentId: number): Promise<Blob> {
-  return apiBlob(`/crm/attachments/${attachmentId}`);
+export function attachmentBlob(attachmentId: number, signal?: AbortSignal): Promise<Blob> {
+  return apiBlob(`/crm/attachments/${attachmentId}`, signal);
 }
 
 /** Скачивание: получаем файл с токеном и отдаём браузеру. */

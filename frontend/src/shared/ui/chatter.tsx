@@ -5,7 +5,12 @@ import { useLayoutEffect, useMemo, useRef, useState } from "react";
 
 import { downloadAttachment } from "@/shared/api/hooks";
 import type { Attachment, TimelineEntry } from "@/shared/types";
-import { formatSize, previewKind, useObjectUrl } from "@/shared/ui/file-preview-utils";
+import {
+  formatSize,
+  previewKind,
+  useNearViewport,
+  useObjectUrl,
+} from "@/shared/ui/file-preview-utils";
 
 /**
  * Чаттер (правая колонка карточки): лента событий, примечания и вложения.
@@ -46,7 +51,9 @@ function dayLabel(iso: string): string {
 }
 
 function AttachmentThumb({ file, onOpen }: { file: Attachment; onOpen: () => void }) {
-  const { url, failed } = useObjectUrl(file);
+  const buttonRef = useRef<HTMLButtonElement>(null);
+  const nearViewport = useNearViewport(buttonRef);
+  const { url, failed } = useObjectUrl(file, nearViewport);
 
   if (failed) {
     return (
@@ -59,6 +66,7 @@ function AttachmentThumb({ file, onOpen }: { file: Attachment; onOpen: () => voi
 
   return (
     <button
+      ref={buttonRef}
       type="button"
       onClick={onOpen}
       title={`${file.name} · ${formatSize(file.size)} — открыть полностью`}

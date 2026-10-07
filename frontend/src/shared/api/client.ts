@@ -132,8 +132,8 @@ export async function apiUpload<T>(path: string, file: File): Promise<T> {
 
 /** Файл приходит из закрытой ручки, поэтому его нельзя вставить в <img src>:
  *  сначала скачиваем с токеном, потом показываем из памяти. */
-export async function apiBlob(path: string): Promise<Blob> {
-  const response = await request(path, {}, true);
+export async function apiBlob(path: string, signal?: AbortSignal): Promise<Blob> {
+  const response = await request(path, signal ? { signal } : {}, true);
   if (!response.ok) throw new ApiError(response.status, "Не удалось получить файл");
   return response.blob();
 }

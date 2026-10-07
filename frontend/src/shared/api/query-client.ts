@@ -1,5 +1,6 @@
 import { QueryCache, QueryClient } from "@tanstack/react-query";
 
+import { clearAttachmentLoadQueue } from "@/shared/lib/attachment-load-queue";
 import { clearBlobCache } from "@/shared/lib/blob-cache";
 
 /**
@@ -38,7 +39,8 @@ export function clearSessionCache(): void {
   void queryClient.cancelQueries();
   // clear очищает одновременно QueryCache и MutationCache.
   queryClient.clear();
-  // Скачанные вложения лежат отдельно от кеша запросов — их тоже убираем,
-  // иначе картинки прежнего сотрудника остались бы в памяти вкладки.
+  // Сначала прекращаем текущие/ожидающие загрузки, затем очищаем кеш вложений.
+  // Иначе поздний ответ прежней учётной записи мог бы попасть в новую сессию.
+  clearAttachmentLoadQueue();
   clearBlobCache();
 }

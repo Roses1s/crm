@@ -11,7 +11,7 @@ import { ShipmentFormPage } from "./ShipmentFormPage";
 import { clearTokens, setAccessToken } from "@/shared/api/auth";
 import { page, startFakeApi, type FakeServer } from "@/test/fake-api";
 import { ToastProvider } from "@/shared/ui/toast";
-import { renderWithProviders } from "@/test/utils";
+import { renderWithDataRouter } from "@/test/utils";
 
 const ME = {
   id: 1,
@@ -60,14 +60,15 @@ function commonRoutes() {
   ];
 }
 
-function renderShipment() {
-  return renderWithProviders(
+function renderShipment(route = "/shipments/101") {
+  return renderWithDataRouter(
     <ToastProvider>
       <Routes>
         <Route path="/shipments/:id" element={<ShipmentFormPage />} />
+        <Route path="/shipments" element={<p>Список заявок</p>} />
       </Routes>
     </ToastProvider>,
-    { route: "/shipments/101" },
+    { route },
   );
 }
 
@@ -135,4 +136,46 @@ it("маржа на вкладке «Позиции заказа» считае�
     (_content, element) =>
       element?.tagName === "SPAN" && element.textContent?.replace(/\u00A0/g, " ") === "15 000,00",
   );
+});
+
+it("сохраняет изменённую заявку перед переходом по внутренней ссылке", async () => {
+  setAccessToken("токен");
+  server = startFakeApi([
+    ...commonRoutes(),
+    {
+      method: "PATCH",
+      path: "/shipments/101",
+      response: (body: unknown) => ({ ...SHIPMENT, ...(body as object) }),
+    },
+  ]);
+
+  const user = userEvent.setup();
+  renderShipment();
+
+  const createdAt = (await screen.findByLabelText("Дата создания")) as HTMLInputElement;
+  await waitFor(() => expect(createdAt.value).toBe("2026-01-15T09:30"));
+  await user.clear(createdAt);
+  await user.type(createdAt, "2025-12-01T00:00");
+  await user.click(screen.getByRole("link", { name: "Заявки" }));
+
+  expect(await screen.findByRole("dialog", { name: "Несохранённые изменения" })).toBeVisible();
+  expect(screen.queryByText("Список заявок")).not.toBeInTheDocument();
+  await user.click(screen.getByRole("button", { name: "Сохранить и перейти" }));
+
+  expect(await screen.findByText("Список заявок")).toBeVisible();
+  expect(server.called("PATCH", "/shipments/101")).toBe(true);
+});
+
+it("защищает даже новую заявку без выбранного лида", async () => {
+  setAccessToken("токен");
+  server = startFakeApi(commonRoutes());
+
+  const user = userEvent.setup();
+  renderShipment("/shipments/new");
+
+  await user.type(await screen.findByLabelText("Адрес погрузки"), "Склад на Севере");
+  await user.click(screen.getByRole("link", { name: "Заявки" }));
+
+  expect(await screen.findByRole("dialog", { name: "Несохранённые изменения" })).toBeVisible();
+  expect(screen.getByRole("button", { name: "Сохранить и перейти" })).toBeDisabled();
 });
