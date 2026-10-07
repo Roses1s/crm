@@ -177,9 +177,13 @@ it("бухгалтера выбирают из фиксированного сп
 
   const accountant = await screen.findByLabelText("Назначенный бухгалтер");
   const accountantLabel = screen.getByText("Назначенный бухгалтер");
+  const priorityLabel = screen.getByText("Приоритет");
   const tagsLabel = screen.getByText("Теги");
   expect(
-    accountantLabel.compareDocumentPosition(tagsLabel) & Node.DOCUMENT_POSITION_FOLLOWING,
+    accountantLabel.compareDocumentPosition(priorityLabel) & Node.DOCUMENT_POSITION_FOLLOWING,
+  ).toBeTruthy();
+  expect(
+    priorityLabel.compareDocumentPosition(tagsLabel) & Node.DOCUMENT_POSITION_FOLLOWING,
   ).toBeTruthy();
   expect(accountant).toHaveValue("");
   expect(

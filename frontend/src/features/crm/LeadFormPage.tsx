@@ -691,19 +691,6 @@ function LeadForm({ id }: { id?: string }) {
                         </InnerGroup>
 
                         <InnerGroup>
-                          <Field label="Приоритет">
-                            {/*
-                            Тот же виджет звёзд, что на канбане: при наведении
-                            подсвечивает звёзды до курсора, при уходе возвращает
-                            сохранённый приоритет, по клику сохраняет значение.
-                          */}
-                            <span className="inline-flex items-center pt-[2px]">
-                              <StarRating
-                                value={form.priority}
-                                onChange={readOnly ? undefined : (n) => set("priority", n)}
-                              />
-                            </span>
-                          </Field>
                           <Field label="Назначенный бухгалтер" htmlFor="lead-accountant">
                             <select
                               id="lead-accountant"
@@ -719,6 +706,19 @@ function LeadForm({ id }: { id?: string }) {
                                 </option>
                               ))}
                             </select>
+                          </Field>
+                          <Field label="Приоритет">
+                            {/*
+                            Тот же виджет звёзд, что на канбане: при наведении
+                            подсвечивает звёзды до курсора, при уходе возвращает
+                            сохранённый приоритет, по клику сохраняет значение.
+                          */}
+                            <span className="inline-flex items-center pt-[2px]">
+                              <StarRating
+                                value={form.priority}
+                                onChange={readOnly ? undefined : (n) => set("priority", n)}
+                              />
+                            </span>
                           </Field>
                           <Field
                             label="Теги"
