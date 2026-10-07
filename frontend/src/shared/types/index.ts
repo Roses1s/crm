@@ -63,7 +63,7 @@ export interface Lead {
   assigned_to_name?: string | null;
   tags: Tag[];
   created_at?: string;
-  updated_at?: string;
+  updated_at: string;
 }
 
 /**

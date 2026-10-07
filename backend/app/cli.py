@@ -17,6 +17,7 @@ from app.db.session import SessionLocal
 from app.models.crm import Lead, Stage, Tag
 from app.models.shipment import Shipment, ShipmentStatus
 from app.models.user import Role, User
+from app.services.lead_versions import advance_lead_version
 from app.services.stages import DEFAULT_STAGES as BOARD_STAGES
 
 DEFAULT_STAGES = [
@@ -79,6 +80,7 @@ async def reset_board(email: str) -> None:
                 previous = old_by_id.get(lead.stage_id)
                 same_name = by_name.get(previous.name) if previous else None
                 lead.stage_id = (same_name or fresh[0]).id
+                advance_lead_version(lead)
                 moved += 1
             await session.flush()
 

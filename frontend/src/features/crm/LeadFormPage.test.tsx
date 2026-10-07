@@ -40,6 +40,8 @@ const LEAD = {
   assigned_to_id: 1,
   assigned_to_name: "Админов Админ",
   tags: [],
+  created_at: "2026-10-01T10:00:00+03:00",
+  updated_at: "2026-10-01T10:00:00+03:00",
 };
 
 const STAGES = [{ id: 1, name: "Новый", sequence: 1, color: "" }];

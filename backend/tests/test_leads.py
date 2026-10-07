@@ -2,13 +2,20 @@
 
 from __future__ import annotations
 
+import asyncio
 from pathlib import Path
 
-from httpx import AsyncClient
+import pytest
+from httpx import AsyncClient, Response
+from sqlalchemy.ext.asyncio import async_sessionmaker
 
 from app.core.config import settings
-from app.models.crm import Stage
-from tests.conftest import TEST_PASSWORD
+from app.core.errors import AppError
+from app.models.crm import Lead, Stage
+from app.models.user import User
+from app.schemas.crm import LeadUpdate
+from app.services.leads import update_lead
+from tests.conftest import TEST_DATABASE_URL, TEST_PASSWORD
 
 
 async def create_manager_stage(session, owner_id: int) -> Stage:
@@ -25,6 +32,107 @@ async def manager_headers(client: AsyncClient) -> dict[str, str]:
         json={"email": "manager@crmdetroid.ru", "password": TEST_PASSWORD},
     )
     return {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+
+async def patch_lead(
+    client: AsyncClient,
+    lead_id: int,
+    payload: dict[str, object],
+    *,
+    headers: dict[str, str] | None = None,
+) -> Response:
+    """Добавляет к PATCH версию карточки, которую клиент только что прочитал."""
+    response = await client.get(f"/api/v1/crm/leads/{lead_id}", headers=headers)
+    assert response.status_code == 200, response.text
+    body = {**payload, "expected_updated_at": response.json()["updated_at"]}
+    return await client.patch(f"/api/v1/crm/leads/{lead_id}", json=body, headers=headers)
+
+
+async def test_lead_patch_requires_the_version_seen_by_the_client(
+    auth_client: AsyncClient, seeded: dict[str, object]
+) -> None:
+    lead = seeded["lead"]
+    response = await auth_client.patch(
+        f"/api/v1/crm/leads/{lead.id}",  # type: ignore[attr-defined]
+        json={"name": "Не должно сохраниться"},
+    )
+
+    assert response.status_code == 422, response.text
+    assert response.json()["code"] == "validation_error"
+    current = await auth_client.get(f"/api/v1/crm/leads/{lead.id}")  # type: ignore[attr-defined]
+    assert current.json()["name"] == lead.name  # type: ignore[attr-defined]
+
+
+async def test_stale_lead_patch_cannot_overwrite_a_newer_change(
+    auth_client: AsyncClient, seeded: dict[str, object]
+) -> None:
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    original = (await auth_client.get(f"/api/v1/crm/leads/{lead_id}")).json()
+    version_seen = original["updated_at"]
+
+    first = await auth_client.patch(
+        f"/api/v1/crm/leads/{lead_id}",
+        json={"name": "Название, сохранённое первым", "expected_updated_at": version_seen},
+    )
+    assert first.status_code == 200, first.text
+    assert first.json()["updated_at"] != version_seen
+
+    stale = await auth_client.patch(
+        f"/api/v1/crm/leads/{lead_id}",
+        json={"logist_contact": "Устаревшее значение", "expected_updated_at": version_seen},
+    )
+    assert stale.status_code == 409, stale.text
+    assert stale.json()["code"] == "lead_conflict"
+
+    current = await auth_client.get(f"/api/v1/crm/leads/{lead_id}")
+    assert current.json()["name"] == "Название, сохранённое первым"
+    assert current.json()["logist_contact"] == original["logist_contact"]
+
+
+@pytest.mark.skipif(
+    TEST_DATABASE_URL.startswith("sqlite"), reason="Параллельные сессии проверяются на PostgreSQL"
+)
+async def test_two_parallel_patches_only_save_one_version(
+    engine, seeded: dict[str, object]
+) -> None:
+    """Два одновременных PATCH с одной версией не могут сохранить обе правки."""
+    lead = seeded["lead"]
+    admin = seeded["admin"]
+    lead_id = lead.id  # type: ignore[attr-defined]
+    admin_id = admin.id  # type: ignore[attr-defined]
+    maker = async_sessionmaker(bind=engine, expire_on_commit=False)
+    async with maker() as db:
+        current = await db.get(Lead, lead_id)
+        assert current is not None
+        expected_updated_at = current.updated_at
+
+    barrier = asyncio.Barrier(2)
+
+    async def save(name: str) -> str:
+        async with maker() as db:
+            user = await db.get(User, admin_id)
+            assert user is not None
+            await barrier.wait()
+            try:
+                await update_lead(
+                    db,
+                    user,
+                    lead_id,
+                    LeadUpdate(name=name, expected_updated_at=expected_updated_at),
+                )
+                return "saved"
+            except AppError as exc:
+                await db.rollback()
+                return exc.code
+
+    outcomes = await asyncio.gather(save("Первый вариант"), save("Второй вариант"))
+    assert outcomes.count("saved") == 1
+    assert outcomes.count("lead_conflict") == 1
+
+    async with maker() as db:
+        current = await db.get(Lead, lead_id)
+        assert current is not None
+        assert current.name in {"Первый вариант", "Второй вариант"}
 
 
 async def test_list_leads_is_paginated(auth_client: AsyncClient) -> None:
@@ -76,9 +184,8 @@ async def test_accountant_can_be_changed_cleared_and_is_validated(
 ) -> None:
     lead_id = seeded["lead"].id  # type: ignore[attr-defined]
 
-    changed = await auth_client.patch(
-        f"/api/v1/crm/leads/{lead_id}",
-        json={"accountant_name": "Кузьмина Виктория Павловна"},
+    changed = await patch_lead(
+        auth_client, lead_id, {"accountant_name": "Кузьмина Виктория Павловна"}
     )
     assert changed.status_code == 200, changed.text
     assert changed.json()["accountant_name"] == "Кузьмина Виктория Павловна"
@@ -86,15 +193,11 @@ async def test_accountant_can_be_changed_cleared_and_is_validated(
     persisted = await auth_client.get(f"/api/v1/crm/leads/{lead_id}")
     assert persisted.json()["accountant_name"] == "Кузьмина Виктория Павловна"
 
-    cleared = await auth_client.patch(
-        f"/api/v1/crm/leads/{lead_id}", json={"accountant_name": None}
-    )
+    cleared = await patch_lead(auth_client, lead_id, {"accountant_name": None})
     assert cleared.status_code == 200, cleared.text
     assert cleared.json()["accountant_name"] is None
 
-    invalid = await auth_client.patch(
-        f"/api/v1/crm/leads/{lead_id}", json={"accountant_name": "Неизвестный бухгалтер"}
-    )
+    invalid = await patch_lead(auth_client, lead_id, {"accountant_name": "Неизвестный бухгалтер"})
     assert invalid.status_code == 422
 
 
@@ -102,7 +205,7 @@ async def test_stage_change_is_written_to_timeline(auth_client: AsyncClient, see
     lead_id = seeded["lead"].id  # type: ignore[attr-defined]
     talks_id = seeded["stage_talks"].id  # type: ignore[attr-defined]
 
-    patch = await auth_client.patch(f"/api/v1/crm/leads/{lead_id}", json={"stage_id": talks_id})
+    patch = await patch_lead(auth_client, lead_id, {"stage_id": talks_id})
     assert patch.status_code == 200
     assert patch.json()["stage_name"] == "Переговоры"
 
@@ -177,9 +280,7 @@ async def test_cannot_move_lead_to_stage_of_another_board(
     await session.commit()
     await session.refresh(foreign_stage)
 
-    patch = await auth_client.patch(
-        f"/api/v1/crm/leads/{lead.id}", json={"stage_id": foreign_stage.id}
-    )
+    patch = await patch_lead(auth_client, lead.id, {"stage_id": foreign_stage.id})
     assert patch.status_code == 404
 
     # Лид остался на прежнем, своём этапе.
@@ -218,7 +319,7 @@ async def test_note_can_be_edited(auth_client: AsyncClient, seeded: dict) -> Non
 async def test_history_entry_cannot_be_edited(auth_client: AsyncClient, seeded: dict) -> None:
     lead_id = seeded["lead"].id  # type: ignore[attr-defined]
     talks_id = seeded["stage_talks"].id  # type: ignore[attr-defined]
-    await auth_client.patch(f"/api/v1/crm/leads/{lead_id}", json={"stage_id": talks_id})
+    await patch_lead(auth_client, lead_id, {"stage_id": talks_id})
 
     timeline = await auth_client.get(f"/api/v1/crm/leads/{lead_id}/timeline")
     history_id = timeline.json()[0]["id"]
@@ -279,7 +380,7 @@ async def test_note_and_stage_record_are_deletable_but_other_history_is_not(
     lead_id = seeded["lead"].id  # type: ignore[attr-defined]
     talks_id = seeded["stage_talks"].id  # type: ignore[attr-defined]
     manager_id = seeded["manager"].id  # type: ignore[attr-defined]
-    await auth_client.patch(f"/api/v1/crm/leads/{lead_id}", json={"stage_id": talks_id})
+    await patch_lead(auth_client, lead_id, {"stage_id": talks_id})
     await auth_client.post(f"/api/v1/crm/leads/{lead_id}/notes", json={"body": "заметка"})
     await auth_client.post(f"/api/v1/crm/leads/{lead_id}/transfer", json={"user_id": manager_id})
 
@@ -396,9 +497,7 @@ async def test_manager_cannot_edit_or_note_foreign_lost_lead(
     await auth_client.post(f"/api/v1/crm/leads/{lead_id}/lose", json={"reason_id": reason_id})
 
     headers = await manager_headers(auth_client)
-    patched = await auth_client.patch(
-        f"/api/v1/crm/leads/{lead_id}", json={"name": "Новое имя"}, headers=headers
-    )
+    patched = await patch_lead(auth_client, lead_id, {"name": "Новое имя"}, headers=headers)
     assert patched.status_code == 404
 
     noted = await auth_client.post(
@@ -442,16 +541,12 @@ async def test_lost_lead_is_read_only_until_restored(
     )
     assert lost.status_code == 204
 
-    admin_edit = await auth_client.patch(
-        f"/api/v1/crm/leads/{lead_id}", json={"name": "Правка администратора"}
-    )
+    admin_edit = await patch_lead(auth_client, lead_id, {"name": "Правка администратора"})
     assert admin_edit.status_code == 409
     assert admin_edit.json()["code"] == "lead_lost"
 
-    owner_edit = await auth_client.patch(
-        f"/api/v1/crm/leads/{lead_id}",
-        json={"name": "Правка прежнего ответственного"},
-        headers=headers,
+    owner_edit = await patch_lead(
+        auth_client, lead_id, {"name": "Правка прежнего ответственного"}, headers=headers
     )
     assert owner_edit.status_code == 409
     assert owner_edit.json()["code"] == "lead_lost"
@@ -481,8 +576,8 @@ async def test_lost_lead_is_read_only_until_restored(
     restored = await auth_client.post(f"/api/v1/crm/leads/{lead_id}/restore", headers=headers)
     assert restored.status_code == 204
 
-    edited = await auth_client.patch(
-        f"/api/v1/crm/leads/{lead_id}", json={"name": "После восстановления"}, headers=headers
+    edited = await patch_lead(
+        auth_client, lead_id, {"name": "После восстановления"}, headers=headers
     )
     assert edited.status_code == 200, edited.text
     assert edited.json()["name"] == "После восстановления"
@@ -716,10 +811,7 @@ async def test_null_inn_is_rejected_with_422(
     «внутренняя ошибка сервера».
     """
     lead = seeded["lead"]
-    response = await auth_client.patch(
-        f"/api/v1/crm/leads/{lead.id}",  # type: ignore[attr-defined]
-        json={"inn": None},
-    )
+    response = await patch_lead(auth_client, lead.id, {"inn": None})  # type: ignore[attr-defined]
     assert response.status_code == 422, response.text
     assert response.json()["code"] == "validation_error"
 
@@ -729,10 +821,7 @@ async def test_unknown_field_in_patch_is_rejected(
 ) -> None:
     """Опечатка в имени поля — ошибка, а не тихий 200 без изменений."""
     lead = seeded["lead"]
-    response = await auth_client.patch(
-        f"/api/v1/crm/leads/{lead.id}",  # type: ignore[attr-defined]
-        json={"nme": "опечатка"},
-    )
+    response = await patch_lead(auth_client, lead.id, {"nme": "опечатка"})  # type: ignore[attr-defined]
     assert response.status_code == 422, response.text
 
 
@@ -741,10 +830,7 @@ async def test_explicit_null_in_required_field_is_rejected(
 ) -> None:
     """Явный null в обязательном поле — понятная ошибка до обращения к базе."""
     lead = seeded["lead"]
-    response = await auth_client.patch(
-        f"/api/v1/crm/leads/{lead.id}",  # type: ignore[attr-defined]
-        json={"logist_contact": None},
-    )
+    response = await patch_lead(auth_client, lead.id, {"logist_contact": None})  # type: ignore[attr-defined]
     assert response.status_code == 422, response.text
     assert "нельзя очистить" in response.text
 
@@ -754,10 +840,7 @@ async def test_nullable_field_can_be_cleared(
 ) -> None:
     """Необязательное поле (почта логиста) очищается штатно."""
     lead = seeded["lead"]
-    response = await auth_client.patch(
-        f"/api/v1/crm/leads/{lead.id}",  # type: ignore[attr-defined]
-        json={"logist_email": None},
-    )
+    response = await patch_lead(auth_client, lead.id, {"logist_email": None})  # type: ignore[attr-defined]
     assert response.status_code == 200, response.text
     assert response.json()["logist_email"] is None
 
@@ -767,10 +850,7 @@ async def test_unknown_tag_does_not_wipe_existing_tags(
 ) -> None:
     """Несуществующий тег — ошибка; прежние теги карточки остаются на месте."""
     lead = seeded["lead"]
-    response = await auth_client.patch(
-        f"/api/v1/crm/leads/{lead.id}",  # type: ignore[attr-defined]
-        json={"tag_ids": [999999]},
-    )
+    response = await patch_lead(auth_client, lead.id, {"tag_ids": [999999]})  # type: ignore[attr-defined]
     assert response.status_code == 404, response.text
 
     card = await auth_client.get(f"/api/v1/crm/leads/{lead.id}")  # type: ignore[attr-defined]

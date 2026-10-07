@@ -4,6 +4,7 @@ import { MoreVertical } from "lucide-react";
 import { useState } from "react";
 import { Link } from "react-router-dom";
 
+import { ApiError } from "@/shared/api/client";
 import { useUpdateLeadPriority } from "@/shared/api/hooks";
 import { ownerInitials, ownerLabel } from "@/shared/lib/owner";
 import type { Lead } from "@/shared/types";
@@ -104,11 +105,22 @@ export function LeadCard({ lead, isOverlay }: { lead: Lead; isOverlay?: boolean 
             ? undefined
             : (priority) => {
                 if (!updatePriority.isPending) {
-                  updatePriority.mutate({ id: lead.id, priority });
+                  updatePriority.mutate({
+                    id: lead.id,
+                    priority,
+                    expected_updated_at: lead.updated_at,
+                  });
                 }
               }
         }
       />
+      {updatePriority.isError && (
+        <p role="alert" className="px-3 pt-1 text-[11px] leading-4 text-odoo-danger">
+          {updatePriority.error instanceof ApiError && updatePriority.error.code === "lead_conflict"
+            ? "Карточка уже изменена. Доска обновлена — выберите приоритет ещё раз."
+            : "Не удалось сохранить приоритет."}
+        </p>
+      )}
     </div>
   );
 

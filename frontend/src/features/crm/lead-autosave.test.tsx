@@ -36,6 +36,8 @@ const LEAD = {
   assigned_to_id: 1,
   assigned_to_name: "Админов Админ",
   tags: [],
+  created_at: "2026-10-01T10:00:00+03:00",
+  updated_at: "2026-10-01T10:00:00+03:00",
 };
 
 const STAGES = [{ id: 1, name: "Новый", sequence: 1, color: "" }];
@@ -201,6 +203,7 @@ it("бухгалтера выбирают из фиксированного сп
   expect(current.accountant_name).toBe("Кузьмина Виктория Павловна");
   expect(server?.calls.find((call) => call.method === "PATCH")?.body).toMatchObject({
     accountant_name: "Кузьмина Виктория Павловна",
+    expected_updated_at: LEAD.updated_at,
   });
 
   await user.selectOptions(accountant, "");
@@ -211,5 +214,47 @@ it("бухгалтера выбирают из фиксированного сп
   expect(current.accountant_name).toBeNull();
   expect(server?.calls.filter((call) => call.method === "PATCH")[1]?.body).toMatchObject({
     accountant_name: null,
+    expected_updated_at: LEAD.updated_at,
   });
+});
+
+it("при конфликте блокирует старую форму и даёт загрузить актуальную карточку", async () => {
+  setAccessToken("токен");
+  const latest = {
+    ...LEAD,
+    name: "Новое название от коллеги",
+    updated_at: "2026-10-01T11:00:00+03:00",
+  };
+  server = startFakeApi([
+    ...routes(latest),
+    {
+      method: "PATCH",
+      path: "/crm/leads/10",
+      status: 409,
+      response: { detail: "Карточка изменилась", code: "lead_conflict" },
+    },
+  ]);
+
+  const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+  renderWithProviders(
+    <ToastProvider>
+      <Routes>
+        <Route path="/crm/leads/:id" element={<LeadFormPage />} />
+      </Routes>
+    </ToastProvider>,
+    { route: "/crm/leads/10" },
+  );
+
+  const name = await screen.findByRole("textbox", { name: "Название лида" });
+  await user.type(name, "!");
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(3500);
+  });
+
+  expect(await screen.findByText(/Другой пользователь уже изменил карточку/)).toBeVisible();
+  expect(name).toBeDisabled();
+
+  await user.click(screen.getByRole("button", { name: "Загрузить актуальную карточку" }));
+  await waitFor(() => expect(name).toHaveValue("Новое название от коллеги"));
+  expect(name).toBeEnabled();
 });

@@ -79,7 +79,7 @@ function LeadForm({ id }: { id?: string }) {
   const savedId = isNew ? undefined : id;
 
   const { data: currentUser } = useMe();
-  const { data: lead, isLoading } = useLead(id);
+  const { data: lead, isLoading, refetch: refetchLead } = useLead(id);
   const { data: stages = [] } = useStages();
   const { data: allTags = [] } = useTags();
   const { data: timeline = [] } = useLeadTimeline(id);
@@ -101,6 +101,8 @@ function LeadForm({ id }: { id?: string }) {
 
   const [form, setForm] = useState<FormState>(empty);
   const [pristine, setPristine] = useState<FormState>(empty);
+  const [updatedAt, setUpdatedAt] = useState<string>();
+  const [leadConflict, setLeadConflict] = useState(false);
   const [error, setError] = useState("");
   const [tab, setTab] = useState("shipments");
   const [actionsOpen, setActionsOpen] = useState(false);
@@ -137,6 +139,8 @@ function LeadForm({ id }: { id?: string }) {
       const next = toForm(lead);
       setForm(next);
       setPristine(next);
+      setUpdatedAt(lead.updated_at);
+      setLeadConflict(false);
     }
   }, [lead]);
 
@@ -159,7 +163,7 @@ function LeadForm({ id }: { id?: string }) {
   }, [dirty, lead?.is_archived]);
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
-    if (lead?.is_archived) return;
+    if (lead?.is_archived || leadConflict) return;
     // Правка руками снимает запрет автосохранения: прошлая попытка могла
     // упасть именно из-за того, что сейчас исправляют.
     autoSaveBlocked.current = false;
@@ -168,6 +172,8 @@ function LeadForm({ id }: { id?: string }) {
 
   function describe(err: unknown, fallback: string): string {
     if (err instanceof ApiError) {
+      if (err.code === "lead_conflict")
+        return "Другой пользователь уже изменил карточку. Ваши правки не сохранены — загрузите актуальную карточку перед продолжением.";
       if (err.status === 422)
         return "Проверьте поля: ИНН должен быть из 10 или 12 цифр с верной контрольной суммой";
       if (err.status === 403) return "Недостаточно прав для этого действия";
@@ -176,8 +182,25 @@ function LeadForm({ id }: { id?: string }) {
     return fallback;
   }
 
+  async function reloadLatestLead() {
+    const result = await refetchLead();
+    if (result.isError || !result.data) {
+      setError(
+        "Не удалось загрузить актуальную карточку. Проверьте соединение и попробуйте снова.",
+      );
+      return;
+    }
+    const next = toForm(result.data);
+    setForm(next);
+    setPristine(next);
+    setUpdatedAt(result.data.updated_at);
+    setLeadConflict(false);
+    autoSaveBlocked.current = false;
+    setError("");
+  }
+
   function save(options: { manual?: boolean } = {}) {
-    if (!isNew && lead?.is_archived) return;
+    if (saving || leadConflict || (!isNew && lead?.is_archived)) return;
     if (options.manual) autoSaveBlocked.current = false;
     setError("");
     if (!form.name.trim()) {
@@ -195,18 +218,28 @@ function LeadForm({ id }: { id?: string }) {
         },
       });
     } else {
-      updateLead.mutate(payload, {
-        onSuccess: (updated) => {
-          const next = toForm(updated);
-          setForm(next);
-          setPristine(next);
-          toast.show("Сохранено");
+      if (!updatedAt) {
+        autoSaveBlocked.current = true;
+        setError("Не удалось проверить версию карточки. Обновите страницу и попробуйте снова.");
+        return;
+      }
+      updateLead.mutate(
+        { ...payload, expected_updated_at: updatedAt },
+        {
+          onSuccess: (updated) => {
+            const next = toForm(updated);
+            setForm(next);
+            setPristine(next);
+            setUpdatedAt(updated.updated_at);
+            toast.show("Сохранено");
+          },
+          onError: (err) => {
+            autoSaveBlocked.current = true;
+            if (err instanceof ApiError && err.code === "lead_conflict") setLeadConflict(true);
+            setError(describe(err, "Не удалось сохранить"));
+          },
         },
-        onError: (err) => {
-          autoSaveBlocked.current = true;
-          setError(describe(err, "Не удалось сохранить"));
-        },
-      });
+      );
     }
   }
 
@@ -264,15 +297,25 @@ function LeadForm({ id }: { id?: string }) {
 
   // Смена этапа у сохранённой карточки уходит на сервер сразу — как в Odoo.
   function selectStage(stageId: number) {
-    if (lead?.is_archived || stageId === form.stage_id) return;
+    if (lead?.is_archived || leadConflict || updateLead.isPending || stageId === form.stage_id)
+      return;
     set("stage_id", stageId);
     if (isNew) return;
+    if (!updatedAt) {
+      set("stage_id", pristine.stage_id);
+      setError("Не удалось проверить версию карточки. Обновите страницу и попробуйте снова.");
+      return;
+    }
     updateLead.mutate(
-      { stage_id: stageId },
+      { stage_id: stageId, expected_updated_at: updatedAt },
       {
-        onSuccess: (updated) => setPristine((p) => ({ ...p, stage_id: updated.stage_id })),
+        onSuccess: (updated) => {
+          setUpdatedAt(updated.updated_at);
+          setPristine((p) => ({ ...p, stage_id: updated.stage_id }));
+        },
         onError: (err) => {
           set("stage_id", pristine.stage_id);
+          if (err instanceof ApiError && err.code === "lead_conflict") setLeadConflict(true);
           setError(describe(err, "Не удалось изменить этап"));
         },
       },
@@ -283,7 +326,7 @@ function LeadForm({ id }: { id?: string }) {
   const ownerAvatar = lead ? ownerInitials(lead) : "—";
   const isOwner = !!lead && !!currentUser && lead.assigned_to_id === currentUser.id;
   // Любой проигранный лид остаётся только для чтения — до явного восстановления.
-  const readOnly = !!lead?.is_archived;
+  const readOnly = !!lead?.is_archived || leadConflict;
   const composerInitial = (currentUser?.first_name || currentUser?.email || "Я")
     .slice(0, 1)
     .toUpperCase();
@@ -584,8 +627,23 @@ function LeadForm({ id }: { id?: string }) {
           )}
 
           <FormSheetBg>
-            {error && <FormAlert>{error}</FormAlert>}
-            {readOnly && (
+            {error && (
+              <FormAlert>
+                <div className="flex flex-wrap items-center justify-between gap-2">
+                  <span>{error}</span>
+                  {leadConflict && (
+                    <button
+                      type="button"
+                      onClick={() => void reloadLatestLead()}
+                      className="rounded-[4px] border border-current px-2 py-1 font-medium hover:bg-odoo-danger/10"
+                    >
+                      Загрузить актуальную карточку
+                    </button>
+                  )}
+                </div>
+              </FormAlert>
+            )}
+            {lead?.is_archived && (
               <FormAlert tone="warning">
                 Лид проигран. Чтобы менять его данные, сначала восстановите карточку.
               </FormAlert>

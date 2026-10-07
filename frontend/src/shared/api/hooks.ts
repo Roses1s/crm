@@ -23,7 +23,7 @@ import type {
   User,
 } from "@/shared/types";
 import { clearTokens, startSession } from "./auth";
-import { api, apiBlob, apiUpload, type Page } from "./client";
+import { ApiError, api, apiBlob, apiUpload, type Page } from "./client";
 
 /**
  * Сколько записей запрашиваем у сервера за раз. Постраничного перелистывания
@@ -386,6 +386,11 @@ export interface LeadPayload {
   tag_ids?: number[];
 }
 
+/** PATCH всегда содержит версию карточки, которую видел пользователь. */
+export interface LeadUpdatePayload extends Partial<LeadPayload> {
+  expected_updated_at: string;
+}
+
 export function useCreateLead() {
   const qc = useQueryClient();
   return useMutation({
@@ -397,12 +402,19 @@ export function useCreateLead() {
 export function useUpdateLead(id: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: Partial<LeadPayload>) =>
+    mutationFn: (body: LeadUpdatePayload) =>
       api<Lead>(`/crm/leads/${id}`, { method: "PATCH", body }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.lead(id ?? "") });
       void qc.invalidateQueries({ queryKey: keys.timeline(id ?? "") });
       void qc.invalidateQueries({ queryKey: ["leads"] });
+    },
+    onError: (error) => {
+      if (error instanceof ApiError && error.code === "lead_conflict") {
+        void qc.invalidateQueries({ queryKey: keys.lead(id ?? "") });
+        void qc.invalidateQueries({ queryKey: keys.timeline(id ?? "") });
+        void qc.invalidateQueries({ queryKey: ["leads"] });
+      }
     },
   });
 }
@@ -411,8 +423,19 @@ export function useUpdateLead(id: string | undefined) {
 export function useMoveLead() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, stage_id }: { id: number; stage_id: number }) =>
-      api<Lead>(`/crm/leads/${id}`, { method: "PATCH", body: { stage_id } }),
+    mutationFn: ({
+      id,
+      stage_id,
+      expected_updated_at,
+    }: {
+      id: number;
+      stage_id: number;
+      expected_updated_at: string;
+    }) =>
+      api<Lead>(`/crm/leads/${id}`, {
+        method: "PATCH",
+        body: { stage_id, expected_updated_at },
+      }),
     // Оптимистично: карточка переезжает сразу, до ответа сервера.
     onMutate: async ({ id, stage_id }) => {
       await qc.cancelQueries({ queryKey: ["leads"] });
@@ -427,8 +450,13 @@ export function useMoveLead() {
       );
       return { snapshot };
     },
-    onError: (_error, _variables, context) => {
+    onError: (error, variables, context) => {
       context?.snapshot.forEach(([key, data]) => qc.setQueryData(key, data));
+      if (error instanceof ApiError && error.code === "lead_conflict") {
+        void qc.invalidateQueries({ queryKey: ["leads"] });
+        void qc.invalidateQueries({ queryKey: keys.lead(variables.id) });
+        void qc.invalidateQueries({ queryKey: keys.timeline(variables.id) });
+      }
     },
     onSuccess: (_data, variables) => {
       void qc.invalidateQueries({ queryKey: ["leads"] });
@@ -442,8 +470,19 @@ export function useMoveLead() {
 export function useUpdateLeadPriority() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: ({ id, priority }: { id: number; priority: number }) =>
-      api<Lead>(`/crm/leads/${id}`, { method: "PATCH", body: { priority } }),
+    mutationFn: ({
+      id,
+      priority,
+      expected_updated_at,
+    }: {
+      id: number;
+      priority: number;
+      expected_updated_at: string;
+    }) =>
+      api<Lead>(`/crm/leads/${id}`, {
+        method: "PATCH",
+        body: { priority, expected_updated_at },
+      }),
     onMutate: async ({ id, priority }) => {
       await qc.cancelQueries({ queryKey: ["leads"] });
       const leadsSnapshot = qc.getQueriesData<Page<Lead>>({
@@ -462,10 +501,15 @@ export function useUpdateLeadPriority() {
       qc.setQueryData<Lead>(keys.lead(id), (old) => (old ? { ...old, priority } : old));
       return { leadsSnapshot, leadSnapshot, id };
     },
-    onError: (_error, _variables, context) => {
+    onError: (error, variables, context) => {
       context?.leadsSnapshot.forEach(([key, data]) => qc.setQueryData(key, data));
       if (context?.leadSnapshot) {
         qc.setQueryData(keys.lead(context.id), context.leadSnapshot);
+      }
+      if (error instanceof ApiError && error.code === "lead_conflict") {
+        void qc.invalidateQueries({ queryKey: ["leads"] });
+        void qc.invalidateQueries({ queryKey: keys.lead(variables.id) });
+        void qc.invalidateQueries({ queryKey: keys.timeline(variables.id) });
       }
     },
     onSuccess: (_data, { id }) => {

@@ -27,6 +27,7 @@ import { useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { AppShell, ControlPanel } from "@/app/layout/AppShell";
+import { ApiError } from "@/shared/api/client";
 import { ListLimitNotice } from "@/shared/ui/list-limit-notice";
 import { BoardBanner } from "@/features/crm/board/BoardBanner";
 import { BoardSuggestions } from "@/features/crm/board/BoardSuggestions";
@@ -227,7 +228,11 @@ export function KanbanPage() {
 
     const lead = leads.find((l) => l.id === leadId);
     if (lead && stageId && lead.stage_id !== stageId) {
-      moveLead.mutate({ id: leadId, stage_id: stageId });
+      moveLead.mutate({
+        id: leadId,
+        stage_id: stageId,
+        expected_updated_at: lead.updated_at,
+      });
     }
   }
 
@@ -270,7 +275,9 @@ export function KanbanPage() {
         >
           {reorderStages.isError
             ? "Не удалось изменить порядок этапов. Изменение отменено."
-            : "Не удалось переместить лид. Изменение отменено."}
+            : moveLead.error instanceof ApiError && moveLead.error.code === "lead_conflict"
+              ? "Карточка уже изменена другим пользователем. Доска обновлена — попробуйте снова."
+              : "Не удалось переместить лид. Изменение отменено."}
         </div>
       )}
 

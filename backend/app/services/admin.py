@@ -24,6 +24,7 @@ from app.models.security import LoginAttempt
 from app.models.timeline import EntryType, TimelineEntry
 from app.models.user import Role, User
 from app.schemas.user import UserCreate, UserUpdate
+from app.services.lead_versions import advance_lead_version
 from app.services.stages import ensure_default_stages
 
 log = get_logger(__name__)
@@ -141,6 +142,7 @@ async def transfer_leads(session: AsyncSession, *, from_user: User, to_user: Use
         same_name = by_name.get(old.name) if old else None
         lead.stage_id = (same_name or fallback).id
         lead.assigned_to_id = to_user.id
+        advance_lead_version(lead)
         session.add(
             TimelineEntry(
                 lead_id=lead.id,

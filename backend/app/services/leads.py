@@ -6,10 +6,12 @@
 
 from __future__ import annotations
 
+from datetime import UTC
 from pathlib import Path
 from typing import Any
 
-from sqlalchemy import Select, and_, func, or_, select, true
+from sqlalchemy import Select, String, and_, cast, func, or_, select, true
+from sqlalchemy import update as sql_update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from starlette.concurrency import run_in_threadpool
@@ -21,6 +23,7 @@ from app.models.crm import Lead, LossReason, Stage, lead_tags
 from app.models.timeline import LEAD_STAGE_LABEL, Attachment, EntryType, TimelineEntry
 from app.models.user import Role, User
 from app.schemas.crm import LeadCreate, LeadLose, LeadTransfer, LeadUpdate, NoteCreate, NoteUpdate
+from app.services.lead_versions import advance_lead_version, next_lead_updated_at
 from app.services.search import LIKE_ESCAPE, like_pattern
 from app.services.stages import board_stage_for, stage_on_board
 from app.services.tags import fetch_tags
@@ -168,7 +171,8 @@ async def create_lead(session: AsyncSession, user: User, payload: LeadCreate) ->
 
 async def update_lead(session: AsyncSession, user: User, lead_id: int, payload: LeadUpdate) -> Lead:
     lead = await get_editable_lead(session, lead_id, user)
-    data = payload.model_dump(exclude_unset=True)
+    expected_updated_at = payload.expected_updated_at
+    data = payload.model_dump(exclude_unset=True, exclude={"expected_updated_at"})
     tag_ids = data.pop("tag_ids", None)
 
     # Смена этапа попадает в ленту — так в чаттере видно историю движения.
@@ -196,6 +200,41 @@ async def update_lead(session: AsyncSession, user: User, lead_id: int, payload: 
             )
         )
 
+    # Сравнение и смена версии — один условный UPDATE. Если другой запрос
+    # успел сохранить карточку, второй UPDATE затронет ноль строк и не сможет
+    # затереть его поля. Версию двигаем минимум на микросекунду: SQLite в
+    # тестах и часть драйверов округляют CURRENT_TIMESTAMP до целой секунды.
+    next_updated_at = next_lead_updated_at(lead.updated_at)
+    if session.get_bind().dialect.name == "sqlite":
+        # SQLite хранит CURRENT_TIMESTAMP без дробной части, а SQLAlchemy
+        # сравнивает DateTime с суффиксом .000000. Нормализуем обе стороны
+        # как текст, сохраняя ненулевые микросекунды версии.
+        expected_utc = (
+            expected_updated_at.replace(tzinfo=UTC)
+            if expected_updated_at.tzinfo is None
+            else expected_updated_at.astimezone(UTC)
+        )
+        expected_text = expected_utc.replace(tzinfo=None).strftime("%Y-%m-%d %H:%M:%S.%f")
+        if expected_text.endswith(".000000"):
+            expected_text = expected_text.removesuffix(".000000")
+        version_match = func.replace(cast(Lead.updated_at, String), ".000000", "") == expected_text
+    else:
+        version_match = Lead.updated_at == expected_updated_at
+
+    result = await session.execute(
+        sql_update(Lead)
+        .where(Lead.id == lead_id, version_match)
+        .values(updated_at=next_updated_at)
+        .execution_options(synchronize_session=False)
+    )
+    if getattr(result, "rowcount", 0) != 1:
+        raise AppError(
+            "Карточка уже изменена другим пользователем. Обновите её перед повторной правкой",
+            code="lead_conflict",
+            status_code=409,
+        )
+
+    lead.updated_at = next_updated_at
     for key, value in data.items():
         setattr(lead, key, value)
     if tag_ids is not None:
@@ -241,6 +280,7 @@ async def lose_lead(session: AsyncSession, user: User, lead_id: int, payload: Le
             ),
         ]
     )
+    advance_lead_version(lead)
     await session.commit()
     log.info("lead.lost", lead_id=lead_id, reason_id=reason.id, by=user.id)
 
@@ -288,6 +328,7 @@ async def restore_lead(session: AsyncSession, user: User, lead_id: int) -> None:
             )
         )
     session.add_all(entries)
+    advance_lead_version(lead)
     await session.commit()
     log.info("lead.restored", lead_id=lead_id, by=user.id)
 
@@ -384,6 +425,7 @@ async def transfer_lead(
             )
         )
     session.add_all(entries)
+    advance_lead_version(lead)
     await session.commit()
     log.info("lead.transferred", lead_id=lead.id, to=target.id, was_lost=was_lost, by=user.id)
 

@@ -15,6 +15,7 @@ from app.core.errors import AppError, NotFoundError, PermissionDeniedError
 from app.models.crm import Lead, Stage
 from app.models.timeline import LEAD_STAGE_LABEL, EntryType, TimelineEntry
 from app.models.user import Role, User
+from app.services.lead_versions import advance_lead_version
 
 # Набор, с которого начинает каждый менеджер. Дальше он правит его под себя:
 # переименовывает, двигает, удаляет — у коллег доска не меняется.
@@ -122,6 +123,7 @@ async def delete_stage(
             raise NotFoundError(f"Этап {fallback_stage_id} не найден на этой доске")
         for lead in leads:
             lead.stage_id = fallback_stage_id
+            advance_lead_version(lead)
             # Перенос попадает в ленту карточки: без записи смена колонки
             # происходила бы молча и её было бы не найти в истории (Б-18).
             session.add(

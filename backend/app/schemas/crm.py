@@ -133,6 +133,10 @@ class LeadTransfer(BaseModel):
 
 
 class LeadUpdate(PatchModel):
+    # PATCH применим только к той версии карточки, которую видел пользователь.
+    # Это защищает от тихого затирания чужих изменений.
+    expected_updated_at: datetime = Field(description="Время карточки, которое прочитал клиент")
+
     # Почта логиста и назначенный бухгалтер необязательны: их разрешено
     # очистить, передав null.
     nullable_fields: ClassVar[frozenset[str]] = frozenset({"logist_email", "accountant_name"})

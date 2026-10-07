@@ -16,6 +16,7 @@ const LEAD = {
   stage_id: 1,
   tags: [{ id: 1, name: "Крупный клиент", color: "#1e8449" }],
   assigned_to_email: "manager@crmdetroid.ru",
+  updated_at: "2026-10-01T10:00:00+03:00",
 } as unknown as Lead;
 
 describe("Карточка лида на канбане", () => {
