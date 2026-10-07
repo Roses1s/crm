@@ -2,15 +2,21 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 from pathlib import Path
 
 import pytest
 from httpx import AsyncClient
-from sqlalchemy.ext.asyncio import AsyncSession
+from sqlalchemy import func, select
+from sqlalchemy.ext.asyncio import AsyncSession, async_sessionmaker
 
 from app.core.config import settings
-from tests.conftest import TEST_PASSWORD
+from app.core.errors import AppError
+from app.models.user import Role, User
+from app.schemas.user import UserUpdate
+from app.services.admin import delete_user, update_user
+from tests.conftest import TEST_DATABASE_URL, TEST_PASSWORD
 
 
 async def test_failed_login_is_recorded(client: AsyncClient, seeded: dict[str, object]) -> None:
@@ -227,6 +233,67 @@ async def test_admin_can_step_down_when_there_is_another_admin(
         json={"role": "manager"},
     )
     assert response.status_code == 200, response.text
+
+
+@pytest.mark.skipif(
+    TEST_DATABASE_URL.startswith("sqlite"), reason="Проверка транзакционной блокировки PostgreSQL"
+)
+async def test_concurrent_admin_removal_keeps_one_active_admin(
+    engine, session: AsyncSession, seeded: dict[str, object]
+) -> None:
+    """Демотирование и удаление одновременно не могут убрать обоих администраторов."""
+    primary = seeded["admin"]
+    secondary = User(
+        email="second-admin@crmdetroid.ru",
+        hashed_password=primary.hashed_password,  # type: ignore[attr-defined]
+        first_name="Второй",
+        last_name="Администратор",
+        role=Role.admin,
+    )
+    session.add(secondary)
+    await session.commit()
+    primary_id = primary.id  # type: ignore[attr-defined]
+    secondary_id = secondary.id
+
+    maker = async_sessionmaker(bind=engine, expire_on_commit=False)
+    barrier = asyncio.Barrier(2)
+
+    async def delete_primary() -> str:
+        async with maker() as db:
+            caller = await db.get(User, secondary_id)
+            target = await db.get(User, primary_id)
+            assert caller is not None and target is not None
+            await barrier.wait()
+            try:
+                await delete_user(db, current=caller, user_id=primary_id)
+                return "deleted"
+            except AppError as exc:
+                await db.rollback()
+                return exc.code
+
+    async def demote_secondary() -> str:
+        async with maker() as db:
+            target = await db.get(User, secondary_id)
+            assert target is not None
+            await barrier.wait()
+            try:
+                await update_user(db, secondary_id, UserUpdate(role=Role.manager))
+                return "demoted"
+            except AppError as exc:
+                await db.rollback()
+                return exc.code
+
+    outcomes = await asyncio.gather(delete_primary(), demote_secondary())
+    assert outcomes.count("last_admin") == 1
+    assert sum(outcome in {"deleted", "demoted"} for outcome in outcomes) == 1
+
+    async with maker() as db:
+        active_admins = await db.scalar(
+            select(func.count())
+            .select_from(User)
+            .where(User.role == Role.admin, User.is_active.is_(True))
+        )
+    assert active_admins == 1
 
 
 async def test_scan_backups_orders_by_freshness(

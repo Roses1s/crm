@@ -18,6 +18,7 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from app.core.errors import AppError, NotFoundError
 from app.core.logging import get_logger
 from app.core.security import hash_password
+from app.db.locks import advisory_xact_lock
 from app.models.crm import Lead, Stage
 from app.models.security import LoginAttempt
 from app.models.timeline import EntryType, TimelineEntry
@@ -26,6 +27,7 @@ from app.schemas.user import UserCreate, UserUpdate
 from app.services.stages import ensure_default_stages
 
 log = get_logger(__name__)
+LAST_ADMIN_LOCK_NAMESPACE = 4230
 
 
 # --- сотрудники ---------------------------------------------------------------
@@ -112,7 +114,9 @@ async def transfer_leads(session: AsyncSession, *, from_user: User, to_user: Use
         return 0
 
     # У администратора может не быть доски, если он ни разу её не открывал.
-    await ensure_default_stages(session, to_user.id)
+    # Не коммитим здесь: блокировка «последнего админа» должна удерживаться
+    # до переноса лидов и удаления сотрудника в конце этой же транзакции.
+    await ensure_default_stages(session, to_user.id, commit=False)
     target_stages = list(
         (
             await session.execute(
@@ -163,14 +167,23 @@ async def _other_active_admins(session: AsyncSession, user_id: int) -> int:
 
 
 async def ensure_not_last_admin(session: AsyncSession, user: User) -> None:
-    """Не даёт убрать последнего администратора.
+    """Не даёт убрать последнего администратора, в том числе при гонке запросов.
 
-    Без этой проверки администратор мог снять с себя роль или отключить
-    собственную учётную запись — и в системе не оставалось никого, кто может
-    заводить сотрудников, смотреть бэкапы и удалять лиды. Вернуть доступ можно
-    было бы только руками через базу на сервере.
+    Простого COUNT недостаточно: два администратора могли одновременно увидеть
+    друг друга и оба снять роль. Общая транзакционная блокировка сериализует
+    проверку с последующим UPDATE/DELETE до коммита.
     """
-    if user.role != Role.admin or not user.is_active:
+    await advisory_xact_lock(
+        session, namespace=LAST_ADMIN_LOCK_NAMESPACE, key="last-active-admin-removal"
+    )
+    fresh_user = (
+        await session.execute(
+            select(User).where(User.id == user.id).execution_options(populate_existing=True)
+        )
+    ).scalar_one_or_none()
+    if fresh_user is None:
+        raise NotFoundError(f"Пользователь {user.id} не найден")
+    if fresh_user.role != Role.admin or not fresh_user.is_active:
         return
     if await _other_active_admins(session, user.id) == 0:
         raise AppError(

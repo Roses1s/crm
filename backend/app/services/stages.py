@@ -27,8 +27,13 @@ DEFAULT_STAGES: list[tuple[str, str]] = [
 ]
 
 
-async def ensure_default_stages(session: AsyncSession, owner_id: int) -> None:
+async def ensure_default_stages(
+    session: AsyncSession, owner_id: int, *, commit: bool = True
+) -> None:
     """Создаёт стандартную воронку, если у сотрудника ещё нет ни одного этапа.
+
+    ``commit=False`` оставляет изменения в транзакции вызывающей операции;
+    например, удаление сотрудника должно удерживать блокировку до конца.
 
     «Проверили — вставили» без защиты могло выполниться дважды: два
     одновременных первых запроса (вход с двух устройств, два админa открыли
@@ -53,7 +58,10 @@ async def ensure_default_stages(session: AsyncSession, owner_id: int) -> None:
         Stage(name=name, color=color, sequence=index, owner_id=owner_id)
         for index, (name, color) in enumerate(DEFAULT_STAGES, start=1)
     )
-    await session.commit()
+    if commit:
+        await session.commit()
+    else:
+        await session.flush()
 
 
 async def board_stage_for(session: AsyncSession, owner_id: int, name: str | None) -> Stage:
