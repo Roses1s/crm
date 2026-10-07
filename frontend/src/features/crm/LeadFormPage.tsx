@@ -704,17 +704,6 @@ function LeadForm({ id }: { id?: string }) {
                               />
                             </span>
                           </Field>
-                          <Field
-                            label="Теги"
-                            help="Метки клиента — видны на карточке в списке и на канбане"
-                          >
-                            <TagsField
-                              all={allTags}
-                              value={form.tag_ids}
-                              onChange={(ids) => set("tag_ids", ids)}
-                              canDelete={currentUser?.role === "admin"}
-                            />
-                          </Field>
                           <Field label="Назначенный бухгалтер" htmlFor="lead-accountant">
                             <select
                               id="lead-accountant"
@@ -730,6 +719,17 @@ function LeadForm({ id }: { id?: string }) {
                                 </option>
                               ))}
                             </select>
+                          </Field>
+                          <Field
+                            label="Теги"
+                            help="Метки клиента — видны на карточке в списке и на канбане"
+                          >
+                            <TagsField
+                              all={allTags}
+                              value={form.tag_ids}
+                              onChange={(ids) => set("tag_ids", ids)}
+                              canDelete={currentUser?.role === "admin"}
+                            />
                           </Field>
                         </InnerGroup>
                       </div>
