@@ -7,7 +7,16 @@ from pathlib import Path
 from httpx import AsyncClient
 
 from app.core.config import settings
+from app.models.crm import Stage
 from tests.conftest import TEST_PASSWORD
+
+
+async def create_manager_stage(session, owner_id: int) -> Stage:
+    stage = Stage(name="Этап менеджера", sequence=1, owner_id=owner_id)
+    session.add(stage)
+    await session.commit()
+    await session.refresh(stage)
+    return stage
 
 
 async def manager_headers(client: AsyncClient) -> dict[str, str]:
@@ -102,6 +111,52 @@ async def test_stage_change_is_written_to_timeline(auth_client: AsyncClient, see
     assert entries[0]["type"] == "history"
     assert entries[0]["old_value"] == "Новый"
     assert entries[0]["new_value"] == "Переговоры"
+
+
+async def test_manager_can_only_create_lead_on_own_board(
+    auth_client: AsyncClient, seeded: dict, session
+) -> None:
+    manager = seeded["manager"]
+    own_stage = await create_manager_stage(session, manager.id)  # type: ignore[attr-defined]
+
+    headers = await manager_headers(auth_client)
+    base = {"name": "ООО «Ромашка»", "inn": "5404123455"}
+
+    foreign = await auth_client.post(
+        "/api/v1/crm/leads",
+        json={**base, "stage_id": seeded["stage_new"].id},  # type: ignore[attr-defined]
+        headers=headers,
+    )
+    assert foreign.status_code == 404
+
+    own = await auth_client.post(
+        "/api/v1/crm/leads", json={**base, "stage_id": own_stage.id}, headers=headers
+    )
+    assert own.status_code == 201, own.text
+    assert own.json()["assigned_to_id"] == manager.id  # type: ignore[attr-defined]
+    assert own.json()["stage_id"] == own_stage.id
+
+
+async def test_admin_creates_lead_for_manager_only_on_managers_board(
+    auth_client: AsyncClient, seeded: dict, session
+) -> None:
+    manager = seeded["manager"]
+    manager_stage = await create_manager_stage(session, manager.id)  # type: ignore[attr-defined]
+    base = {
+        "name": "ООО «Ромашка»",
+        "inn": "5404123455",
+        "assigned_to_id": manager.id,  # type: ignore[attr-defined]
+    }
+
+    foreign = await auth_client.post(
+        "/api/v1/crm/leads",
+        json={**base, "stage_id": seeded["stage_new"].id},  # type: ignore[attr-defined]
+    )
+    assert foreign.status_code == 404
+
+    own = await auth_client.post("/api/v1/crm/leads", json={**base, "stage_id": manager_stage.id})
+    assert own.status_code == 201, own.text
+    assert own.json()["assigned_to_id"] == manager.id  # type: ignore[attr-defined]
 
 
 async def test_cannot_move_lead_to_stage_of_another_board(
@@ -378,7 +433,7 @@ async def test_pager_reports_position(auth_client: AsyncClient, seeded: dict) ->
 
 
 async def test_admin_pager_does_not_leak_into_another_managers_board(
-    auth_client: AsyncClient, seeded: dict
+    auth_client: AsyncClient, seeded: dict, session
 ) -> None:
     """Листая карточки под админом, нельзя попасть на лида другого менеджера.
 
@@ -397,10 +452,16 @@ async def test_admin_pager_does_not_leak_into_another_managers_board(
     ).json()
 
     # Лид менеджера на отдельной доске — не должен попасть в диапазон листания админа.
+    manager_id = seeded["manager"].id  # type: ignore[attr-defined]
+    manager_stage = await create_manager_stage(session, manager_id)
     manager_lead = (
         await auth_client.post(
             "/api/v1/crm/leads",
-            json={"name": "ООО «Чужой»", "inn": "7447112236", "stage_id": stage_id},
+            json={
+                "name": "ООО «Чужой»",
+                "inn": "7447112236",
+                "stage_id": manager_stage.id,
+            },
             headers=await manager_headers(auth_client),
         )
     ).json()
@@ -477,7 +538,7 @@ async def test_missing_lead_is_404(auth_client: AsyncClient) -> None:
 
 
 async def test_manager_cannot_delete_lead_permanently(
-    auth_client: AsyncClient, seeded: dict
+    auth_client: AsyncClient, seeded: dict, session
 ) -> None:
     """Безвозвратное удаление — право только администратора, менеджер видит 403.
 
@@ -485,7 +546,9 @@ async def test_manager_cannot_delete_lead_permanently(
     бы 404 ещё на проверке видимости, и роль ни при чём было бы не проверить.
     """
     headers = await manager_headers(auth_client)
-    stage_id = seeded["stage_new"].id  # type: ignore[attr-defined]
+    manager_id = seeded["manager"].id  # type: ignore[attr-defined]
+    manager_stage = await create_manager_stage(session, manager_id)
+    stage_id = manager_stage.id
     own_lead = (
         await auth_client.post(
             "/api/v1/crm/leads",

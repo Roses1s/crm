@@ -134,13 +134,19 @@ async def list_leads(
 
 async def create_lead(session: AsyncSession, user: User, payload: LeadCreate) -> Lead:
     data = payload.model_dump(exclude={"tag_ids"})
+    # Сначала определяем владельца: этап обязан принадлежать именно его доске.
+    # Проверка только при PATCH оставляла дыру в POST и могла спрятать новый
+    # лид на чужой канбан (ревью 06.10, Б-10).
+    assigned_to_id = data["assigned_to_id"]
+    if assigned_to_id is None or user.role != Role.admin:
+        assigned_to_id = user.id
+    await stage_on_board(session, data["stage_id"], assigned_to_id)
+    data["assigned_to_id"] = assigned_to_id
+
     lead = Lead(**data)
     # Теги проставляем ДО add/flush: у ещё не сохранённого объекта присваивание
     # коллекции не требует подгрузки старого значения из базы.
     lead.tags = await fetch_tags(session, payload.tag_ids)
-    # Менеджер не может создать лид «на коллегу»: карточка появляется на его доске.
-    if lead.assigned_to_id is None or user.role != Role.admin:
-        lead.assigned_to_id = user.id
     session.add(lead)
     await session.commit()
     log.info("lead.created", lead_id=lead.id, by=user.id)
