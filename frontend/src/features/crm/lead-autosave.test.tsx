@@ -177,6 +177,7 @@ it("бухгалтера выбирают из фиксированного сп
 
   const accountant = await screen.findByLabelText("Назначенный бухгалтер");
   const accountantLabel = screen.getByText("Назначенный бухгалтер");
+  expect(accountantLabel.parentElement).toHaveClass("items-center");
   const priorityLabel = screen.getByText("Приоритет");
   const tagsLabel = screen.getByText("Теги");
   expect(

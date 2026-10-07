@@ -690,7 +690,7 @@ function LeadForm({ id }: { id?: string }) {
                           )}
                         </InnerGroup>
 
-                        <InnerGroup>
+                        <InnerGroup verticalAlign="center">
                           <Field label="Назначенный бухгалтер" htmlFor="lead-accountant">
                             <select
                               id="lead-accountant"

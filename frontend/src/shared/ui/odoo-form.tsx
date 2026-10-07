@@ -251,8 +251,18 @@ export function FormTitle({ children }: { children: ReactNode }) {
   );
 }
 
-/** .o_inner_group — фиксированная колонка подписей, значения выровнены. */
-export function InnerGroup({ title, children }: { title?: string; children: ReactNode }) {
+/** .o_inner_group — фиксированная колонка подписей; строки можно центрировать по вертикали. */
+export function InnerGroup({
+  title,
+  children,
+  verticalAlign = "start",
+}: {
+  title?: string;
+  children: ReactNode;
+  verticalAlign?: "start" | "center";
+}) {
+  const itemAlignment = verticalAlign === "center" ? "items-center" : "items-start";
+
   return (
     <div className="mb-[var(--odoo-form-section-gap)]">
       {title && (
@@ -261,7 +271,7 @@ export function InnerGroup({ title, children }: { title?: string; children: Reac
         </h3>
       )}
       <div
-        className="grid items-start gap-x-3 gap-y-[var(--odoo-form-field-gap)]"
+        className={`grid ${itemAlignment} gap-x-3 gap-y-[var(--odoo-form-field-gap)]`}
         style={{ gridTemplateColumns: "140px minmax(0, 1fr)" }}
       >
         {children}
