@@ -63,8 +63,8 @@ backend/                    FastAPI
 ├── app/services/           бизнес-логика отдельно от HTTP: leads · shipments · attachments · customers · stages · tags · search
 ├── app/worker/             Celery: бэкапы базы и вложений, уборка файлов и отозванных токенов
 ├── app/cli.py              createsuperuser, seed, resetboard (сброс доски к стандартной)
-├── alembic/                23 миграции
-└── tests/                  pytest; локально 187 прошло, 5 пропущено на SQLite
+├── alembic/                26 миграций
+└── tests/                  pytest; локально 190 прошло, 5 пропущено на SQLite
 
 frontend/                   React 19
 ├── src/app/                router, providers, layout (AppShell, Navbar, ControlPanel)
@@ -150,6 +150,6 @@ cd /opt/crm && ./deploy.sh      # или на сервере
 - Бэкапы: `pg_dump` ежедневно в 03:00, хранение 14 дней; архив вложений — еженедельно
 - Проверка бэкапа: `ssh crm "cd /opt/crm && ./deploy/restore-test.sh"` — разворачивает
   свежую копию во временную базу, показывает повторы номеров заявок в ней и
-  удаляет её за собой. Последняя фактическая проверка восстановления — 29.09.2026.
+  удаляет её за собой. 07.10.2026 восстановление прошло; в 11 заявках дублей не найдено.
 - Доступ по SSH: только по ключам, пользователь `deploy`; как добавить новый
   компьютер — в [`docs/deploy/01-server-setup.md`](docs/deploy/01-server-setup.md)
