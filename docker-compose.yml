@@ -109,6 +109,8 @@ services:
       POSTGRES_HOST: postgres
       VALKEY_URL: redis://valkey:6379/0
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
+      # Принимаем X-Forwarded-* только от этого точного адреса nginx.
+      GUNICORN_FORWARDED_ALLOW_IPS: ${CRM_NGINX_PROXY_IP:-172.31.250.2}
     # Миграции запускает deploy.sh отдельным контролируемым шагом до замены
     # контейнеров. API сам схему не меняет: иначе автоматический рестарт мог бы
     # неожиданно применить миграцию вне окна деплоя.
@@ -122,7 +124,7 @@ services:
         condition: service_healthy
       valkey:
         condition: service_healthy
-    networks: [internal, edge]
+    networks: [internal, proxy]
 
   # --- фоновые задачи -------------------------------------------------------
   worker:
@@ -224,7 +226,11 @@ services:
     depends_on:
       - backend
       - frontend
-    networks: [edge]
+    networks:
+      edge:
+      # Статический адрес — единственный узел, чьи proxy-заголовки принимает API.
+      proxy:
+        ipv4_address: ${CRM_NGINX_PROXY_IP:-172.31.250.2}
 
 volumes:
   pgdata:
@@ -235,10 +241,18 @@ volumes:
 networks:
   # internal — действительно без выхода в интернет (флаг internal): база,
   # кеш и воркеры наружу не ходят, им достаточно друг друга (И-08 ревью).
-  # Бэкенду наружу может понадобиться (Sentry), поэтому он ещё и в edge.
+  # Бэкенду наружу может понадобиться (например, Sentry), поэтому он также
+  # подключён к отдельной сети proxy, которая не помечена internal.
   internal:
     name: crm_internal
     internal: true
-  # edge — nginx, фронтенд и API
+  # proxy — закрытая связка backend ↔ nginx. Никакие другие контейнеры в неё
+  # не входят; фиксированный IP nginx указан в списке доверенных Gunicorn.
+  proxy:
+    name: crm_proxy
+    ipam:
+      config:
+        - subnet: ${CRM_PROXY_SUBNET:-172.31.250.0/24}
+  # edge — публичный nginx и статический фронтенд; API сюда не подключён.
   edge:
     name: crm_edge

@@ -1,18 +1,27 @@
 # Этап 4. Деплой полного стека на crmdetroid.ru
 
 Что поднимаем: **PostgreSQL 18 + Valkey 8 + FastAPI (Gunicorn) + Celery worker + Celery beat + собранный React + Nginx 1.30**.
-Наружу по-прежнему смотрит только nginx на портах 80/443 — всё остальное живёт внутри docker-сетей.
+Наружу по-прежнему смотрит только nginx на портах 80/443. Для связи nginx с API
+есть отдельная сеть; Gunicorn доверяет proxy-заголовкам только от точного IP
+nginx. Nginx заменяет присланный клиентом `X-Forwarded-For` на `$remote_addr`.
 
 ```
                  ┌──────────── интернет ────────────┐
                  ▼                                  │
-        crm-nginx :80/:443  ──── /api/ ────►  crm-backend :8000 ──┐
-          (сеть edge)       ──── /     ────►  crm-frontend :80    │
-                                                                  │  сеть internal
-                                   crm-worker ──┐                 │
-                                   crm-beat   ──┼──► crm-valkey :6379
-                                                └──► crm-postgres :5432
+        crm-nginx :80/:443 ── edge ──► crm-frontend :80
+                 │
+                 └── crm_proxy (172.31.250.0/24) ──► crm-backend :8000
+                                      nginx: .2      │
+                                                    │ сеть internal
+                           crm-worker ──┐           ├──► crm-valkey :6379
+                           crm-beat   ──┴───────────└──► crm-postgres :5432
 ```
+
+Сеть `crm_proxy` содержит только `nginx` и `backend`; адрес nginx по умолчанию
+`172.31.250.2`. Если эта подсеть пересекается с сетью сервера или VPN, задайте
+другую `CRM_PROXY_SUBNET` и адрес `CRM_NGINX_PROXY_IP` в `.env` — адрес должен
+находиться внутри подсети. Оба значения обычно уже появятся после копирования
+`.env.example`.
 
 > Все команды выполняются на сервере под пользователем `deploy`
 > (`ssh crm`). Перед блоками вставки лучше разблокировать sudo: `sudo -v`.
