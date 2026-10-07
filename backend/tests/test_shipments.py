@@ -4,8 +4,11 @@ from __future__ import annotations
 
 from decimal import Decimal
 
+from asyncpg.exceptions import UniqueViolationError
 from httpx import AsyncClient
+from sqlalchemy.exc import IntegrityError
 
+from app.core.errors import _classify_integrity_error
 from tests.conftest import TEST_PASSWORD
 
 
@@ -15,6 +18,19 @@ async def manager_headers(client: AsyncClient) -> dict[str, str]:
         json={"email": "manager@crmdetroid.ru", "password": TEST_PASSWORD},
     )
     return {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+
+def test_asyncpg_shipment_number_constraint_has_specific_conflict_code() -> None:
+    """asyncpg передаёт имя ограничения напрямую, не через ``diag``."""
+    orig = UniqueViolationError("duplicate key")
+    orig.constraint_name = "uq_shipments_number"
+    exc = IntegrityError("UPDATE shipments", {}, orig)
+
+    assert _classify_integrity_error(exc) == (
+        "shipment_number_conflict",
+        "Номер заявки уже используется",
+        409,
+    )
 
 
 async def test_create_and_read_shipment(auth_client: AsyncClient, seeded: dict) -> None:

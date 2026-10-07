@@ -69,10 +69,16 @@ def _classify_integrity_error(exc: IntegrityError) -> tuple[str, str, int]:
     orig = exc.orig
     sqlstate = str(getattr(orig, "sqlstate", "") or getattr(orig, "pgcode", "") or "")
     text = str(orig).lower()
-    constraint_name = str(getattr(getattr(orig, "diag", None), "constraint_name", "") or "")
+    constraint_name = str(
+        getattr(getattr(orig, "diag", None), "constraint_name", "")
+        or getattr(orig, "constraint_name", "")
+        or ""
+    )
 
-    if constraint_name == "uq_shipments_number" or (
-        "unique constraint failed" in text and "shipments.number" in text
+    if (
+        constraint_name == "uq_shipments_number"
+        or "uq_shipments_number" in text
+        or ("unique constraint failed" in text and "shipments.number" in text)
     ):
         return (
             "shipment_number_conflict",
