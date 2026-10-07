@@ -7,12 +7,13 @@
  * вкладка. Проверяем, что после ошибки повторов нет, а после правки руками
  * автосохранение снова работает.
  */
-import { act, screen, waitFor } from "@testing-library/react";
+import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { LeadFormPage } from "./LeadFormPage";
+import { ACCOUNTANT_NAMES } from "@/features/crm/lead-form/accountant-options";
 import { clearTokens, setAccessToken } from "@/shared/api/auth";
 import { startFakeApi, type FakeServer } from "@/test/fake-api";
 import { ToastProvider } from "@/shared/ui/toast";
@@ -27,6 +28,7 @@ const LEAD = {
   logist_contact: "Иван",
   logist_phone: "",
   logist_email: null,
+  accountant_name: null as string | null,
   priority: 0,
   is_archived: false,
   stage_id: 1,
@@ -38,13 +40,13 @@ const LEAD = {
 
 const STAGES = [{ id: 1, name: "Новый", sequence: 1, color: "" }];
 
-function routes() {
+function routes(leadResponse: unknown = LEAD) {
   return [
     { path: "/auth/me", response: ME },
     { path: "/crm/leads/10/timeline", response: [] },
     { path: "/crm/leads/10/pager", response: { position: 1, total: 1 } },
     { path: "/crm/leads/10/attachments", response: [] },
-    { path: "/crm/leads/10", response: LEAD },
+    { path: "/crm/leads/10", response: leadResponse },
     { path: "/crm/stages", response: STAGES },
     { path: "/crm/tags", response: [] },
     { path: "/crm/customers/by-inn", response: [] },
@@ -146,4 +148,58 @@ it("правка руками снова включает автосохране
     await vi.advanceTimersByTimeAsync(3500);
   });
   await waitFor(() => expect(attempt).toBe(2));
+});
+
+it("бухгалтера выбирают из фиксированного списка, сохраняют и могут очистить", async () => {
+  setAccessToken("токен");
+  let current = { ...LEAD };
+  server = startFakeApi([
+    ...routes(() => current),
+    {
+      method: "PATCH",
+      path: "/crm/leads/10",
+      response: (body: unknown) => {
+        current = { ...current, ...(body as Partial<typeof LEAD>) };
+        return current;
+      },
+    },
+  ]);
+
+  const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+  renderWithProviders(
+    <ToastProvider>
+      <Routes>
+        <Route path="/crm/leads/:id" element={<LeadFormPage />} />
+      </Routes>
+    </ToastProvider>,
+    { route: "/crm/leads/10" },
+  );
+
+  const accountant = await screen.findByLabelText("Назначенный бухгалтер");
+  expect(accountant).toHaveValue("");
+  expect(
+    within(accountant)
+      .getAllByRole("option")
+      .map((option) => option.textContent),
+  ).toEqual(["Выбрать", ...ACCOUNTANT_NAMES]);
+
+  await user.selectOptions(accountant, "Кузьмина Виктория Павловна");
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(3500);
+  });
+  await waitFor(() => expect(savesCount()).toBe(1));
+  expect(current.accountant_name).toBe("Кузьмина Виктория Павловна");
+  expect(server?.calls.find((call) => call.method === "PATCH")?.body).toMatchObject({
+    accountant_name: "Кузьмина Виктория Павловна",
+  });
+
+  await user.selectOptions(accountant, "");
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(3500);
+  });
+  await waitFor(() => expect(savesCount()).toBe(2));
+  expect(current.accountant_name).toBeNull();
+  expect(server?.calls.filter((call) => call.method === "PATCH")[1]?.body).toMatchObject({
+    accountant_name: null,
+  });
 });

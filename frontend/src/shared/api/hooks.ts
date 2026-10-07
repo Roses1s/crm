@@ -380,6 +380,7 @@ export interface LeadPayload {
   logist_contact?: string;
   logist_phone?: string;
   logist_email?: string | null;
+  accountant_name?: string | null;
   priority?: number;
   stage_id?: number;
   tag_ids?: number[];

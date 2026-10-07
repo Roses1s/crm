@@ -51,6 +51,7 @@ export interface Lead {
   logist_contact: string;
   logist_phone: string;
   logist_email: string | null;
+  accountant_name: string | null;
   priority: number;
   is_archived: boolean;
   loss_reason_id?: number | null;

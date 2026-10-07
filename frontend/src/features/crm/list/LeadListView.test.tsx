@@ -19,6 +19,7 @@ function lead(id: number, name: string, inn: string, priority = 0): Lead {
     logist_contact: "Иван",
     logist_phone: "",
     logist_email: null,
+    accountant_name: null,
     priority,
     is_archived: false,
     loss_reason_id: null,

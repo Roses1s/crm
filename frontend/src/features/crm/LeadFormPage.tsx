@@ -4,6 +4,7 @@ import { Link, useNavigate, useParams } from "react-router-dom";
 
 import { AppShell, ControlPanel } from "@/app/layout/AppShell";
 import { StarRating } from "@/features/crm/board/StarRating";
+import { ACCOUNTANT_NAMES } from "@/features/crm/lead-form/accountant-options";
 import { TagsField } from "@/features/crm/lead-form/TagsField";
 import {
   empty,
@@ -713,6 +714,22 @@ function LeadForm({ id }: { id?: string }) {
                               onChange={(ids) => set("tag_ids", ids)}
                               canDelete={currentUser?.role === "admin"}
                             />
+                          </Field>
+                          <Field label="Назначенный бухгалтер" htmlFor="lead-accountant">
+                            <select
+                              id="lead-accountant"
+                              value={form.accountant_name}
+                              disabled={readOnly}
+                              onChange={(event) => set("accountant_name", event.target.value)}
+                              className="w-full rounded-[3px] border border-transparent bg-transparent px-1 py-[2px] text-[13px] leading-[19px] text-odoo-text outline-none transition-colors hover:border-odoo-border focus:border-odoo-focus/40 disabled:cursor-not-allowed"
+                            >
+                              <option value="">Выбрать</option>
+                              {ACCOUNTANT_NAMES.map((name) => (
+                                <option key={name} value={name}>
+                                  {name}
+                                </option>
+                              ))}
+                            </select>
                           </Field>
                         </InnerGroup>
                       </div>
