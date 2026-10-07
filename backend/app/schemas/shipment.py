@@ -14,7 +14,8 @@ from app.schemas.validators import validate_inn_optional
 
 
 class ShipmentBase(BaseModel):
-    # Номер заявки — редактируемый пользователем текст (по умолчанию = id).
+    # Номер заявки — редактируемый текст; без значения сервис подставит id,
+    # а при совпадении добавит суффикс.
     number: str = Field(default="", max_length=40)
 
     # Маршрут (адреса и контакты; города — списком тегов ниже).
