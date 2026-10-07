@@ -69,7 +69,16 @@ def _classify_integrity_error(exc: IntegrityError) -> tuple[str, str, int]:
     orig = exc.orig
     sqlstate = str(getattr(orig, "sqlstate", "") or getattr(orig, "pgcode", "") or "")
     text = str(orig).lower()
+    constraint_name = str(getattr(getattr(orig, "diag", None), "constraint_name", "") or "")
 
+    if constraint_name == "uq_shipments_number" or (
+        "unique constraint failed" in text and "shipments.number" in text
+    ):
+        return (
+            "shipment_number_conflict",
+            "Номер заявки уже используется",
+            status.HTTP_409_CONFLICT,
+        )
     if sqlstate == "23505" or "unique constraint" in text or "duplicate key" in text:
         return "conflict", "Запись с такими данными уже существует", status.HTTP_409_CONFLICT
     if sqlstate == "23502" or "not null" in text:

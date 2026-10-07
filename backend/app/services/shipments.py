@@ -4,6 +4,7 @@ from __future__ import annotations
 
 from decimal import Decimal
 from typing import Any
+from uuid import uuid4
 
 from sqlalchemy import Numeric, case, func, literal, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
@@ -83,6 +84,23 @@ async def get_shipment_or_404(
 
 async def _reload_shipment(session: AsyncSession, shipment_id: int) -> Shipment:
     return await get_shipment_or_404(session, shipment_id)
+
+
+async def _default_shipment_number(session: AsyncSession, shipment_id: int) -> str:
+    """Сначала пробует номер по id; если его заняли, добавляет суффикс."""
+    base = str(shipment_id)
+    candidate = base
+    suffix = 2
+    while (
+        await session.scalar(
+            select(Shipment.id)
+            .where(Shipment.number == candidate, Shipment.id != shipment_id)
+            .limit(1)
+        )
+    ) is not None:
+        candidate = f"{base}-{suffix}"
+        suffix += 1
+    return candidate
 
 
 def visible_shipments(stmt: Any, user: User) -> Any:
@@ -206,16 +224,19 @@ async def create_shipment(session: AsyncSession, user: User, payload: ShipmentCr
     # модели перекрыла бы server_default и упала бы на вставке NULL — вместо
     # этого просто не передаём атрибут, и дата проставится сама по умолчанию.
     data = payload.model_dump(exclude={"tag_ids", "created_at"})
+    if not payload.number:
+        # До получения id временный номер не должен нарушить уникальность.
+        data["number"] = f"tmp-{uuid4().hex}"
     shipment = Shipment(**data)
     if payload.created_at is not None:
         shipment.created_at = payload.created_at
     shipment.tags = await fetch_tags(session, payload.tag_ids)
     session.add(shipment)
     await session.flush()
-    # Номер по умолчанию = id — но это только стартовое значение, дальше
-    # пользователь волен переименовать его во что угодно.
-    if not shipment.number:
-        shipment.number = str(shipment.id)
+    # Обычно номер по умолчанию равен id. Если пользователь уже присвоил этот
+    # номер другой заявке, добавляем суффикс вместо отказа создать новую.
+    if not payload.number:
+        shipment.number = await _default_shipment_number(session, shipment.id)
     await session.commit()
     log.info("shipment.created", shipment_id=shipment.id, by=user.id)
     return await _reload_shipment(session, shipment.id)

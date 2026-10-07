@@ -39,7 +39,7 @@ async def test_create_and_read_shipment(auth_client: AsyncClient, seeded: dict) 
     assert body["carrier_name"] == "ООО «АвтоТрансЛайн»"
     assert body["carrier_inn"] == "7447112236"
     assert body["carrier_contact"] == "Логист Иванов"
-    # Номер заявки по умолчанию = её id, но его можно свободно переименовать.
+    # Обычно номер по умолчанию равен id; при занятом id сервис добавляет суффикс.
     assert body["number"] == str(body["id"])
 
     listed = await auth_client.get("/api/v1/shipments")
@@ -97,6 +97,63 @@ async def test_shipment_number_is_editable(auth_client: AsyncClient, seeded: dic
 
     again = await auth_client.get(f"/api/v1/shipments/{shipment['id']}")
     assert again.json()["number"] == "ЗНТ-042"
+
+
+async def test_shipment_number_conflict_on_create(auth_client: AsyncClient, seeded: dict) -> None:
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    payload = {"lead_id": lead_id, "number": "ЗНТ-042"}
+
+    created = await auth_client.post("/api/v1/shipments", json=payload)
+    assert created.status_code == 201, created.text
+
+    duplicate = await auth_client.post("/api/v1/shipments", json=payload)
+    assert duplicate.status_code == 409, duplicate.text
+    assert duplicate.json()["code"] == "shipment_number_conflict"
+    assert duplicate.json()["detail"] == "Номер заявки уже используется"
+
+
+async def test_shipment_number_conflict_on_update(
+    auth_client: AsyncClient, seeded: dict, session
+) -> None:
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    first = (await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})).json()
+    second = (await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})).json()
+
+    claimed = await auth_client.patch(
+        f"/api/v1/shipments/{first['id']}", json={"number": "ЗНТ-042"}
+    )
+    assert claimed.status_code == 200, claimed.text
+
+    duplicate = await auth_client.patch(
+        f"/api/v1/shipments/{second['id']}", json={"number": "ЗНТ-042"}
+    )
+    assert duplicate.status_code == 409, duplicate.text
+    assert duplicate.json()["code"] == "shipment_number_conflict"
+    # В тестовой обвязке одна сессия переиспользуется между запросами;
+    # реальная зависимость FastAPI откатывает её после IntegrityError сама.
+    await session.rollback()
+
+    unchanged = await auth_client.get(f"/api/v1/shipments/{second['id']}")
+    assert unchanged.json()["number"] == str(second["id"])
+
+
+async def test_default_shipment_number_avoids_a_custom_number(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    first = (await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})).json()
+    second = (await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})).json()
+
+    next_id = second["id"] + 1
+    reserved = await auth_client.patch(
+        f"/api/v1/shipments/{first['id']}", json={"number": str(next_id)}
+    )
+    assert reserved.status_code == 200, reserved.text
+
+    created = await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})
+    assert created.status_code == 201, created.text
+    assert created.json()["id"] == next_id
+    assert created.json()["number"] == f"{next_id}-2"
 
 
 async def test_shipment_number_cannot_be_blanked(auth_client: AsyncClient, seeded: dict) -> None:

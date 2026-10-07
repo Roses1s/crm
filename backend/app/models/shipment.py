@@ -129,14 +129,15 @@ class Shipment(Base, TimestampMixin):
     # Индекс под сортировку списка (created_at DESC) — см. М-03 ревью 06.10.
     __table_args__ = (
         UniqueConstraint("id", "lead_id", name="uq_shipments_id_lead_id"),
+        UniqueConstraint("number", name="uq_shipments_number"),
         Index("ix_shipments_created_at", "created_at"),
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
     # Номер заявки — видимый пользователю идентификатор, который можно
-    # переименовать (в отличие от id). При создании по умолчанию равен id,
-    # но это просто стартовое значение текстового поля, не ограничение.
-    number: Mapped[str] = mapped_column(String(40), default="", nullable=False, index=True)
+    # переименовать (в отличие от id). По умолчанию он равен id, если этот номер
+    # уже занят — к id добавляется суффикс. Уникальность проверяет база данных.
+    number: Mapped[str] = mapped_column(String(40), default="", nullable=False)
     lead_id: Mapped[int] = mapped_column(
         ForeignKey("leads.id", ondelete="CASCADE"), nullable=False, index=True
     )
