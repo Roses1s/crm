@@ -590,12 +590,19 @@ async def test_shipments_list_margin_and_totals(auth_client: AsyncClient, seeded
 
 async def test_shipments_totals_match_row_margins(auth_client: AsyncClient, seeded: dict) -> None:
     """Итоги считаются в SQL (Б-26), но обязаны сходиться со значениями в
-    строках до копейки при любых ставках НДС — в том числе НДС 0% и без НДС."""
+    строках до копейки при любых ставках НДС — в том числе НДС 0% и без НДС.
+
+    Цены в случаях подбираются без маржи на границе X.XX5: на PostgreSQL
+    (прод) арифметика точная и границ не бывает, а вот float-округление
+    в SQLite различается между сборками — 3.40 округляет 500.025 вверх,
+    3.45+ — по значению double вниз. Граничные значения здесь проверяли
+    бы версию SQLite, а не нашу формулу.
+    """
     lead_id = seeded["lead"].id  # type: ignore[attr-defined]
 
     cases = [
         ("10000", "vat_22", "5000", "no_vat"),
-        ("1000.05", "vat_0", "333.35", "no_vat"),
+        ("1000.00", "vat_0", "333.25", "no_vat"),
         ("500", "no_vat", "122.00", "vat_22"),
     ]
     for customer_price, customer_tax, carrier_price, carrier_tax in cases:
