@@ -52,7 +52,8 @@ pip-compile --generate-hashes --extra dev --output-file requirements-dev.lock py
 .venv/bin/ruff check .        # линтер
 .venv/bin/ruff format .       # форматирование
 .venv/bin/mypy app            # типы (strict)
-.venv/bin/python -m pytest    # тесты (148 функций, SQLite в памяти)
+.venv/bin/python -m pytest --cov=app --cov-branch --cov-report=term-missing --cov-fail-under=70
+# порог тот же, что в CI: не ниже 70% общего покрытия с ветвлениями
 .venv/bin/alembic check       # модели и миграции совпадают
 .venv/bin/pip-audit           # уязвимости в зависимостях
 ```

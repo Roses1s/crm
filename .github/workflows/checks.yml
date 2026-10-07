@@ -18,7 +18,7 @@ on:
 
 jobs:
   backend:
-    name: Бэкенд — ruff, mypy, pytest
+    name: Бэкенд — ruff, mypy, pytest и покрытие
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -53,8 +53,12 @@ jobs:
       - name: Типы
         run: mypy app
 
-      - name: Тесты
-        run: python -m pytest -q
+      - name: Тесты с проверкой покрытия
+        # Считаем строки и ветвления всего backend/app; порог ниже текущего
+        # замера на три пункта, чтобы защищать от падения покрытия без шума.
+        run: >-
+          python -m pytest -q --cov=app --cov-branch
+          --cov-report=term-missing --cov-fail-under=70
 
       - name: Миграции проходят на пустой базе
         env:
@@ -162,7 +166,7 @@ jobs:
           PY
 
   frontend:
-    name: Фронтенд — типы, тесты, сборка
+    name: Фронтенд — типы, тесты и покрытие
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -188,8 +192,8 @@ jobs:
       - name: Типы
         run: npx tsc -b
 
-      - name: Тесты
-        run: npm test
+      - name: Тесты с проверкой покрытия
+        run: npm test -- --coverage
 
       - name: Сборка
         run: npm run build

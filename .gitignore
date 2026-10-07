@@ -19,6 +19,8 @@ __pycache__/
 .mypy_cache/
 .ruff_cache/
 .pytest_cache/
+.coverage*
+coverage/
 *.tsbuildinfo
 
 # локальные базы

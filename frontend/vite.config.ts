@@ -44,6 +44,26 @@ export default defineConfig({
     globals: true,
     setupFiles: ["./src/test/setup.ts"],
     css: false,
+    coverage: {
+      provider: "v8",
+      // Явно включаем весь рабочий исходный код, а не только файлы,
+      // которые уже импортируются тестами: иначе отчёт завышает покрытие.
+      include: ["src/**/*.ts", "src/**/*.tsx"],
+      exclude: [
+        "src/**/*.test.ts",
+        "src/**/*.test.tsx",
+        "src/**/*.spec.ts",
+        "src/**/*.spec.tsx",
+        "src/test/**",
+        "src/**/*.d.ts",
+        "src/shared/types/**",
+      ],
+      reporter: ["text"],
+      thresholds: {
+        lines: 60,
+        branches: 58,
+      },
+    },
   },
   preview: {
     host: "0.0.0.0",

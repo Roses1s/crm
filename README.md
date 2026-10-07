@@ -80,10 +80,10 @@ deploy/                     инфраструктура сервера
 ├── restore-test.sh         восстановление бэкапа во временную базу и отчёт о дублях заявок
 └── scripts/                deploy-hook Certbot (мягкая перезагрузка nginx)
 
-.github/workflows/          автопроверки: ruff, mypy, pytest, миграции и alembic check,
-                            блокирующий аудит зависимостей, те же тесты на настоящем
-                            PostgreSQL, tsc, vitest, сборка, `nginx -t` на боевых
-                            конфигах; dependabot.yml — еженедельные обновления
+.github/workflows/          автопроверки: ruff, mypy, pytest с порогом покрытия,
+                            миграции и alembic check, блокирующий аудит зависимостей,
+                            тесты на настоящем PostgreSQL, tsc, Vitest с порогом покрытия,
+                            сборка и `nginx -t`; dependabot.yml — еженедельные обновления
 ```
 
 ## Запуск локально
@@ -104,8 +104,11 @@ cd ../frontend && npm install && npm run dev           # http://localhost:5173
 
 ```bash
 cd backend && .venv/bin/ruff check . && .venv/bin/ruff format --check . \
-  && .venv/bin/mypy app && .venv/bin/python -m pytest && .venv/bin/alembic check
-cd ../frontend && npm run lint && npm run format:check && npx tsc -b && npm test \
+  && .venv/bin/mypy app \
+  && .venv/bin/python -m pytest --cov=app --cov-branch --cov-report=term-missing --cov-fail-under=70 \
+  && .venv/bin/alembic check
+cd ../frontend && npm run lint && npm run format:check && npx tsc -b \
+  && npm test -- --coverage \
   && npm run build
 cd .. && python scripts/snapshot.py        # пересобрать паспорт проекта
 ```
