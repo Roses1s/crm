@@ -66,9 +66,9 @@ jobs:
         run: alembic upgrade head
 
       - name: Модели и миграции совпадают
-        # `alembic check` сравнивает модели в коде со схемой базы после всех
-        # миграций. Падает, если кто-то изменил модель и забыл создать
-        # миграцию — иначе такая ошибка всплыла бы только на проде.
+        # `alembic check` сравнивает модели и схему после всех миграций,
+        # включая server_default (временные дефолты М-05 сняты отдельной
+        # миграцией). Если модель изменили без миграции, CI упадёт до выкатки.
         env:
           DATABASE_URL: sqlite+aiosqlite:////tmp/checks.db
         run: alembic check
@@ -137,6 +137,7 @@ jobs:
         run: alembic upgrade head
 
       - name: Модели и миграции совпадают (PostgreSQL)
+        # Проверяет в том числе server_default на той же СУБД, что и production.
         env:
           DATABASE_URL: postgresql+asyncpg://crm:crm@localhost:5432/crm_test
         run: alembic check

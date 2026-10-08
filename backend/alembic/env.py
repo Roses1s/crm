@@ -29,14 +29,11 @@ def run_migrations_offline() -> None:
         literal_binds=True,
         dialect_opts={"paramstyle": "named"},
         compare_type=True,
-        # Значения по умолчанию на стороне базы пока не сравниваем: несколько
-        # старых миграций задавали server_default только для заполнения уже
-        # существующих строк, а не как постоянное правило модели. После миграции
-        # часть таких default осталась в БД, поэтому это скрывает расхождение
-        # (М-05). Не включать сравнение вслепую: сначала отдельной миграцией
-        # убрать только временные default; перед production-миграцией нужен
-        # свежий проверенный дамп. Некоторые default в модели намеренные.
-        compare_server_default=False,
+        # Временные server_default из старых миграций сняты отдельной миграцией
+        # М-05. Сравнение включено, чтобы будущие расхождения между моделями и
+        # схемой базы ловились командой `alembic check`; намеренные значения
+        # (например, created_at/updated_at) описаны и в моделях.
+        compare_server_default=True,
     )
     with context.begin_transaction():
         context.run_migrations()
@@ -47,7 +44,7 @@ def do_run_migrations(connection: Connection) -> None:
         connection=connection,
         target_metadata=target_metadata,
         compare_type=True,
-        compare_server_default=False,  # см. комментарий выше
+        compare_server_default=True,
         render_as_batch=connection.dialect.name == "sqlite",
     )
     with context.begin_transaction():
