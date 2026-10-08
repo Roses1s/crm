@@ -4,9 +4,6 @@ import { useSearchParams } from "react-router-dom";
 import { AppShell, ControlPanel } from "@/app/layout/AppShell";
 import { useCustomers } from "@/shared/api/hooks";
 import { CustomerTile } from "@/features/customers/CustomerTile";
-import { ListLimitNotice } from "@/shared/ui/list-limit-notice";
-
-const TILES_PER_PAGE = 60;
 
 /**
  * «Клиенты» — аналог Odoo Contacts: абсолютно все лиды компании плиткой.
@@ -20,7 +17,6 @@ export function CustomersPage() {
   const [params, setParams] = useSearchParams();
   const search = params.get("search") ?? "";
   const [searchInput, setSearchInput] = useState(search);
-  const [visible, setVisible] = useState(TILES_PER_PAGE);
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -33,15 +29,18 @@ export function CustomersPage() {
         },
         { replace: true },
       );
-      setVisible(TILES_PER_PAGE);
     }, 300);
     return () => clearTimeout(timer);
   }, [searchInput, setParams]);
 
-  const { data: customersPage, isLoading } = useCustomers(search);
+  const {
+    data: customersPage,
+    isLoading,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+  } = useCustomers(search);
   const customers = customersPage?.items ?? [];
-  const shown = customers.slice(0, visible);
-  const hidden = customers.length - shown.length;
 
   return (
     <AppShell>
@@ -50,9 +49,8 @@ export function CustomersPage() {
         search={searchInput}
         onSearch={setSearchInput}
         count={customersPage?.total || undefined}
+        loadedCount={customers.length}
       />
-
-      <ListLimitNotice data={customersPage} noun="клиентов" />
 
       <div className="min-h-[calc(100dvh-var(--odoo-record-control-panel-height))] bg-odoo-bg p-4">
         {isLoading ? (
@@ -64,18 +62,21 @@ export function CustomersPage() {
         ) : (
           <>
             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 md:grid-cols-4 lg:grid-cols-5 xl:grid-cols-6">
-              {shown.map((customer) => (
+              {customers.map((customer) => (
                 <CustomerTile key={customer.id} customer={customer} />
               ))}
             </div>
-            {hidden > 0 && (
+            {hasNextPage && customersPage && (
               <div className="mt-4 flex justify-center">
                 <button
                   type="button"
-                  onClick={() => setVisible((n) => n + TILES_PER_PAGE)}
-                  className="rounded-[3px] border border-odoo-border bg-odoo-surface px-3 py-1.5 text-[13px] text-odoo-action hover:bg-odoo-bg"
+                  disabled={isFetchingNextPage}
+                  onClick={() => void fetchNextPage()}
+                  className="rounded-[3px] border border-odoo-border bg-odoo-surface px-3 py-1.5 text-[13px] text-odoo-action hover:bg-odoo-bg disabled:cursor-wait disabled:opacity-60"
                 >
-                  Показать ещё {Math.min(TILES_PER_PAGE, hidden)} из {customers.length}
+                  {isFetchingNextPage
+                    ? "Загрузка…"
+                    : `Показать ещё ${Math.min(customersPage.limit, customersPage.total - customers.length)} из ${customersPage.total}`}
                 </button>
               </div>
             )}

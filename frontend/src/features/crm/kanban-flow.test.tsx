@@ -79,7 +79,8 @@ function startBoard(): FakeServer {
     { path: "/auth/me", response: ME },
     { path: "/crm/stages", response: STAGES },
     { path: "/crm/tags", response: [] },
-    { path: "/crm/leads", response: page(LEADS) },
+    { path: "/crm/leads", query: { stage: "1" }, response: page([LEADS[0]]) },
+    { path: "/crm/leads", query: { stage: "2" }, response: page([LEADS[1]]) },
   ]);
 }
 

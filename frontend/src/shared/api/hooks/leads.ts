@@ -1,4 +1,11 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  infiniteQueryOptions,
+  useInfiniteQuery,
+  useMutation,
+  useQuery,
+  useQueryClient,
+} from "@tanstack/react-query";
+import type { InfiniteData, QueryKey } from "@tanstack/react-query";
 
 import type { Colleague, Customer, Lead, Pager, TimelineEntry } from "@/shared/types";
 import { ApiError, api, type Page } from "../client";
@@ -13,12 +20,15 @@ import {
 } from "../schemas";
 import {
   apiVoid,
-  CUSTOMERS_LIMIT,
+  CUSTOMER_PAGE_SIZE,
+  KANBAN_PAGE_SIZE,
+  LEAD_PAGE_SIZE,
   invalidateLeadDetails,
   invalidateLeadLists,
   keys,
   leadsQueryString,
   LIST_LIMIT,
+  toInfiniteListResult,
   toListResult,
   type LeadFilters,
 } from "./shared";
@@ -35,24 +45,85 @@ export function useLeads(filters: LeadFilters = {}) {
   });
 }
 
+function leadPagesOptions(
+  queryKey: QueryKey,
+  filters: LeadFilters,
+  pageSize: number,
+  enabled: boolean,
+) {
+  return infiniteQueryOptions({
+    queryKey,
+    queryFn: ({ pageParam }) =>
+      api<Page<Lead>>(`/crm/leads?${leadsQueryString(filters, pageParam, pageSize)}`, {
+        schema: pageSchema(leadSchema),
+      }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => lastPage.next ?? undefined,
+    enabled,
+  });
+}
+
+/** Параметры запроса для страницы списка лидов. */
+export function leadPagesQueryOptions(
+  filters: LeadFilters,
+  pageSize = LEAD_PAGE_SIZE,
+  enabled = true,
+) {
+  return leadPagesOptions(keys.leadPages(filters, pageSize), filters, pageSize, enabled);
+}
+
+/** Каждая колонка получает собственные страницы и свой счётчик с сервера. */
+export function stageLeadPagesQueryOptions(
+  stageId: number,
+  filters: Omit<LeadFilters, "stage">,
+  enabled = true,
+) {
+  const stageFilters: LeadFilters = { ...filters, stage: stageId };
+  return leadPagesOptions(
+    keys.stageLeads(stageId, filters, KANBAN_PAGE_SIZE),
+    stageFilters,
+    KANBAN_PAGE_SIZE,
+    enabled,
+  );
+}
+
+/** Серверные страницы одного этапа Kanban. */
+export function useStageLeads(stageId: number, filters: Omit<LeadFilters, "stage">) {
+  return useInfiniteQuery(stageLeadPagesQueryOptions(stageId, filters));
+}
+
+/** Лист лидов догружает следующую порцию, не теряя поиск и отбор доски. */
+export function useInfiniteLeads(
+  filters: LeadFilters = {},
+  pageSize = LEAD_PAGE_SIZE,
+  enabled = true,
+) {
+  return useInfiniteQuery({
+    ...leadPagesQueryOptions(filters, pageSize, enabled),
+    select: (data) => toInfiniteListResult(data, pageSize),
+  });
+}
+
 /**
- * Модуль «Клиенты»: ВСЕ лиды компании. Поиск — только по названию/ИНН (так же
- * ограничен и на бэкенде — это единственные поля, видимые на чужом активном
- * лиде). Запрашиваем первые CUSTOMERS_LIMIT записей и показываем их пачками
- * кнопкой «Показать ещё»; если на сервере их больше — об этом честно
- * сообщает ListLimitNotice.
+ * «Клиенты» показывает все лиды компании. Поиск ограничен названием и ИНН,
+ * чтобы не раскрывать данные чужой карточки.
  */
 export function useCustomers(search: string) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: keys.customers(search),
-    queryFn: () => {
-      const params = new URLSearchParams({ page_size: String(CUSTOMERS_LIMIT) });
+    queryFn: ({ pageParam }) => {
+      const params = new URLSearchParams({
+        page: String(pageParam),
+        page_size: String(CUSTOMER_PAGE_SIZE),
+      });
       if (search) params.set("search", search);
       return api<Page<Customer>>(`/crm/customers?${params.toString()}`, {
         schema: pageSchema(customerSchema),
       });
     },
-    select: (page) => toListResult(page, CUSTOMERS_LIMIT),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => lastPage.next ?? undefined,
+    select: (data) => toInfiniteListResult(data, CUSTOMER_PAGE_SIZE),
   });
 }
 
@@ -167,22 +238,10 @@ export function useMoveLead() {
         body: { stage_id, expected_updated_at },
         schema: leadSchema,
       }),
-    // Оптимистично: карточка переезжает сразу, до ответа сервера.
-    onMutate: async ({ id, stage_id }) => {
-      await qc.cancelQueries({ queryKey: ["leads"] });
-      const snapshot = qc.getQueriesData<Page<Lead>>({ queryKey: ["leads"] });
-      qc.setQueriesData<Page<Lead>>({ queryKey: ["leads"] }, (old) =>
-        old
-          ? {
-              ...old,
-              results: old.results.map((lead) => (lead.id === id ? { ...lead, stage_id } : lead)),
-            }
-          : old,
-      );
-      return { snapshot };
-    },
-    onError: (error, variables, context) => {
-      context?.snapshot.forEach(([key, data]) => qc.setQueryData(key, data));
+    // Доска получает отдельные страницы для каждого этапа. Не переносим запись
+    // вручную между срезами: после ответа сервера перечитываем обе колонки,
+    // чтобы не показать дубль и не потерять карточку на границе страниц.
+    onError: (error, variables) => {
       if (error instanceof ApiError && error.code === "lead_conflict") {
         invalidateLeadLists(qc);
         invalidateLeadDetails(qc, variables.id);
@@ -193,6 +252,26 @@ export function useMoveLead() {
       invalidateLeadDetails(qc, variables.id);
     },
   });
+}
+
+type CachedLeadList = Page<Lead> | InfiniteData<Page<Lead>, number>;
+
+/** Обновляет и обычные ответы, и кеши с несколькими страницами. */
+function updateCachedLeads(
+  old: CachedLeadList | undefined,
+  update: (lead: Lead) => Lead,
+): CachedLeadList | undefined {
+  if (!old) return old;
+  if ("pages" in old) {
+    return {
+      ...old,
+      pages: old.pages.map((page) => ({
+        ...page,
+        results: page.results.map(update),
+      })),
+    };
+  }
+  return { ...old, results: old.results.map(update) };
 }
 
 /** Быстрая смена приоритета на доске: звёзды меняются до ответа сервера. */
@@ -215,18 +294,13 @@ export function useUpdateLeadPriority() {
       }),
     onMutate: async ({ id, priority }) => {
       await qc.cancelQueries({ queryKey: ["leads"] });
-      const leadsSnapshot = qc.getQueriesData<Page<Lead>>({
+      const leadsSnapshot = qc.getQueriesData<CachedLeadList>({
         queryKey: ["leads"],
       });
       const leadSnapshot = qc.getQueryData<Lead>(keys.lead(id));
 
-      qc.setQueriesData<Page<Lead>>({ queryKey: ["leads"] }, (old) =>
-        old
-          ? {
-              ...old,
-              results: old.results.map((lead) => (lead.id === id ? { ...lead, priority } : lead)),
-            }
-          : old,
+      qc.setQueriesData<CachedLeadList>({ queryKey: ["leads"] }, (old) =>
+        updateCachedLeads(old, (lead) => (lead.id === id ? { ...lead, priority } : lead)),
       );
       qc.setQueryData<Lead>(keys.lead(id), (old) => (old ? { ...old, priority } : old));
       return { leadsSnapshot, leadSnapshot, id };

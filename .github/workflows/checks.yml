@@ -257,6 +257,101 @@ jobs:
         # а серьёзную уязвимость сборка пропустить не должна.
         run: npm audit --audit-level=high
 
+  browser-e2e:
+    name: Браузер — Playwright и Chromium на тестовой базе
+    runs-on: ubuntu-24.04
+    # Отдельные временные сервисы на каждое выполнение. Production ни в одном
+    # шаге этого задания не используется.
+    services:
+      postgres:
+        image: postgres:18-alpine
+        env:
+          POSTGRES_USER: crm
+          POSTGRES_PASSWORD: crm
+          POSTGRES_DB: crm_browser_test
+        ports:
+          - 5432:5432
+        options: >-
+          --health-cmd "pg_isready -U crm -d crm_browser_test"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      valkey:
+        image: valkey/valkey:8-alpine@sha256:081c2f5cb575efc901aa80ff9cdbd1ec6a301682fd35e1ebb4b0990a4a4a8507
+        ports:
+          - 6379:6379
+        options: >-
+          --health-cmd "valkey-cli ping"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+    steps:
+      - uses: actions/checkout@v7
+
+      - uses: actions/setup-python@v7
+        with:
+          python-version: "3.13"
+          cache: pip
+          cache-dependency-path: backend/requirements-dev.lock
+
+      - uses: actions/setup-node@v7
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: frontend/package-lock.json
+
+      - name: Установка зависимостей backend
+        run: |
+          pip install --require-hashes -r backend/requirements-dev.lock
+          pip install -e backend --no-deps
+
+      - name: Установка зависимостей frontend
+        working-directory: frontend
+        run: npm ci
+
+      - name: Установка Chromium для Playwright
+        working-directory: frontend
+        run: npx playwright install --with-deps chromium
+
+      - name: Миграции на отдельной тестовой базе
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+asyncpg://crm:crm@localhost:5432/crm_browser_test
+        run: alembic upgrade head
+
+      - name: Подготовка тестовых записей
+        working-directory: backend
+        env:
+          DATABASE_URL: postgresql+asyncpg://crm:crm@localhost:5432/crm_browser_test
+          PLAYWRIGHT_TEST_DATABASE: "1"
+          SECRET_KEY: playwright-only-test-secret-key-with-at-least-32-bytes
+          ENVIRONMENT: local
+        run: python scripts/seed_browser_tests.py
+
+      - name: Настоящие браузерные сценарии
+        working-directory: frontend
+        env:
+          DATABASE_URL: postgresql+asyncpg://crm:crm@localhost:5432/crm_browser_test
+          VALKEY_URL: redis://localhost:6379/0
+          SECRET_KEY: playwright-only-test-secret-key-with-at-least-32-bytes
+          RATE_LIMIT_ENABLED: "false"
+          ATTACHMENTS_DIR: /tmp/crm-playwright-attachments
+          MAX_UPLOAD_MB: "1"
+          LOG_JSON: "false"
+          LOG_LEVEL: WARNING
+          ENVIRONMENT: local
+        run: npm run test:e2e
+
+      - name: Сохранить отчёт Playwright
+        if: always()
+        uses: actions/upload-artifact@v6
+        with:
+          name: playwright-browser-report
+          path: |
+            frontend/playwright-report/
+            frontend/test-results/
+          if-no-files-found: ignore
+
   nginx-config:
     name: Nginx — проверка конфигурации
     runs-on: ubuntu-24.04

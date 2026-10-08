@@ -1,4 +1,4 @@
-import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { useInfiniteQuery, useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
 import type { Shipment, ShipmentListItem, ShipmentTotals, TimelineEntry } from "@/shared/types";
 import { api, type Page } from "../client";
@@ -9,7 +9,7 @@ import {
   shipmentsPageSchema,
   timelineEntrySchema,
 } from "../schemas";
-import { apiVoid, keys, LIST_LIMIT, toListResult } from "./shared";
+import { apiVoid, keys, SHIPMENT_PAGE_SIZE, toInfiniteListResult } from "./shared";
 
 // --- лента заявки ------------------------------------------------------------
 export function useShipmentTimeline(id: string | undefined) {
@@ -63,10 +63,13 @@ export function useDeleteShipmentTimelineEntry(id: string | undefined) {
 type ShipmentsPageData = Page<ShipmentListItem> & { totals: ShipmentTotals };
 
 export function useShipments(status = "", search = "", assignedTo: number | null = null) {
-  return useQuery({
+  return useInfiniteQuery({
     queryKey: keys.shipments(status, search, assignedTo),
-    queryFn: () => {
-      const params = new URLSearchParams({ page_size: String(LIST_LIMIT) });
+    queryFn: ({ pageParam }) => {
+      const params = new URLSearchParams({
+        page: String(pageParam),
+        page_size: String(SHIPMENT_PAGE_SIZE),
+      });
       if (status) params.set("status", status);
       if (search) params.set("search", search);
       // Отбор «заявки сотрудника» — админский; сервер сам проверит права.
@@ -75,7 +78,15 @@ export function useShipments(status = "", search = "", assignedTo: number | null
         schema: shipmentsPageSchema,
       });
     },
-    select: (page) => ({ ...toListResult(page, LIST_LIMIT), totals: page.totals }),
+    initialPageParam: 1,
+    getNextPageParam: (lastPage) => lastPage.next ?? undefined,
+    select: (data) => {
+      const firstPage = data.pages[0];
+      return {
+        ...toInfiniteListResult(data, SHIPMENT_PAGE_SIZE),
+        totals: firstPage?.totals ?? { margin: "0.00", customer_total: "0.00" },
+      };
+    },
   });
 }
 

@@ -1,14 +1,14 @@
 // Списочное представление лидов в стиле Odoo 17: сортируемые заголовки,
-// чекбокс выбора в строке, панель действий сверху, группировка и подсветка
-// выбранных строк. Данные статичные, запросов нет.
+// чекбокс выбора в строке, группировка и подсветка выбранных строк.
 import { useMemo, useState } from "react";
 import { useNavigate } from "react-router-dom";
+import { LEAD_PAGE_SIZE } from "@/shared/api/hooks";
 import { ownerInitials, ownerLabel } from "@/shared/lib/owner";
 import type { Lead } from "@/shared/types";
 import { StarRating } from "../board/StarRating";
 
 const LIST_COLUMNS = 8; // чекбокс + 7 колонок данных
-const ROWS_PER_PAGE = 80;
+const ROWS_PER_PAGE = LEAD_PAGE_SIZE;
 
 type SortKey =
   "name" | "inn" | "logist_contact" | "tags" | "assigned_to_email" | "stage_name" | "priority";
@@ -105,13 +105,20 @@ function ListTh({
 export function LeadListView({
   leads,
   groupBy,
+  total = leads.length,
+  hasNextPage = false,
+  isFetchingNextPage = false,
+  onLoadMore,
 }: {
   leads: Lead[];
   /** Повторяет меню группировки канбана: строки группируются так же. */
   groupBy?: "stage" | "assigned" | "";
+  total?: number;
+  hasNextPage?: boolean;
+  isFetchingNextPage?: boolean;
+  onLoadMore?: () => void;
 }) {
   const navigate = useNavigate();
-  const [visible, setVisible] = useState(ROWS_PER_PAGE);
   const [sort, setSort] = useState<SortState | null>(null);
   const [selected, setSelected] = useState<Set<number>>(() => new Set());
 
@@ -134,15 +141,10 @@ export function LeadListView({
     return Array.from(map, ([title, items]) => ({ key: title, title, items }));
   }, [sorted, groupBy]);
 
-  const shownIds = useMemo(() => {
-    const ids: number[] = [];
-    let budget = visible;
-    for (const g of groups) {
-      for (const l of g.items.slice(0, Math.max(budget, 0))) ids.push(l.id);
-      budget -= g.items.length;
-    }
-    return ids;
-  }, [groups, visible]);
+  const shownIds = useMemo(
+    () => groups.flatMap((group) => group.items.map((lead) => lead.id)),
+    [groups],
+  );
 
   const allShownSelected = shownIds.length > 0 && shownIds.every((id) => selected.has(id));
 
@@ -284,15 +286,7 @@ export function LeadListView({
     ));
   }
 
-  const pagedGroups: { key: string; title: string; items: Lead[] }[] = [];
-  let budget = visible;
-  for (const g of groups) {
-    if (budget <= 0) break;
-    pagedGroups.push({ ...g, items: g.items.slice(0, budget) });
-    budget -= g.items.length;
-  }
-  const shownCount = pagedGroups.reduce((n, g) => n + g.items.length, 0);
-  const hidden = leads.length - shownCount;
+  const hidden = Math.max(0, total - leads.length);
 
   return (
     <div className="h-[calc(100dvh-var(--odoo-record-control-panel-height))] min-h-0 overflow-auto overscroll-contain border-t border-odoo-border-light bg-odoo-bg [scrollbar-gutter:stable]">
@@ -335,7 +329,7 @@ export function LeadListView({
           </tbody>
         )}
 
-        {pagedGroups.map((g) => (
+        {groups.map((g) => (
           <tbody key={g.key || "__all"}>
             {g.title && (
               <tr className="border-b border-odoo-border-light bg-odoo-bg">
@@ -349,16 +343,19 @@ export function LeadListView({
           </tbody>
         ))}
 
-        {hidden > 0 && (
+        {hasNextPage && onLoadMore && hidden > 0 && (
           <tbody>
             <tr>
               <td colSpan={LIST_COLUMNS} className="bg-odoo-surface px-4 py-2">
                 <button
                   type="button"
-                  onClick={() => setVisible((n) => n + ROWS_PER_PAGE)}
-                  className="text-[13px] text-odoo-action hover:underline"
+                  disabled={isFetchingNextPage}
+                  onClick={onLoadMore}
+                  className="text-[13px] text-odoo-action hover:underline disabled:cursor-wait disabled:opacity-60"
                 >
-                  Показать ещё {Math.min(ROWS_PER_PAGE, hidden)} из {leads.length}
+                  {isFetchingNextPage
+                    ? "Загрузка…"
+                    : `Показать ещё ${Math.min(ROWS_PER_PAGE, hidden)} из ${total}`}
                 </button>
               </td>
             </tr>

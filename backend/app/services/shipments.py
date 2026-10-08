@@ -177,7 +177,9 @@ async def list_shipments(
     search: str | None = None,
     assigned_to: int | None = None,
 ) -> dict[str, Any]:
-    stmt = visible_shipments(select(Shipment).order_by(Shipment.created_at.desc()), user)
+    stmt = visible_shipments(
+        select(Shipment).order_by(Shipment.created_at.desc(), Shipment.id.desc()), user
+    )
     if assigned_to is not None:
         # Фильтр «заявки сотрудника» — инструмент администратора: менеджер
         # и без него видит только свои заявки, чужие ему смотреть нельзя.

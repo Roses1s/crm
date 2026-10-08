@@ -4,16 +4,12 @@ import { CSS } from "@dnd-kit/utilities";
 import { MoreHorizontal } from "lucide-react";
 import { useCallback, useState } from "react";
 
+import { KANBAN_PAGE_SIZE, useDeleteStage, useUpdateStage } from "@/shared/api/hooks";
 import { Modal } from "@/shared/ui/modal";
-
-import { useDeleteStage, useUpdateStage } from "@/shared/api/hooks";
 import type { Lead, Stage } from "@/shared/types";
 import { LeadCard } from "./LeadCard";
 import { stageDragId } from "./stage-order";
 import { STAGE_COLORS, stageColor } from "./stage-colors";
-
-// Колонка рисует страницу карточек, остальное — по кнопке, как в канбане Odoo.
-const CARDS_PER_COLUMN = 20;
 
 /**
  * Колонка канбана: приёмник для перетаскивания карточек и меню управления
@@ -23,19 +19,31 @@ const CARDS_PER_COLUMN = 20;
 export function Column({
   stage,
   leads,
+  total = leads.length,
+  hasNextPage = false,
+  isFetchingNextPage = false,
+  isLoading = false,
+  isError = false,
+  onLoadMore,
+  onRetry,
   folded,
   onFold,
   allStages,
 }: {
   stage: Stage;
   leads: Lead[];
+  total?: number;
+  hasNextPage?: boolean;
+  isFetchingNextPage?: boolean;
+  isLoading?: boolean;
+  isError?: boolean;
+  onLoadMore?: () => void;
+  onRetry?: () => void;
   folded: boolean;
   onFold: () => void;
   allStages: Stage[];
 }) {
-  const [visible, setVisible] = useState(CARDS_PER_COLUMN);
-  const shown = leads.slice(0, visible);
-  const hidden = leads.length - shown.length;
+  const leadCount = Math.max(total, leads.length);
   const { setNodeRef: setDropNodeRef, isOver } = useDroppable({
     id: `stage-${stage.id}`,
   });
@@ -81,7 +89,7 @@ export function Column({
         }}
       >
         <span className="mt-8 origin-center rotate-180 text-[12px] font-semibold tracking-wide text-odoo-text [writing-mode:vertical-rl]">
-          {stage.name} ({leads.length})
+          {stage.name} ({leadCount})
         </span>
       </button>
     );
@@ -93,6 +101,7 @@ export function Column({
     // проходил мимо — карточка возвращалась на место.
     <div
       ref={setNodeRef}
+      data-testid={`kanban-column-${stage.id}`}
       style={{
         transform: CSS.Translate.toString(stageTransform),
         transition: stageTransition,
@@ -203,16 +212,16 @@ export function Column({
             <div
               className="h-full min-w-1"
               style={{
-                width: `${Math.min(100, Math.max(4, leads.length * 12))}%`,
+                width: `${Math.min(100, Math.max(4, leadCount * 12))}%`,
                 backgroundColor: color,
               }}
             />
           </div>
           <span
             className="flex h-3 w-5 shrink-0 items-center justify-end text-right text-[13px] font-semibold leading-none text-odoo-text [font-variant-numeric:tabular-nums]"
-            aria-label={`Лидов в этапе: ${leads.length}`}
+            aria-label={`Лидов в этапе: ${leadCount}`}
           >
-            {leads.length}
+            {leadCount}
           </span>
         </div>
       </div>
@@ -226,10 +235,14 @@ export function Column({
             <h3 className="text-[15px] font-semibold text-odoo-text">
               Удалить этап «{stage.name}»?
             </h3>
-            {leads.length > 0 ? (
+            {isLoading ? (
+              <p className="mt-2 text-[13px] text-odoo-text-muted">
+                Проверяем количество карточек…
+              </p>
+            ) : leadCount > 0 ? (
               <>
                 <p className="mt-2 text-[13px] text-odoo-text-muted">
-                  В этапе {leads.length} лид(ов). Выберите, куда их перенести — без этого удалить
+                  В этапе {leadCount} лид(ов). Выберите, куда их перенести — без этого удалить
                   нельзя.
                 </p>
                 <select
@@ -261,13 +274,13 @@ export function Column({
               </button>
               <button
                 type="button"
-                disabled={remove.isPending || (leads.length > 0 && moveTo === null)}
+                disabled={remove.isPending || isLoading || (leadCount > 0 && moveTo === null)}
                 className="h-8 rounded-[4px] bg-odoo-danger px-3 text-sm font-medium text-white disabled:opacity-60"
                 onClick={() => {
                   remove.mutate(
                     {
                       id: stage.id,
-                      fallbackId: leads.length ? (moveTo ?? undefined) : undefined,
+                      fallbackId: leadCount ? (moveTo ?? undefined) : undefined,
                     },
                     { onSuccess: () => setConfirmDelete(false) },
                   );
@@ -282,20 +295,35 @@ export function Column({
 
       <div className="flex min-h-0 flex-1 flex-col overflow-y-auto overscroll-y-contain [scrollbar-gutter:stable]">
         <SortableContext
-          items={shown.map((l) => `lead-${l.id}`)}
+          items={leads.map((lead) => `lead-${lead.id}`)}
           strategy={verticalListSortingStrategy}
         >
-          {shown.map((lead) => (
+          {leads.map((lead) => (
             <LeadCard key={lead.id} lead={lead} />
           ))}
         </SortableContext>
-        {hidden > 0 && (
+        {isLoading && leads.length === 0 && (
+          <p className="px-3 py-4 text-center text-[12px] text-odoo-text-muted">Загрузка…</p>
+        )}
+        {isError && onRetry && (
           <button
             type="button"
-            onClick={() => setVisible((n) => n + CARDS_PER_COLUMN)}
-            className="mx-2.5 mb-2 rounded-[3px] border border-dashed border-odoo-border px-2 py-1.5 text-[13px] text-odoo-text-muted transition-colors hover:bg-odoo-surface-hover hover:text-odoo-text"
+            onClick={onRetry}
+            className="mx-2.5 mb-2 rounded-[3px] border border-odoo-danger/30 px-2 py-1.5 text-[12px] text-odoo-danger"
           >
-            Показать ещё {Math.min(CARDS_PER_COLUMN, hidden)} из {leads.length}
+            Не удалось загрузить лиды. Повторить
+          </button>
+        )}
+        {hasNextPage && onLoadMore && (
+          <button
+            type="button"
+            disabled={isFetchingNextPage}
+            onClick={onLoadMore}
+            className="mx-2.5 mb-2 rounded-[3px] border border-dashed border-odoo-border px-2 py-1.5 text-[13px] text-odoo-text-muted transition-colors hover:bg-odoo-surface-hover hover:text-odoo-text disabled:cursor-wait disabled:opacity-60"
+          >
+            {isFetchingNextPage
+              ? "Загрузка…"
+              : `Показать ещё ${Math.min(KANBAN_PAGE_SIZE, Math.max(leadCount - leads.length, 0))} из ${leadCount}`}
           </button>
         )}
       </div>

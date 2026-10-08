@@ -1,11 +1,14 @@
-import type { QueryClient } from "@tanstack/react-query";
+import type { InfiniteData, QueryClient } from "@tanstack/react-query";
 
 import { api, type Page } from "../client";
 import { voidResponseSchema } from "../schemas";
 
-/** Максимум записей, который загружает интерфейс без постраничного перехода. */
-export const LIST_LIMIT = 200;
-export const CUSTOMERS_LIMIT = 500;
+/** Размер одной порции в списках и на доске. */
+export const LIST_LIMIT = 200; // Только для старых запросов, где нужен один ответ.
+export const LEAD_PAGE_SIZE = 80;
+export const CUSTOMER_PAGE_SIZE = 60;
+export const KANBAN_PAGE_SIZE = 20;
+export const SHIPMENT_PAGE_SIZE = 80;
 
 type VoidApiOptions = Omit<RequestInit, "body"> & {
   body?: unknown;
@@ -30,6 +33,19 @@ export function toListResult<T>(page: Page<T>, limit: number): ListResult<T> {
   return { items: page.results, total: page.count, limit };
 }
 
+/** Склеивает уже полученные серверные страницы, сохраняя общее количество. */
+export function toInfiniteListResult<T>(
+  data: InfiniteData<Page<T>, number>,
+  pageSize: number,
+): ListResult<T> {
+  const firstPage = data.pages[0];
+  return {
+    items: data.pages.flatMap((page) => page.results),
+    total: firstPage?.count ?? 0,
+    limit: pageSize,
+  };
+}
+
 export interface LeadFilters {
   search?: string;
   stage?: number | null;
@@ -39,14 +55,15 @@ export interface LeadFilters {
   archived?: boolean;
 }
 
-export function leadsQueryString(filters: LeadFilters): string {
-  const params = new URLSearchParams({ page_size: String(LIST_LIMIT) });
+export function leadsQueryString(filters: LeadFilters, page = 1, pageSize = LIST_LIMIT): string {
+  const params = new URLSearchParams({ page_size: String(pageSize) });
+  if (page > 1) params.set("page", String(page));
   params.set("is_archived", filters.archived ? "true" : "false");
   if (filters.search) params.set("search", filters.search);
-  if (filters.stage) params.set("stage", String(filters.stage));
-  if (filters.tag) params.set("tag", String(filters.tag));
-  if (filters.priority) params.set("priority", String(filters.priority));
-  if (filters.assigned) params.set("assigned_to", String(filters.assigned));
+  if (filters.stage != null) params.set("stage", String(filters.stage));
+  if (filters.tag != null) params.set("tag", String(filters.tag));
+  if (filters.priority != null) params.set("priority", String(filters.priority));
+  if (filters.assigned != null) params.set("assigned_to", String(filters.assigned));
   return params.toString();
 }
 
@@ -60,6 +77,10 @@ export const keys = {
   lossReasons: ["loss-reasons"] as const,
   customers: (search: string) => ["customers", search] as const,
   leads: (filters: LeadFilters) => ["leads", filters] as const,
+  leadPages: (filters: LeadFilters, pageSize: number) =>
+    ["leads", "pages", filters, pageSize] as const,
+  stageLeads: (stageId: number, filters: Omit<LeadFilters, "stage">, pageSize: number) =>
+    ["leads", "stage", stageId, filters, pageSize] as const,
   lead: (id: string | number) => ["lead", String(id)] as const,
   timeline: (id: string | number) => ["timeline", String(id)] as const,
   pager: (id: string | number) => ["pager", String(id)] as const,

@@ -18,6 +18,8 @@ interface FakeRoute {
   method?: string;
   /** Начало адреса без префикса /api/v1, например "/crm/leads". */
   path: string;
+  /** Необязательные параметры адреса, например { stage: "2", page: "2" }. */
+  query?: Record<string, string>;
   /** Ответ: готовый объект или функция от тела запроса. */
   response: unknown | ((body: unknown) => unknown);
   /** Код ответа; по умолчанию 200. */
@@ -47,10 +49,14 @@ export function startFakeApi(routes: FakeRoute[]): FakeServer {
     const body = init?.body ? safeParse(String(init.body)) : undefined;
     calls.push({ method, url, body });
 
+    const requestUrl = new URL(url, "http://fake-api.local");
     const route = routes.find(
       (candidate) =>
         (candidate.method ?? "GET").toUpperCase() === method &&
-        url.startsWith(`/api/v1${candidate.path}`),
+        requestUrl.pathname.startsWith(`/api/v1${candidate.path}`) &&
+        Object.entries(candidate.query ?? {}).every(
+          ([key, value]) => requestUrl.searchParams.get(key) === value,
+        ),
     );
 
     if (!route) {

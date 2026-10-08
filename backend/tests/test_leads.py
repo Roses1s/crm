@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 import asyncio
+from datetime import UTC, datetime
 from pathlib import Path
 
 import pytest
@@ -146,6 +147,46 @@ async def test_list_leads_is_paginated(auth_client: AsyncClient) -> None:
     assert lead["assigned_to_name"] == "Артём Соколов"
     assert lead["accountant_name"] is None
     assert [t["name"] for t in lead["tags"]] == ["Крупный клиент"]
+
+
+async def test_tied_lead_timestamps_do_not_duplicate_or_skip_pages(
+    auth_client: AsyncClient,
+    session,
+    seeded: dict[str, object],
+) -> None:
+    """Одинаковое время изменения не должно ломать границы страниц."""
+    stamp = datetime(2026, 10, 1, 10, 0, tzinfo=UTC)
+    original = seeded["lead"]
+    original.updated_at = stamp  # type: ignore[attr-defined]
+    stage = seeded["stage_new"]
+    admin = seeded["admin"]
+    extra = [
+        Lead(
+            name=f"Тестовый лид {index}",
+            inn=f"770000000{index}",
+            stage_id=stage.id,  # type: ignore[attr-defined]
+            assigned_to_id=admin.id,  # type: ignore[attr-defined]
+            updated_at=stamp,
+        )
+        for index in (1, 2)
+    ]
+    session.add_all(extra)
+    await session.commit()
+
+    expected = sorted(
+        [original.id, *(lead.id for lead in extra)],  # type: ignore[attr-defined]
+        reverse=True,
+    )
+    actual = []
+    for page_number in range(1, 4):
+        response = await auth_client.get(
+            "/api/v1/crm/leads",
+            params={"page": page_number, "page_size": 1},
+        )
+        assert response.status_code == 200, response.text
+        actual.extend(row["id"] for row in response.json()["results"])
+
+    assert actual == expected
 
 
 async def test_search_filter(auth_client: AsyncClient) -> None:

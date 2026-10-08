@@ -49,8 +49,9 @@ describe("Страница клиентов", () => {
       stage_name: null,
     });
     useCustomersMock.mockReturnValue({
-      data: { items: [open, masked], total: 2, limit: 500 },
+      data: { items: [open, masked], total: 2, limit: 60 },
       isLoading: false,
+      hasNextPage: false,
     });
 
     renderWithProviders(<CustomersPage />, { route: "/customers?search=Север" });
@@ -71,8 +72,9 @@ describe("Страница клиентов", () => {
     expect(screen.getByText("Загрузка…")).toBeInTheDocument();
 
     useCustomersMock.mockReturnValue({
-      data: { items: [], total: 0, limit: 500 },
+      data: { items: [], total: 0, limit: 60 },
       isLoading: false,
+      hasNextPage: false,
     });
     view.rerender(<CustomersPage />);
 
@@ -80,28 +82,31 @@ describe("Страница клиентов", () => {
     expect(screen.queryByText("Загрузка…")).not.toBeInTheDocument();
   });
 
-  it("открывает следующую пачку плиток по кнопке", async () => {
-    const customers = Array.from({ length: 61 }, (_, index) => customer(index + 1));
+  it("запрашивает следующую порцию клиентов по кнопке", async () => {
+    const customers = Array.from({ length: 60 }, (_, index) => customer(index + 1));
+    const fetchNextPage = vi.fn();
     useCustomersMock.mockReturnValue({
-      data: { items: customers, total: customers.length, limit: 500 },
+      data: { items: customers, total: 61, limit: 60 },
       isLoading: false,
+      hasNextPage: true,
+      isFetchingNextPage: false,
+      fetchNextPage,
     });
     const user = userEvent.setup();
 
     renderWithProviders(<CustomersPage />);
 
     expect(screen.queryByText("Клиент 61")).not.toBeInTheDocument();
-    const more = screen.getByRole("button", { name: "Показать ещё 1 из 61" });
-    await user.click(more);
+    await user.click(screen.getByRole("button", { name: "Показать ещё 1 из 61" }));
 
-    expect(screen.getByText("Клиент 61")).toBeInTheDocument();
-    expect(screen.queryByRole("button", { name: /Показать ещё/ })).not.toBeInTheDocument();
+    expect(fetchNextPage).toHaveBeenCalledOnce();
   });
 
   it("передаёт новый поисковый текст в запрос после небольшой задержки", async () => {
     useCustomersMock.mockReturnValue({
-      data: { items: [], total: 0, limit: 500 },
+      data: { items: [], total: 0, limit: 60 },
       isLoading: false,
+      hasNextPage: false,
     });
     renderWithProviders(<CustomersPage />);
 

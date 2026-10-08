@@ -135,7 +135,12 @@ async def list_leads(
 ) -> dict[str, Any]:
     stmt = apply_filters(
         visible_only(
-            select(Lead).options(selectinload(Lead.tags)).order_by(Lead.updated_at.desc()), user
+            select(Lead)
+            .options(selectinload(Lead.tags))
+            # id делает порядок страниц устойчивым, даже когда несколько
+            # карточек получили одинаковое время изменения.
+            .order_by(Lead.updated_at.desc(), Lead.id.desc()),
+            user,
         ),
         search=search,
         stage=stage,

@@ -66,7 +66,12 @@ async def list_customers(
     # же, что секунду назад поменяли через /lose в этой же сессии) отдаёт
     # старые значения связей (stage/loss_reason) из identity map — тот же
     # трюк, что и в get_lead_or_404.
-    stmt = select(Lead).order_by(Lead.updated_at.desc()).execution_options(populate_existing=True)
+    stmt = (
+        select(Lead)
+        # Второй ключ устраняет пропуски/дубли страниц при одинаковом updated_at.
+        .order_by(Lead.updated_at.desc(), Lead.id.desc())
+        .execution_options(populate_existing=True)
+    )
     if search:
         pattern = like_pattern(search)
         stmt = stmt.where(

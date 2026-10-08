@@ -41,6 +41,7 @@ export function ControlPanel({
   view,
   onView,
   count,
+  loadedCount,
 }: {
   title?: string;
   crumbs?: { label: string; to?: string }[];
@@ -59,7 +60,10 @@ export function ControlPanel({
   createTo?: string;
   view?: "kanban" | "list";
   onView?: (v: "kanban" | "list") => void;
+  /** Общее количество по текущему отбору. */
   count?: number;
+  /** Сколько записей уже загружено; без этого поля показывается весь диапазон. */
+  loadedCount?: number;
 }) {
   return (
     <div className="sticky top-10 z-30 shrink-0 border-b border-odoo-border-light bg-odoo-surface">
@@ -178,7 +182,9 @@ export function ControlPanel({
               className="mr-1 whitespace-nowrap text-[13px] leading-none text-odoo-text-muted [font-variant-numeric:tabular-nums]"
               aria-label={`Записей: ${count}`}
             >
-              1-{count} / {count}
+              {loadedCount === undefined
+                ? `1-${count} / ${count}`
+                : `${loadedCount > 0 ? `1-${Math.min(loadedCount, count)}` : "0"} / ${count}`}
             </span>
           )}
           {onView && (

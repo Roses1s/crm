@@ -3,7 +3,6 @@ import { Link, useNavigate, useSearchParams } from "react-router-dom";
 
 import { AppShell, ControlPanel } from "@/app/layout/AppShell";
 import { BoardSuggestions } from "@/features/crm/board/BoardSuggestions";
-import { ListLimitNotice } from "@/shared/ui/list-limit-notice";
 import { useMe, useShipments } from "@/shared/api/hooks";
 import { EmployeeBanner } from "./employee-banner";
 import { formatShipmentDate, SHIPMENT_STATUS } from "./shipment-status";
@@ -32,7 +31,13 @@ export function ShipmentsPage() {
   const employeeParam = Number(params.get("employee"));
   const employeeId =
     isAdmin && Number.isInteger(employeeParam) && employeeParam > 0 ? employeeParam : null;
-  const { data: shipmentsPage, isLoading } = useShipments(status, search, employeeId);
+  const {
+    data: shipmentsPage,
+    isLoading,
+    hasNextPage,
+    isFetchingNextPage,
+    fetchNextPage,
+  } = useShipments(status, search, employeeId);
   const shipments = shipmentsPage?.items ?? [];
   const totals = shipmentsPage?.totals;
 
@@ -85,6 +90,7 @@ export function ShipmentsPage() {
         title="Заявки"
         status={statusFilter}
         count={shipmentsPage?.total ?? 0}
+        loadedCount={shipments.length}
         search={searchInput}
         onSearch={setSearchInput}
         searchSuggestions={
@@ -103,8 +109,6 @@ export function ShipmentsPage() {
           ) : undefined
         }
       />
-
-      <ListLimitNotice data={shipmentsPage} noun="заявок" />
 
       {employeeId !== null && (
         <EmployeeBanner userId={employeeId} onLeave={() => setFilter("employee", "")} />
@@ -211,6 +215,20 @@ export function ShipmentsPage() {
             </tfoot>
           )}
         </table>
+        {hasNextPage && shipmentsPage && (
+          <div className="flex justify-center py-3">
+            <button
+              type="button"
+              disabled={isFetchingNextPage}
+              onClick={() => void fetchNextPage()}
+              className="rounded-[3px] border border-odoo-border bg-odoo-surface px-3 py-1.5 text-[13px] text-odoo-action hover:bg-odoo-bg disabled:cursor-wait disabled:opacity-60"
+            >
+              {isFetchingNextPage
+                ? "Загрузка…"
+                : `Показать ещё ${Math.min(shipmentsPage.limit, shipmentsPage.total - shipments.length)} из ${shipmentsPage.total}`}
+            </button>
+          </div>
+        )}
       </div>
     </AppShell>
   );

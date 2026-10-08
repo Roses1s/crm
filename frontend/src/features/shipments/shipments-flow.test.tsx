@@ -189,26 +189,53 @@ describe("Сценарий: список заявок", () => {
     );
   });
 
-  it("предупреждает, когда показаны не все заявки", async () => {
-    // Пагинации в интерфейсе нет: сервер отдаёт первую страницу. Раньше
-    // остальные записи просто исчезали, и об этом никто не знал.
+  it("загружает следующую страницу и сохраняет поиск со статусом", async () => {
     setAccessToken("токен");
+    const secondShipment = { ...SHIPMENTS[0], id: 102, number: "102", lead_name: "ООО Вторая" };
     server = startFakeApi([
       { path: "/auth/me", response: ME },
       {
         path: "/shipments",
-        response: { count: 240, next: 2, previous: null, results: SHIPMENTS, totals: TOTALS },
+        query: { page: "1", status: "loaded", search: "Ромашка" },
+        response: { count: 2, next: 2, previous: null, results: SHIPMENTS, totals: TOTALS },
+      },
+      {
+        path: "/shipments",
+        query: { page: "2", status: "loaded", search: "Ромашка" },
+        response: {
+          count: 2,
+          next: null,
+          previous: 1,
+          results: [secondShipment],
+          totals: TOTALS,
+        },
       },
     ]);
 
+    const user = userEvent.setup();
     renderWithProviders(
       <Routes>
         <Route path="/shipments" element={<ShipmentsPage />} />
       </Routes>,
-      { route: "/shipments" },
+      { route: "/shipments?status=loaded&search=Ромашка" },
     );
 
-    expect(await screen.findByRole("status")).toHaveTextContent(/Показаны первые 1 заявок из 240/);
+    expect(await screen.findByRole("link", { name: "101" })).toBeVisible();
+    const more = screen.getByRole("button", { name: "Показать ещё 1 из 2" });
+    await user.click(more);
+
+    expect(await screen.findByRole("link", { name: "102" })).toBeVisible();
+    expect(
+      server.calls.some((call) => {
+        const url = new URL(call.url, "http://fake-api.local");
+        return (
+          url.searchParams.get("page") === "2" &&
+          url.searchParams.get("status") === "loaded" &&
+          url.searchParams.get("search") === "Ромашка"
+        );
+      }),
+    ).toBe(true);
+    expect(screen.queryByRole("button", { name: /Показать ещё/ })).not.toBeInTheDocument();
   });
 
   it("админ находит заявки сотрудника через общий поиск", async () => {

@@ -23,23 +23,23 @@ import {
   sortableKeyboardCoordinates,
 } from "@dnd-kit/sortable";
 import { Plus } from "lucide-react";
-import { useEffect, useState } from "react";
+import { useCallback, useEffect, useState } from "react";
 import { useSearchParams } from "react-router-dom";
 
 import { AppShell, ControlPanel } from "@/app/layout/AppShell";
 import { ApiError } from "@/shared/api/client";
-import { ListLimitNotice } from "@/shared/ui/list-limit-notice";
 import { BoardBanner } from "@/features/crm/board/BoardBanner";
 import { BoardSuggestions } from "@/features/crm/board/BoardSuggestions";
-import { Column } from "@/features/crm/board/Column";
+import { StageColumn } from "@/features/crm/board/StageColumn";
 import { LeadCard } from "@/features/crm/board/LeadCard";
 import { useFoldedStages } from "@/features/crm/board/folded-stages";
 import { isStageDragId, reorderedStageIds, stageDragId } from "@/features/crm/board/stage-order";
 import { LeadListView } from "@/features/crm/list/LeadListView";
 import { QuickCreateLeadDialog } from "@/features/crm/lead-form/QuickCreateLeadDialog";
 import {
+  LEAD_PAGE_SIZE,
   useCreateStage,
-  useLeads,
+  useInfiniteLeads,
   useMe,
   useMoveLead,
   useReorderStages,
@@ -63,8 +63,7 @@ const dropAnimation: DropAnimation = {
  * Панель фильтров убрана: доска у каждого своя, нужную карточку ищут поиском.
  * В адресной строке живут поисковый запрос, режим просмотра и номер чужой
  * доски (`board`) — такую ссылку можно переслать коллеге. Перетаскивание
- * карточки меняет этап на сервере (оптимистично: карточка переезжает сразу,
- * при ошибке возвращается назад).
+ * карточки меняет этап на сервере, после ответа доски перечитывают свои страницы.
  */
 export function KanbanPage() {
   const [params, setParams] = useSearchParams();
@@ -86,6 +85,26 @@ export function KanbanPage() {
   // с четырьмя обязательными полями (см. QuickCreateLeadDialog).
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const [stageName, setStageName] = useState("");
+  const boardFilterKey = JSON.stringify([search, boardUserId]);
+  const [loadedStageLeads, setLoadedStageLeads] = useState<{
+    filterKey: string;
+    byStage: Map<number, Lead[]>;
+  }>({ filterKey: "", byStage: new Map() });
+  const onStageLeadsChange = useCallback(
+    (stageId: number, stageLeads: Lead[]) => {
+      setLoadedStageLeads((previous) => {
+        const byStage =
+          previous.filterKey === boardFilterKey ? previous.byStage : new Map<number, Lead[]>();
+        if (previous.filterKey === boardFilterKey && byStage.get(stageId) === stageLeads) {
+          return previous;
+        }
+        const next = new Map(byStage);
+        next.set(stageId, stageLeads);
+        return { filterKey: boardFilterKey, byStage: next };
+      });
+    },
+    [boardFilterKey],
+  );
 
   // Поиск уходит на сервер с задержкой — иначе запрос на каждую букву.
   useEffect(() => {
@@ -105,9 +124,19 @@ export function KanbanPage() {
 
   // Фильтров в интерфейсе больше нет: доска у каждого своя, а нужную карточку
   // ищут поиском. Из параметров остаётся чужая доска для администратора.
-  const { data: leadsPage } = useLeads({ search, assigned: boardUserId });
-  const leads = leadsPage?.items ?? [];
   const { data: stages = [] } = useStages(boardUserId);
+  const listQuery = useInfiniteLeads(
+    { search, assigned: boardUserId },
+    LEAD_PAGE_SIZE,
+    view === "list",
+  );
+  const leadsByStage =
+    loadedStageLeads.filterKey === boardFilterKey
+      ? loadedStageLeads.byStage
+      : new Map<number, Lead[]>();
+  const boardLeads = stages.flatMap((stage) => leadsByStage.get(stage.id) ?? []);
+  const listLeads = listQuery.data?.items ?? [];
+  const leads = view === "list" ? listLeads : boardLeads;
   const moveLead = useMoveLead();
   const reorderStages = useReorderStages();
   const createStage = useCreateStage();
@@ -132,17 +161,6 @@ export function KanbanPage() {
       );
     const pointer = relevant(pointerWithin(args));
     return pointer.length > 0 ? pointer : relevant(closestCorners(args));
-  }
-
-  /**
-   * Порядок карточек в колонке.
-   *
-   * Сервер отдаёт лиды по времени изменения, поэтому после переноса карточка
-   * прыгала в начало колонки — это и выглядело рывком. На доске держим
-   * стабильный порядок по номеру: он не меняется от правок.
-   */
-  function columnLeads(stageId: number) {
-    return leads.filter((l) => l.stage_id === stageId).sort((a, b) => a.id - b.id);
   }
 
   const sensors = useSensors(
@@ -237,7 +255,8 @@ export function KanbanPage() {
         onNew={() => setQuickCreateOpen(true)}
         view={view}
         onView={(v) => setFilter("view", v === "list" ? "list" : "")}
-        count={view === "list" ? leads.length : undefined}
+        count={view === "list" ? listQuery.data?.total : undefined}
+        loadedCount={view === "list" ? listLeads.length : undefined}
         searchSuggestions={
           isAdmin ? (
             <BoardSuggestions
@@ -253,8 +272,6 @@ export function KanbanPage() {
           ) : undefined
         }
       ></ControlPanel>
-
-      <ListLimitNotice data={leadsPage} noun="лидов" />
 
       {boardUserId !== null && (
         <BoardBanner boardUserId={boardUserId} onLeave={() => setFilter("board", "")} />
@@ -273,7 +290,16 @@ export function KanbanPage() {
         </div>
       )}
 
-      {view === "list" && <LeadListView leads={leads} groupBy="stage" />}
+      {view === "list" && (
+        <LeadListView
+          leads={listLeads}
+          groupBy="stage"
+          total={listQuery.data?.total}
+          hasNextPage={listQuery.hasNextPage}
+          isFetchingNextPage={listQuery.isFetchingNextPage}
+          onLoadMore={() => void listQuery.fetchNextPage()}
+        />
+      )}
 
       {view !== "list" && (
         <div className="crm-kanban-renderer flex h-[calc(100dvh-var(--odoo-record-control-panel-height))] min-h-0 snap-x snap-mandatory gap-0 overflow-x-auto overflow-y-hidden overscroll-x-contain bg-odoo-board-canvas pl-2 md:snap-none">
@@ -293,10 +319,11 @@ export function KanbanPage() {
               strategy={horizontalListSortingStrategy}
             >
               {stages.map((stage) => (
-                <Column
+                <StageColumn
                   key={stage.id}
                   stage={stage}
-                  leads={columnLeads(stage.id)}
+                  search={search}
+                  assigned={boardUserId}
                   folded={folded.includes(stage.id)}
                   onFold={() =>
                     setFolded((f) =>
@@ -304,6 +331,7 @@ export function KanbanPage() {
                     )
                   }
                   allStages={stages}
+                  onLeadsChange={onStageLeadsChange}
                 />
               ))}
             </SortableContext>
