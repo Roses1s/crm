@@ -1,12 +1,14 @@
-import { screen } from "@testing-library/react";
+import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { expect, it, vi } from "vitest";
 
+import { attachmentBlob, attachmentThumbnailBlob } from "@/shared/api/hooks";
 import { renderWithProviders } from "@/test/utils";
 import { FilePreview } from "@/shared/ui/file-preview";
 
 vi.mock("@/shared/api/hooks", () => ({
   attachmentBlob: vi.fn(() => new Promise<Blob>(() => undefined)),
+  attachmentThumbnailBlob: vi.fn(() => new Promise<Blob>(() => undefined)),
   downloadAttachment: vi.fn(),
 }));
 
@@ -28,6 +30,8 @@ it("закрывает просмотр файла кнопкой-фоном", a
   );
 
   expect(screen.getByRole("dialog", { name: "Просмотр файла договор.pdf" })).toBeInTheDocument();
+  await waitFor(() => expect(attachmentBlob).toHaveBeenCalledOnce());
+  expect(attachmentThumbnailBlob).not.toHaveBeenCalled();
   await user.click(screen.getByRole("button", { name: "Закрыть просмотр файла" }));
 
   expect(onClose).toHaveBeenCalledOnce();

@@ -21,7 +21,7 @@
 | Файл | Адреса начинаются с | Ручек |
 |---|---|---|
 | `admin.py` | `/admin` | 8 |
-| `attachments.py` | `/crm` | 6 |
+| `attachments.py` | `/crm` | 7 |
 | `auth.py` | `/auth` | 4 |
 | `customers.py` | `/crm/customers` | 2 |
 | `health.py` | `—` | 2 |
@@ -92,8 +92,8 @@
 
 ## Тесты
 
-- бэкенд (pytest): **191** тест-функций
-- фронтенд (vitest): **104** тестов
+- бэкенд (pytest): **196** тест-функций
+- фронтенд (vitest): **106** тестов
 - сценарные (подменяется только сеть, остальное настоящее):
   - `frontend/src/features/auth/login-flow.test.tsx`
   - `frontend/src/features/crm/kanban-flow.test.tsx`

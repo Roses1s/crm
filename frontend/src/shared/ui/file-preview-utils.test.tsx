@@ -9,10 +9,16 @@ import type { Attachment } from "@/shared/types";
 
 const attachmentBlob = vi.fn((id: number, signal?: AbortSignal) => {
   if (signal?.aborted) return Promise.reject(signal.reason);
-  return Promise.resolve(new Blob([`картинка ${id}`]));
+  return Promise.resolve(new Blob([`оригинал ${id}`]));
+});
+const attachmentThumbnailBlob = vi.fn((id: number, signal?: AbortSignal) => {
+  if (signal?.aborted) return Promise.reject(signal.reason);
+  return Promise.resolve(new Blob([`миниатюра ${id}`]));
 });
 vi.mock("@/shared/api/hooks", () => ({
   attachmentBlob: (id: number, signal?: AbortSignal) => attachmentBlob(id, signal),
+  attachmentThumbnailBlob: (id: number, signal?: AbortSignal) =>
+    attachmentThumbnailBlob(id, signal),
 }));
 
 const FILE: Attachment = {
@@ -24,15 +30,20 @@ const FILE: Attachment = {
 };
 
 function Thumb() {
-  const { url } = useObjectUrl(FILE);
+  const { url } = useObjectUrl(FILE, true, "thumbnail");
   // Пока ссылки нет, картинку не рисуем — как в ленте чаттера.
-  return url ? <img src={url} alt="вложение" /> : <span>Загрузка…</span>;
+  return url ? <img src={url} alt="миниатюра" /> : <span>Загрузка…</span>;
+}
+
+function OriginalPreview() {
+  const { url } = useObjectUrl(FILE);
+  return url ? <img src={url} alt="оригинал" /> : <span>Загрузка оригинала…</span>;
 }
 
 function LazyThumb({ file }: { file: Attachment }) {
   const ref = useRef<HTMLButtonElement>(null);
   const nearViewport = useNearViewport(ref);
-  const { url } = useObjectUrl(file, nearViewport);
+  const { url } = useObjectUrl(file, nearViewport, "thumbnail");
   return (
     <button ref={ref} type="button">
       {url || "Загрузка…"}
@@ -41,7 +52,7 @@ function LazyThumb({ file }: { file: Attachment }) {
 }
 
 function QueueThumb({ id }: { id: number }) {
-  const { url } = useObjectUrl({ ...FILE, id });
+  const { url } = useObjectUrl({ ...FILE, id }, true, "thumbnail");
   return <span>{url || "Загрузка…"}</span>;
 }
 
@@ -49,22 +60,52 @@ afterEach(() => {
   clearAttachmentLoadQueue();
   clearBlobCache();
   attachmentBlob.mockReset();
-  attachmentBlob.mockImplementation((id) => Promise.resolve(new Blob([`картинка ${id}`])));
+  attachmentBlob.mockImplementation((id) => Promise.resolve(new Blob([`оригинал ${id}`])));
+  attachmentThumbnailBlob.mockReset();
+  attachmentThumbnailBlob.mockImplementation((id) =>
+    Promise.resolve(new Blob([`миниатюра ${id}`])),
+  );
   vi.unstubAllGlobals();
 });
 
-it("скачивает вложение один раз и показывает его из памяти вкладки", async () => {
+it("скачивает миниатюру один раз и показывает её из памяти вкладки", async () => {
   URL.createObjectURL = vi.fn(() => "blob:фото");
   URL.revokeObjectURL = vi.fn();
 
   const first = render(<Thumb />);
-  await waitFor(() => expect(screen.getByAltText("вложение")).toHaveAttribute("src", "blob:фото"));
+  await waitFor(() => expect(screen.getByAltText("миниатюра")).toHaveAttribute("src", "blob:фото"));
   first.unmount();
 
   render(<Thumb />);
 
-  // Карточку открыли второй раз: картинка на месте сразу, сеть не тревожим.
-  expect(screen.getByAltText("вложение")).toHaveAttribute("src", "blob:фото");
+  // Карточку открыли второй раз: миниатюра на месте сразу, сеть не тревожим.
+  expect(screen.getByAltText("миниатюра")).toHaveAttribute("src", "blob:фото");
+  expect(attachmentThumbnailBlob).toHaveBeenCalledTimes(1);
+  expect(attachmentBlob).not.toHaveBeenCalled();
+});
+
+it("не смешивает миниатюру с оригиналом одного вложения", async () => {
+  let nextUrl = 0;
+  URL.createObjectURL = vi.fn(() => `blob:${++nextUrl}`);
+
+  render(
+    <>
+      <Thumb />
+      <OriginalPreview />
+    </>,
+  );
+
+  await waitFor(() => {
+    expect(screen.getByAltText("миниатюра")).toHaveAttribute(
+      "src",
+      expect.stringMatching(/^blob:/),
+    );
+    expect(screen.getByAltText("оригинал")).toHaveAttribute("src", expect.stringMatching(/^blob:/));
+  });
+  expect(screen.getByAltText("миниатюра").getAttribute("src")).not.toBe(
+    screen.getByAltText("оригинал").getAttribute("src"),
+  );
+  expect(attachmentThumbnailBlob).toHaveBeenCalledTimes(1);
   expect(attachmentBlob).toHaveBeenCalledTimes(1);
 });
 
@@ -88,12 +129,13 @@ it("откладывает скачивание миниатюры, пока о�
 
   render(<LazyThumb file={FILE} />);
 
-  expect(attachmentBlob).not.toHaveBeenCalled();
+  expect(attachmentThumbnailBlob).not.toHaveBeenCalled();
   expect(observers).toHaveLength(1);
   act(() => observers[0].enter());
 
   await waitFor(() => expect(screen.getByText("blob:фото")).toBeVisible());
-  expect(attachmentBlob).toHaveBeenCalledTimes(1);
+  expect(attachmentThumbnailBlob).toHaveBeenCalledTimes(1);
+  expect(attachmentBlob).not.toHaveBeenCalled();
 });
 
 it("не запускает больше трёх скачиваний вложений одновременно", async () => {
@@ -101,7 +143,7 @@ it("не запускает больше трёх скачиваний влож�
   let maxActive = 0;
   let nextUrl = 0;
   const releases = new Map<number, (blob: Blob) => void>();
-  attachmentBlob.mockImplementation(
+  attachmentThumbnailBlob.mockImplementation(
     (id) =>
       new Promise<Blob>((resolve) => {
         active += 1;
@@ -122,7 +164,7 @@ it("не запускает больше трёх скачиваний влож�
     </>,
   );
 
-  await waitFor(() => expect(attachmentBlob).toHaveBeenCalledTimes(3));
+  await waitFor(() => expect(attachmentThumbnailBlob).toHaveBeenCalledTimes(3));
   expect(maxActive).toBe(3);
 
   for (let id = 1; id <= 8; id += 1) {

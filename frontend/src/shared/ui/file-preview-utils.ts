@@ -1,8 +1,8 @@
 import { useEffect, useState, type RefObject } from "react";
 
-import { attachmentBlob } from "@/shared/api/hooks";
+import { attachmentBlob, attachmentThumbnailBlob } from "@/shared/api/hooks";
 import { enqueueAttachmentLoad } from "@/shared/lib/attachment-load-queue";
-import { peekBlobUrl, rememberBlob } from "@/shared/lib/blob-cache";
+import { peekBlobUrl, rememberBlob, type BlobVariant } from "@/shared/lib/blob-cache";
 import type { Attachment } from "@/shared/types";
 
 /** Что умеем показать прямо в окне, а что только скачать. */
@@ -28,10 +28,11 @@ export function formatSize(bytes: number): string {
 export function useObjectUrl(
   file: Attachment | null,
   enabled = true,
+  variant: BlobVariant = "original",
 ): { url: string; failed: boolean } {
   const attachmentId = file?.id;
   const [url, setUrl] = useState(() =>
-    attachmentId !== undefined ? peekBlobUrl(attachmentId) : "",
+    attachmentId !== undefined ? peekBlobUrl(attachmentId, variant) : "",
   );
   const [failed, setFailed] = useState(false);
 
@@ -44,14 +45,15 @@ export function useObjectUrl(
     let active = true;
     setFailed(false);
 
-    const ready = peekBlobUrl(attachmentId);
+    const ready = peekBlobUrl(attachmentId, variant);
     setUrl(ready);
     if (ready || !enabled) return;
 
-    enqueueAttachmentLoad(attachmentId, (signal) => attachmentBlob(attachmentId, signal))
+    const load = variant === "thumbnail" ? attachmentThumbnailBlob : attachmentBlob;
+    enqueueAttachmentLoad(attachmentId, (signal) => load(attachmentId, signal), variant)
       .then((blob) => {
         if (!active) return;
-        setUrl(rememberBlob(attachmentId, blob));
+        setUrl(rememberBlob(attachmentId, blob, variant));
       })
       .catch(() => active && setFailed(true));
 
@@ -59,7 +61,7 @@ export function useObjectUrl(
       // Ссылку не освобождаем: ею владеет кеш и чистит граница сессии.
       active = false;
     };
-  }, [attachmentId, enabled]);
+  }, [attachmentId, enabled, variant]);
 
   return { url, failed };
 }

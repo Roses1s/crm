@@ -53,7 +53,7 @@ function dayLabel(iso: string): string {
 function AttachmentThumb({ file, onOpen }: { file: Attachment; onOpen: () => void }) {
   const buttonRef = useRef<HTMLButtonElement>(null);
   const nearViewport = useNearViewport(buttonRef);
-  const { url, failed } = useObjectUrl(file, nearViewport);
+  const { url, failed } = useObjectUrl(file, nearViewport, "thumbnail");
 
   if (failed) {
     return (

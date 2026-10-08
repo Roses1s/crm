@@ -2,11 +2,14 @@
 
 from __future__ import annotations
 
+from io import BytesIO
 from pathlib import Path
 
 import pytest
 from httpx import AsyncClient
+from PIL import Image
 
+from app.core.attachment_paths import is_thumbnail_path, thumbnail_path
 from app.core.config import settings
 from tests.conftest import TEST_PASSWORD
 
@@ -17,6 +20,14 @@ async def manager_headers(client: AsyncClient) -> dict[str, str]:
         json={"email": "manager@crmdetroid.ru", "password": TEST_PASSWORD},
     )
     return {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+
+def sample_png() -> bytes:
+    image = Image.new("RGB", (1200, 800), (41, 91, 127))
+    buffer = BytesIO()
+    image.save(buffer, format="PNG")
+    image.close()
+    return buffer.getvalue()
 
 
 async def test_upload_and_download(auth_client: AsyncClient, seeded: dict) -> None:
@@ -41,6 +52,96 @@ async def test_upload_and_download(auth_client: AsyncClient, seeded: dict) -> No
     # PDF показывается в окне, произвольный файл — только скачиванием.
     assert downloaded.headers["content-disposition"].startswith("inline")
     assert downloaded.headers["x-content-type-options"] == "nosniff"
+    assert (
+        await auth_client.get(f"/api/v1/crm/attachments/{body['id']}/thumbnail")
+    ).status_code == 404
+
+
+async def test_thumbnail_is_smaller_and_original_remains_unchanged(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    """Лента получает WebP уменьшенного размера, оригинал доступен без изменений."""
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    original_bytes = sample_png()
+    uploaded = await auth_client.post(
+        f"/api/v1/crm/leads/{lead_id}/attachments",
+        files={"file": ("Фото.png", original_bytes, "image/png")},
+    )
+    assert uploaded.status_code == 201, uploaded.text
+    attachment_id = uploaded.json()["id"]
+
+    thumbnail = await auth_client.get(f"/api/v1/crm/attachments/{attachment_id}/thumbnail")
+
+    assert thumbnail.status_code == 200, thumbnail.text
+    assert thumbnail.headers["content-type"] == "image/webp"
+    assert thumbnail.headers["cache-control"] == "private, no-store"
+    assert thumbnail.headers["content-disposition"].startswith("inline")
+    assert thumbnail.headers["x-content-type-options"] == "nosniff"
+    with Image.open(BytesIO(thumbnail.content)) as decoded:
+        assert decoded.format == "WEBP"
+        assert decoded.size == (480, 320)
+    assert len(thumbnail.content) < len(original_bytes)
+
+    stored_files = [
+        path
+        for path in Path(settings.attachments_dir).rglob("*")
+        if path.is_file() and not is_thumbnail_path(path)
+    ]
+    assert len(stored_files) == 1
+    original_path = stored_files[0]
+    cached_thumbnail = thumbnail_path(original_path)
+    assert cached_thumbnail.read_bytes() == thumbnail.content
+
+    full_file = await auth_client.get(f"/api/v1/crm/attachments/{attachment_id}")
+    assert full_file.status_code == 200
+    assert full_file.content == original_bytes
+    assert original_path.read_bytes() == original_bytes
+
+
+async def test_thumbnail_rejects_corrupt_image_but_preserves_original(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    original_bytes = b"this is not a JPEG"
+    uploaded = await auth_client.post(
+        f"/api/v1/crm/leads/{lead_id}/attachments",
+        files={"file": ("broken.jpg", original_bytes, "image/jpeg")},
+    )
+    attachment_id = uploaded.json()["id"]
+
+    thumbnail = await auth_client.get(f"/api/v1/crm/attachments/{attachment_id}/thumbnail")
+    full_file = await auth_client.get(f"/api/v1/crm/attachments/{attachment_id}")
+
+    assert thumbnail.status_code == 422
+    assert thumbnail.json()["code"] == "invalid_image"
+    assert full_file.status_code == 200
+    assert full_file.content == original_bytes
+
+
+async def test_thumbnail_has_the_same_access_as_original(
+    client: AsyncClient, auth_client: AsyncClient, seeded: dict
+) -> None:
+    """Проверка прав идёт до создания кеша и совпадает с ручкой оригинала."""
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    uploaded = await auth_client.post(
+        f"/api/v1/crm/leads/{lead_id}/attachments",
+        files={"file": ("Фото.png", sample_png(), "image/png")},
+    )
+    attachment_id = uploaded.json()["id"]
+    headers = await manager_headers(client)
+
+    original = await client.get(f"/api/v1/crm/attachments/{attachment_id}", headers=headers)
+    thumbnail = await client.get(
+        f"/api/v1/crm/attachments/{attachment_id}/thumbnail", headers=headers
+    )
+
+    assert original.status_code == 404
+    assert thumbnail.status_code == original.status_code
+    assert not any(
+        is_thumbnail_path(path)
+        for path in Path(settings.attachments_dir).rglob("*")
+        if path.is_file()
+    )
 
 
 @pytest.mark.parametrize("name", ["page.html", "иконка.svg", "setup.exe", "файл-без-расширения"])

@@ -29,6 +29,7 @@ from sqlalchemy import CursorResult, Engine, create_engine, delete, select
 from sqlalchemy.engine import make_url
 from sqlalchemy.orm import Session
 
+from app.core.attachment_paths import thumbnail_path
 from app.core.config import settings
 from app.core.logging import configure_logging, get_logger
 from app.models.security import LoginAttempt, RevokedToken
@@ -128,6 +129,8 @@ def backup_attachments() -> dict[str, Any]:
     target = BACKUP_DIR / f"files-{stamp}.tar.gz"
 
     with tarfile.open(target, "w:gz") as archive:
+        # В архив входят оригиналы и уже созданные WebP-миниатюры. При
+        # восстановлении пустые кеши также будут автоматически пересозданы.
         archive.add(source, arcname="attachments")
 
     # Оставляем только N последних архивов файлов.
@@ -228,7 +231,9 @@ def cleanup_orphan_files() -> dict[str, Any]:
     Обратная задача к `cleanup_orphan_attachments`. Такие файлы остаются после
     прерванной загрузки, отката транзакции и удаления примечания вместе с
     вложениями (строки уходят каскадом, файлы — нет). Ни в одном интерфейсе
-    они не видны и занимают место бесконечно.
+    они не видны и занимают место бесконечно. WebP-миниатюры не имеют своей
+    строки в базе: их сохраняем только пока существует оригинал и удаляем
+    вместе с сиротским вложением.
 
     Чтобы не удалить файл, который прямо сейчас дописывается, трогаем только
     то, что старше часа.
@@ -239,9 +244,15 @@ def cleanup_orphan_files() -> dict[str, Any]:
 
     cutoff = (datetime.now(tz=UTC) - timedelta(hours=1)).timestamp()
     with _session() as session:
-        known = {
-            str(path) for (path,) in session.execute(select(Attachment.storage_path)).all() if path
-        }
+        known: set[str] = set()
+        for (path,) in session.execute(select(Attachment.storage_path)).all():
+            if not path:
+                continue
+            original = Path(path)
+            known.add(str(original))
+            # Миниатюра — производный кеш, в таблице отдельной строки для неё
+            # нет. Сохраняем sidecar, пока существует исходное вложение.
+            known.add(str(thumbnail_path(original)))
 
     removed = 0
     freed = 0

@@ -779,12 +779,17 @@ export function useDeleteShipmentTimelineEntry(id: string | undefined) {
   });
 }
 
-/** Содержимое файла — для миниатюр и предпросмотра. */
+/** Содержимое оригинала — для полноразмерного просмотра и скачивания. */
 export function attachmentBlob(attachmentId: number, signal?: AbortSignal): Promise<Blob> {
   return apiBlob(`/crm/attachments/${attachmentId}`, signal);
 }
 
-/** Скачивание: получаем файл с токеном и отдаём браузеру. */
+/** Уменьшенная копия для превью в ленте; оригинал эта ручка не скачивает. */
+export function attachmentThumbnailBlob(attachmentId: number, signal?: AbortSignal): Promise<Blob> {
+  return apiBlob(`/crm/attachments/${attachmentId}/thumbnail`, signal);
+}
+
+/** Скачивание: получаем исходный файл с токеном и отдаём браузеру. */
 export async function downloadAttachment(attachment: Attachment): Promise<void> {
   const blob = await attachmentBlob(attachment.id);
   const url = URL.createObjectURL(blob);

@@ -34,6 +34,15 @@ describe("Память вкладки для вложений", () => {
     expect(peekBlobUrl(42)).toBe("");
   });
 
+  it("хранит миниатюру отдельно от оригинала того же вложения", () => {
+    const original = rememberBlob(7, blobOf(4));
+    const thumbnail = rememberBlob(7, blobOf(1), "thumbnail");
+
+    expect(peekBlobUrl(7)).toBe(original);
+    expect(peekBlobUrl(7, "thumbnail")).toBe(thumbnail);
+    expect(thumbnail).not.toBe(original);
+  });
+
   it("освобождает самые давние файлы, когда их становится много", () => {
     for (let id = 1; id <= 13; id += 1) rememberBlob(id, blobOf(1));
 

@@ -1,10 +1,12 @@
+import type { BlobVariant } from "./blob-cache";
+
 /** Максимальное число одновременно скачиваемых вложений. */
 export const MAX_CONCURRENT_ATTACHMENT_DOWNLOADS = 3;
 
 const CANCELLED = new Error("Загрузка вложения отменена");
 
 type Job = {
-  id: number;
+  key: string;
   generation: number;
   promise: Promise<Blob>;
   load: (signal: AbortSignal) => Promise<Blob>;
@@ -17,14 +19,14 @@ type Job = {
 
 const queue: Job[] = [];
 const activeJobs = new Set<Job>();
-const pending = new Map<number, Promise<Blob>>();
+const pending = new Map<string, Promise<Blob>>();
 let active = 0;
 let generation = 0;
 
 function settle(job: Job, result: { error: unknown } | { blob: Blob }): void {
   if (job.settled) return;
   job.settled = true;
-  if (pending.get(job.id) === job.promise) pending.delete(job.id);
+  if (pending.get(job.key) === job.promise) pending.delete(job.key);
   if ("error" in result) job.reject(result.error);
   else job.resolve(result.blob);
 }
@@ -61,18 +63,20 @@ function startQueuedJobs(): void {
       .finally(() => {
         releaseSlot(job);
         activeJobs.delete(job);
-        if (pending.get(job.id) === job.promise) pending.delete(job.id);
+        if (pending.get(job.key) === job.promise) pending.delete(job.key);
         startQueuedJobs();
       });
   }
 }
 
-/** Добавляет загрузку в общую очередь и объединяет одновременные запросы одного файла. */
+/** Добавляет запрос в общую очередь и объединяет загрузки одного варианта файла. */
 export function enqueueAttachmentLoad(
   id: number,
   load: (signal: AbortSignal) => Promise<Blob>,
+  variant: BlobVariant = "original",
 ): Promise<Blob> {
-  const existing = pending.get(id);
+  const key = `${variant}:${id}`;
+  const existing = pending.get(key);
   if (existing) return existing;
 
   let resolve!: (blob: Blob) => void;
@@ -82,7 +86,7 @@ export function enqueueAttachmentLoad(
     reject = rejectPromise;
   });
   const job: Job = {
-    id,
+    key,
     generation,
     promise,
     load,
@@ -93,7 +97,7 @@ export function enqueueAttachmentLoad(
     holdsSlot: false,
   };
 
-  pending.set(id, promise);
+  pending.set(key, promise);
   queue.push(job);
   startQueuedJobs();
   return promise;

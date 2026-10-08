@@ -2,7 +2,9 @@
 
 Файлы лежат на диске в томе (`ATTACHMENTS_DIR`), а метаданные — в базе.
 На диск попадает обезличенное имя `<uuid>.<расширение>`: так исключены
-совпадения имён и подстановка пути вроде `../../etc/passwd`.
+совпадения имён и подстановка пути вроде `../../etc/passwd`. Миниатюра для
+чаттера создаётся рядом как производный кеш `<uuid>.thumbnail.webp` и может
+быть в любой момент построена заново из оригинала.
 
 База, резервные копии и вложения живут на одном разделе, поэтому перед
 записью проверяется свободное место (`MIN_FREE_DISK_MB`): переполненный диск
@@ -13,14 +15,20 @@
 from __future__ import annotations
 
 import shutil
+import threading
 import uuid
+import warnings
+from contextlib import suppress
+from io import BytesIO
 from pathlib import Path
 
 from fastapi import UploadFile, status
+from PIL import Image, ImageOps, UnidentifiedImageError
 from sqlalchemy import select
 from sqlalchemy.ext.asyncio import AsyncSession
 from starlette.concurrency import run_in_threadpool
 
+from app.core.attachment_paths import thumbnail_path
 from app.core.config import settings
 from app.core.errors import AppError, NotFoundError, PermissionDeniedError
 from app.core.logging import get_logger
@@ -56,6 +64,16 @@ ALLOWED_EXTENSIONS: dict[str, str] = {
 
 # Эти типы браузер может открыть прямо в окне — остальные всегда скачиваются.
 INLINE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp", "application/pdf"}
+IMAGE_TYPES = frozenset({"image/png", "image/jpeg", "image/gif", "image/webp"})
+THUMBNAIL_CONTENT_TYPE = "image/webp"
+THUMBNAIL_MAX_EDGE = 480
+# Максимум около 72 МБ RGB или 96 МБ RGBA до уменьшения. Порог защищает
+# API от архивов-картинок и оставляет место для обычных фото с телефона.
+THUMBNAIL_MAX_PIXELS = 24_000_000
+THUMBNAIL_QUALITY = 82
+# Уменьшение большой картинки временно занимает заметную память; не даём
+# нескольким запросам одновременно декодировать изображения в одном worker.
+_THUMBNAIL_SLOT = threading.BoundedSemaphore(1)
 
 
 def storage_root() -> Path:
@@ -146,6 +164,101 @@ async def _store_upload(file: UploadFile, relative_dir: Path) -> tuple[str, str,
     target = storage_root() / relative_dir / f"{uuid.uuid4().hex}{suffix}"
     size = await _save_upload(file, target)
     return original[:255], ALLOWED_EXTENSIONS[suffix], size, target
+
+
+def _thumbnail_is_fresh(original: Path, thumbnail: Path) -> bool:
+    """Не пересчитывает миниатюру, пока оригинал не менялся."""
+    try:
+        return (
+            thumbnail.is_file()
+            and thumbnail.stat().st_size > 0
+            and thumbnail.stat().st_mtime_ns >= original.stat().st_mtime_ns
+        )
+    except FileNotFoundError:
+        return False
+
+
+def _render_thumbnail(original: Path, target: Path) -> None:
+    """Создаёт небольшую WebP-копию, не меняя загруженный оригинал."""
+    try:
+        with warnings.catch_warnings():
+            # Очень большие изображения отклоняем понятной ошибкой, а не
+            # позволяем Pillow развернуть их в памяти без ограничений.
+            warnings.simplefilter("error", Image.DecompressionBombWarning)
+            with Image.open(original) as source:
+                if source.format not in {"PNG", "JPEG", "GIF", "WEBP"}:
+                    raise AppError(
+                        "Файл не распознан как поддерживаемое изображение",
+                        code="invalid_image",
+                        status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+                    )
+                if source.width * source.height > THUMBNAIL_MAX_PIXELS:
+                    raise AppError(
+                        "Изображение слишком большое для миниатюры",
+                        code="image_too_large",
+                        status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+                    )
+
+                image = ImageOps.exif_transpose(source)
+                try:
+                    # Для GIF используем первый кадр; исходная анимация остаётся
+                    # нетронутой и доступна при открытии полного файла.
+                    image.thumbnail(
+                        (THUMBNAIL_MAX_EDGE, THUMBNAIL_MAX_EDGE), Image.Resampling.LANCZOS
+                    )
+                    has_alpha = "A" in image.getbands() or "transparency" in image.info
+                    converted = image.convert("RGBA" if has_alpha else "RGB")
+                    try:
+                        buffer = BytesIO()
+                        converted.save(
+                            buffer,
+                            format="WEBP",
+                            quality=THUMBNAIL_QUALITY,
+                            method=4,
+                        )
+                        content = buffer.getvalue()
+                    finally:
+                        converted.close()
+                finally:
+                    if image is not source:
+                        image.close()
+    except FileNotFoundError:
+        raise
+    except AppError:
+        raise
+    except (Image.DecompressionBombError, Image.DecompressionBombWarning) as exc:
+        raise AppError(
+            "Изображение слишком большое для миниатюры",
+            code="image_too_large",
+            status_code=status.HTTP_413_CONTENT_TOO_LARGE,
+        ) from exc
+    except (UnidentifiedImageError, OSError, ValueError) as exc:
+        raise AppError(
+            "Файл повреждён или не является изображением",
+            code="invalid_image",
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+        ) from exc
+
+    temporary = target.with_name(f".{target.name}.{uuid.uuid4().hex}.tmp")
+    try:
+        target.parent.mkdir(parents=True, exist_ok=True)
+        temporary.write_bytes(content)
+        temporary.replace(target)
+    except OSError as exc:
+        with suppress(OSError):
+            temporary.unlink(missing_ok=True)
+        raise AppError(
+            "Не удалось сохранить миниатюру на сервере",
+            code="thumbnail_storage_failed",
+            status_code=status.HTTP_507_INSUFFICIENT_STORAGE,
+        ) from exc
+
+
+def _ensure_thumbnail(original: Path, target: Path) -> None:
+    """Проверяет кеш и атомарно пересоздаёт устаревшую миниатюру."""
+    with _THUMBNAIL_SLOT:
+        if not _thumbnail_is_fresh(original, target):
+            _render_thumbnail(original, target)
 
 
 # --- вложения лида ----------------------------------------------------------
@@ -286,6 +399,30 @@ async def get_for_download(
     return attachment, path, disposition
 
 
+async def get_thumbnail(
+    session: AsyncSession, user: User, attachment_id: int
+) -> tuple[Attachment, Path]:
+    """Проверяет те же права чтения, что и оригинал, и возвращает его миниатюру."""
+    attachment = await session.get(Attachment, attachment_id)
+    if attachment is None:
+        raise NotFoundError(f"Вложение {attachment_id} не найдено")
+    # Доступ совпадает с get_for_download: те же лид и режим чтения проигранного.
+    await get_lead_or_404(session, attachment.lead_id, user, allow_lost=True)
+
+    if attachment.content_type not in IMAGE_TYPES:
+        raise NotFoundError("Для этого вложения миниатюра не предусмотрена")
+
+    original = Path(attachment.storage_path)
+    if not original.is_file():
+        raise NotFoundError("Файл не найден на диске — возможно, он был удалён")
+    target = thumbnail_path(original)
+    try:
+        await run_in_threadpool(_ensure_thumbnail, original, target)
+    except FileNotFoundError as exc:
+        raise NotFoundError("Файл не найден на диске — возможно, он был удалён") from exc
+    return attachment, target
+
+
 async def delete_attachment(session: AsyncSession, user: User, attachment_id: int) -> None:
     attachment = await session.get(Attachment, attachment_id)
     if attachment is None:
@@ -306,6 +443,7 @@ async def delete_attachment(session: AsyncSession, user: User, attachment_id: in
     await session.delete(attachment)
     await session.commit()
     await run_in_threadpool(path.unlink, missing_ok=True)
+    await run_in_threadpool(thumbnail_path(path).unlink, missing_ok=True)
     log.info("attachment.deleted", attachment_id=attachment_id, by=user.id)
 
 

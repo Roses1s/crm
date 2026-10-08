@@ -9,6 +9,7 @@
 from __future__ import annotations
 
 import os
+import tarfile
 import time
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
@@ -18,6 +19,7 @@ import pytest
 from sqlalchemy import create_engine, select
 from sqlalchemy.orm import Session
 
+from app.core.attachment_paths import thumbnail_path
 from app.core.config import settings
 from app.db.base import Base
 from app.models.security import LoginAttempt
@@ -144,15 +146,19 @@ def test_cleanup_orphan_files_removes_only_unknown_and_old(tmp_path: Path) -> No
     storage = tmp_path / "attachments"
     storage.mkdir()
     known = storage / "известный.txt"
+    known_thumbnail = thumbnail_path(known)
     orphan_old = storage / "сирота.txt"
+    orphan_thumbnail = thumbnail_path(storage / "исходник-удалён.png")
     orphan_fresh = storage / "только-что-загружен.txt"
-    for file in (known, orphan_old, orphan_fresh):
+    for file in (known, known_thumbnail, orphan_old, orphan_thumbnail, orphan_fresh):
         file.write_bytes(b"x" * 10)
 
     # Старым файлам сдвигаем время изменения на сутки назад.
     day_ago = time.time() - 24 * 3600
     os.utime(known, (day_ago, day_ago))
+    os.utime(known_thumbnail, (day_ago, day_ago))
     os.utime(orphan_old, (day_ago, day_ago))
+    os.utime(orphan_thumbnail, (day_ago, day_ago))
 
     with Session(engine) as session:
         session.add(Attachment(lead_id=1, name="известный.txt", size=10, storage_path=str(known)))
@@ -164,10 +170,36 @@ def test_cleanup_orphan_files_removes_only_unknown_and_old(tmp_path: Path) -> No
     ):
         result = worker_tasks.cleanup_orphan_files()
 
-    assert result["removed"] == 1
+    assert result["removed"] == 2
     assert known.exists()
+    assert known_thumbnail.exists(), "миниатюра живого вложения не должна считаться сиротой"
     assert orphan_fresh.exists()
     assert not orphan_old.exists()
+    assert not orphan_thumbnail.exists(), "миниатюру удалённого вложения нужно убрать"
+
+
+def test_backup_attachments_includes_original_and_thumbnail(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Архив сохраняет оригиналы и миниатюры; обе версии переживают восстановление."""
+    storage = tmp_path / "attachments"
+    storage.mkdir()
+    original = storage / "photo.jpg"
+    original.write_bytes(b"original image")
+    thumbnail = thumbnail_path(original)
+    thumbnail.write_bytes(b"webp thumbnail")
+    backup_dir = tmp_path / "backups"
+    monkeypatch.setattr(settings, "attachments_dir", str(storage))
+    monkeypatch.setattr(settings, "backup_files_keep", 3)
+    monkeypatch.setattr(worker_tasks, "BACKUP_DIR", backup_dir)
+
+    result = worker_tasks.backup_attachments()
+
+    assert result["ok"] is True
+    with tarfile.open(backup_dir / result["file"], "r:gz") as archive:
+        names = set(archive.getnames())
+    assert "attachments/photo.jpg" in names
+    assert f"attachments/{thumbnail.name}" in names
 
 
 def test_cleanup_login_attempts_keeps_recent(tmp_path: Path) -> None:

@@ -15,6 +15,8 @@ dependencies = [
     # Синхронный драйвер для задач Celery (там нет цикла событий).
     "psycopg[binary]>=3.2",
     "alembic>=1.14",
+    # Миниатюры в чаттере, формат WebP; Pillow использует сборки с поддержкой WebP.
+    "pillow>=11.3",
     "pydantic[email]>=2.10",
     "pydantic-settings>=2.7",
     "pyjwt[crypto]>=2.10",

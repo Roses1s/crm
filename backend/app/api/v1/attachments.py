@@ -15,7 +15,12 @@ from app.api.deps import CurrentUser, SessionDep
 from app.models.timeline import Attachment
 from app.schemas.crm import AttachmentRead
 from app.services import attachments as service
-from app.services.attachments import ALLOWED_EXTENSIONS, INLINE_TYPES, disk_usage
+from app.services.attachments import (
+    ALLOWED_EXTENSIONS,
+    INLINE_TYPES,
+    THUMBNAIL_CONTENT_TYPE,
+    disk_usage,
+)
 
 router = APIRouter(prefix="/crm", tags=["crm: вложения"])
 # Заявки живут вне префикса /crm, поэтому их вложениям нужен отдельный роутер.
@@ -74,6 +79,26 @@ async def upload_shipment_attachment(
     entry_id: Annotated[int | None, Query(description="Привязать файл к записи ленты")] = None,
 ) -> Attachment:
     return await service.upload_shipment_attachment(session, user, shipment_id, file, entry_id)
+
+
+@router.get(
+    "/attachments/{attachment_id}/thumbnail",
+    summary="Миниатюра изображения",
+)
+async def download_attachment_thumbnail(
+    attachment_id: int, session: SessionDep, user: CurrentUser
+) -> FileResponse:
+    _, path = await service.get_thumbnail(session, user, attachment_id)
+    return FileResponse(
+        path,
+        media_type=THUMBNAIL_CONTENT_TYPE,
+        filename=f"attachment-{attachment_id}-thumbnail.webp",
+        content_disposition_type="inline",
+        headers={
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
+    )
 
 
 @router.get("/attachments/{attachment_id}", summary="Скачать файл")
