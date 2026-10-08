@@ -4,6 +4,7 @@
 #  На сервере лежит в /opt/crm/docker-compose.yml (каталог = клон репозитория).
 #
 #  Production: ./deploy.sh (дамп, отдельная миграция, безопасный запуск)
+#  Текущая версия production и результат последней выкладки: docs/STATUS.md.
 #  Локально: см. README.md — сначала build и `run backend alembic upgrade head`
 #  Логи:     docker compose logs -f backend
 #  Остановка: docker compose down
