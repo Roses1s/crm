@@ -8,7 +8,7 @@ const encodedSearch = encodeURIComponent(SEARCH);
 async function signIn(page: Page) {
   await page.goto("/login");
   await page.getByLabel("Email").fill(EMAIL);
-  await page.getByLabel("Пароль").fill(PASSWORD);
+  await page.locator('input[autocomplete="current-password"]').fill(PASSWORD);
   await page.getByRole("button", { name: "Войти" }).click();
   await expect(page).toHaveURL(/\/$/);
 }
@@ -45,7 +45,7 @@ test("Канбан загружает лиды отдельно для кажд�
   await firstStage.getByRole("button", { name: "Показать ещё 1 из 21" }).click();
   await nextPage;
 
-  await expect(firstStage.getByText("Тестовый клиент 001")).toBeVisible();
+  await expect(firstStage.getByRole("heading", { name: /^Тестовый клиент 001/ })).toBeVisible();
   await expect(firstStage.getByRole("button", { name: /Показать ещё/ })).toHaveCount(0);
   // Нажатие в первой колонке не загружает и не скрывает страницу второй.
   await expect(secondStage.getByRole("button", { name: "Показать ещё 20 из 140" })).toBeVisible();
