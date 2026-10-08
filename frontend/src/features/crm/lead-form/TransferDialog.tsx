@@ -1,7 +1,8 @@
 import { Search } from "lucide-react";
 import { useMemo, useState } from "react";
 
-import { useColleagues, type Colleague } from "@/shared/api/hooks";
+import { useColleagues } from "@/shared/api/hooks";
+import type { Colleague } from "@/shared/types";
 import { Modal } from "@/shared/ui/modal";
 
 /**

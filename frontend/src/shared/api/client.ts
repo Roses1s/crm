@@ -6,6 +6,8 @@
  * Поэтому никаких абсолютных адресов и переменных окружения с хостом не нужно.
  */
 
+import type { ZodType } from "zod";
+
 import { clearTokens, getAccessToken, refreshSession } from "./auth";
 
 const BASE = "/api/v1";
@@ -21,12 +23,30 @@ export class ApiError extends Error {
   }
 }
 
+export interface ApiResponseIssue {
+  path: string;
+  message: string;
+}
+
+/** Сервер ответил успешно, но вернул данные не того формата, которого ждёт приложение. */
+export class ApiResponseError extends ApiError {
+  constructor(
+    readonly endpoint: string,
+    readonly issues: ApiResponseIssue[],
+  ) {
+    super(
+      502,
+      `Ответ сервера не соответствует ожидаемому формату (${endpoint})`,
+      "invalid_response",
+    );
+    this.name = "ApiResponseError";
+  }
+}
+
 /**
  * Общий "низ" для api/apiUpload/apiBlob: добавляет Authorization, а при 401
  * один раз пробует продлить сессию по refresh-куке и повторяет запрос — чтобы
  * получасовой access-токен не выгонял человека с открытой вкладки на логин.
- * Раньше эту логику повторял только `api()`, а apiUpload/apiBlob при 401 просто
- * падали с ошибкой вместо тихого продления сессии.
  */
 async function request(
   path: string,
@@ -37,14 +57,8 @@ async function request(
   const token = auth ? getAccessToken() : null;
 
   const response = await fetch(`${BASE}${path}`, {
-    // Справочники (теги, причины проигрыша) бэкенд отдаёт с
-    // заголовком `Cache-Control: max-age=...` — это кеш fastapi-cache на
-    // стороне сервера, который корректно сбрасывается при изменении записи.
-    // Но тот же заголовок видит и браузер: без явного `no-store` он сам
-    // кеширует GET-ответ и после инвалидации в React Query отдаёт запросу
-    // ту же самую устаревшую копию из своего HTTP-кеша, в обход сервера.
-    // Поэтому именно браузерный кеш запросов всегда отключаем — за актуальность
-    // данных отвечает React Query на клиенте и fastapi-cache на сервере.
+    // Браузерный кеш отключён: за актуальность данных отвечают React Query
+    // на клиенте и fastapi-cache на сервере.
     cache: "no-store",
     ...init,
     headers: {
@@ -79,14 +93,33 @@ function errorCode(payload: unknown): string | undefined {
     : undefined;
 }
 
-type Options = Omit<RequestInit, "body"> & { body?: unknown; auth?: boolean };
+type Options<T> = Omit<RequestInit, "body"> & {
+  body?: unknown;
+  auth?: boolean;
+  schema: ZodType<T>;
+};
 
-/**
- * Тип `T` проверяется только компилятором: JSON приводится к нему без
- * проверки структуры во время работы программы (остаток Ф-09).
- */
-export async function api<T>(path: string, options: Options = {}): Promise<T> {
-  const { body, auth = true, headers, ...rest } = options;
+function validateResponse<T>(
+  path: string,
+  method: string,
+  schema: ZodType<T>,
+  payload: unknown,
+): T {
+  const result = schema.safeParse(payload);
+  if (!result.success) {
+    const endpoint = `${method.toUpperCase()} ${path.split("?", 1)[0]}`;
+    const issues = result.error.issues.map((issue) => ({
+      path: issue.path.map(String).join(".") || "$",
+      message: issue.message,
+    }));
+    throw new ApiResponseError(endpoint, issues);
+  }
+  return result.data;
+}
+
+/** Успешный JSON разбирается по схеме, а не приводится к типу без проверки. */
+export async function api<T>(path: string, options: Options<T>): Promise<T> {
+  const { body, auth = true, headers, schema, ...rest } = options;
 
   const response = await request(
     path,
@@ -101,7 +134,8 @@ export async function api<T>(path: string, options: Options = {}): Promise<T> {
     auth,
   );
 
-  if (response.status === 204) return undefined as T;
+  const method = String(rest.method ?? "GET");
+  if (response.status === 204) return validateResponse(path, method, schema, undefined);
 
   const payload = await response.json().catch(() => null);
 
@@ -109,7 +143,7 @@ export async function api<T>(path: string, options: Options = {}): Promise<T> {
     throw new ApiError(response.status, errorDetail(payload, response.status), errorCode(payload));
   }
 
-  return payload as T;
+  return validateResponse(path, method, schema, payload);
 }
 
 /** Ответ списочных ручек бэкенда. */
@@ -120,10 +154,8 @@ export interface Page<T> {
   results: T[];
 }
 
-/** Загрузка файла: FormData, Content-Type браузер выставит сам (с boundary).
- * Ответ тоже приводится к `T` без проверки структуры во время работы программы (Ф-09).
- */
-export async function apiUpload<T>(path: string, file: File): Promise<T> {
+/** Загрузка файла: FormData, Content-Type браузер выставит сам (с boundary). */
+export async function apiUpload<T>(path: string, file: File, schema: ZodType<T>): Promise<T> {
   const form = new FormData();
   form.append("file", file);
 
@@ -133,7 +165,7 @@ export async function apiUpload<T>(path: string, file: File): Promise<T> {
   if (!response.ok) {
     throw new ApiError(response.status, errorDetail(payload, response.status), errorCode(payload));
   }
-  return payload as T;
+  return validateResponse(path, "POST", schema, payload);
 }
 
 /** Файл приходит из закрытой ручки, поэтому его нельзя вставить в <img src>:

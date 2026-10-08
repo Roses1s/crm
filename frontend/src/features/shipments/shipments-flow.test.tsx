@@ -54,6 +54,7 @@ const SHIPMENTS = [
     status: "new",
     route: "Москва — Казань",
     carrier_name: "ИП Сидоров",
+    tags: [],
     created_at: "2026-09-30T10:00:00+03:00",
     margin: "1500.00",
     customer_total: "122000.00",
@@ -127,7 +128,10 @@ describe("Сценарий: список заявок", () => {
     setAccessToken("токен");
     server = startFakeApi([
       { path: "/auth/me", response: ME },
-      { path: "/shipments", response: page([]) },
+      {
+        path: "/shipments",
+        response: { ...page([]), totals: { margin: "0.00", customer_total: "0.00" } },
+      },
     ]);
 
     renderWithProviders(<ShipmentsPage />, { route: "/shipments" });
@@ -139,7 +143,7 @@ describe("Сценарий: список заявок", () => {
     setAccessToken("токен");
     server = startFakeApi([
       { path: "/auth/me", response: ME },
-      { path: "/shipments", response: page(SHIPMENTS) },
+      { path: "/shipments", response: { ...page(SHIPMENTS), totals: TOTALS } },
     ]);
 
     const user = userEvent.setup();
@@ -158,7 +162,7 @@ describe("Сценарий: список заявок", () => {
     setAccessToken("токен");
     server = startFakeApi([
       { path: "/auth/me", response: ME },
-      { path: "/shipments", response: page(SHIPMENTS) },
+      { path: "/shipments", response: { ...page(SHIPMENTS), totals: TOTALS } },
     ]);
 
     const user = userEvent.setup();
@@ -193,7 +197,7 @@ describe("Сценарий: список заявок", () => {
       { path: "/auth/me", response: ME },
       {
         path: "/shipments",
-        response: { count: 240, next: 2, previous: null, results: SHIPMENTS },
+        response: { count: 240, next: 2, previous: null, results: SHIPMENTS, totals: TOTALS },
       },
     ]);
 

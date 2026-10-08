@@ -14,6 +14,11 @@ const TIMELINE: TimelineEntry[] = [
     author_initials: "МИ",
     author_id: 7,
     body: "Договорились перезвонить завтра.\nЖдём ответ логиста.",
+    field_label: null,
+    old_value: null,
+    new_value: null,
+    is_stage_change: false,
+    attachments: [],
     created_at: "2026-09-30T12:00:00+05:00",
   },
   {
@@ -25,6 +30,9 @@ const TIMELINE: TimelineEntry[] = [
     field_label: "Этапы лидов",
     old_value: "Новый",
     new_value: "Перезвонить",
+    author_id: 7,
+    is_stage_change: false,
+    attachments: [],
     created_at: "2026-09-30T11:30:00+05:00",
   },
 ];

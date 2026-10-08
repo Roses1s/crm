@@ -16,7 +16,14 @@ import { startFakeApi, type FakeServer } from "@/test/fake-api";
 import { ToastProvider } from "@/shared/ui/toast";
 import { renderWithDataRouter } from "@/test/utils";
 
-const ME = { id: 1, email: "admin@example.com", role: "admin", first_name: "А", last_name: "Б" };
+const ME = {
+  id: 1,
+  email: "admin@example.com",
+  role: "admin",
+  first_name: "А",
+  last_name: "Б",
+  is_active: true,
+};
 
 let server: FakeServer | undefined;
 
@@ -31,7 +38,10 @@ it("просит вложения и заявки, не дожидаясь от�
   server = startFakeApi([
     { path: "/auth/me", response: ME },
     { path: "/crm/leads/10/timeline", response: [] },
-    { path: "/crm/leads/10/pager", response: { position: 1, total: 1 } },
+    {
+      path: "/crm/leads/10/pager",
+      response: { position: 1, total: 1, prev_id: null, next_id: null },
+    },
     { path: "/crm/leads/10/attachments", response: [] },
     { path: "/crm/stages", response: [] },
     { path: "/crm/tags", response: [] },

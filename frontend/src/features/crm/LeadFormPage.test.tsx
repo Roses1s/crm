@@ -26,7 +26,14 @@ function renderLead(id: string) {
   );
 }
 
-const ME = { id: 1, email: "admin@example.com", role: "admin", first_name: "А", last_name: "Б" };
+const ME = {
+  id: 1,
+  email: "admin@example.com",
+  role: "admin",
+  first_name: "А",
+  last_name: "Б",
+  is_active: true,
+};
 
 const LEAD = {
   id: 10,
@@ -35,11 +42,15 @@ const LEAD = {
   logist_contact: "Иван",
   logist_phone: "+7 900 000-00-00",
   logist_email: null,
+  accountant_name: null,
   priority: 0,
   is_archived: false,
+  loss_reason_id: null,
+  loss_reason_name: null as string | null,
   stage_id: 1,
   stage_name: "Новый",
   assigned_to_id: 1,
+  assigned_to_email: "admin@example.com",
   assigned_to_name: "Админов Админ",
   tags: [],
   created_at: "2026-10-01T10:00:00+03:00",
@@ -62,7 +73,10 @@ function commonRoutes(me = ME, lead = LEAD) {
   return [
     { path: "/auth/me", response: me },
     { path: "/crm/leads/10/timeline", response: [] },
-    { path: "/crm/leads/10/pager", response: { position: 1, total: 1 } },
+    {
+      path: "/crm/leads/10/pager",
+      response: { position: 1, total: 1, prev_id: null, next_id: null },
+    },
     { path: "/crm/leads/10/attachments", response: [] },
     { path: "/crm/leads/10", response: lead },
     { path: "/crm/stages", response: STAGES },
@@ -86,7 +100,14 @@ it("предупреждает о дубле ИНН при редактиров�
           assigned_to_name: "Пётр Сидоров",
           is_archived: false,
           can_open: false,
+          loss_reason_name: null,
           logist_contact: null,
+          logist_phone: null,
+          logist_email: null,
+          priority: null,
+          stage_name: null,
+          tags: [],
+          updated_at: "2026-10-01T10:00:00+03:00",
         },
       ],
     },

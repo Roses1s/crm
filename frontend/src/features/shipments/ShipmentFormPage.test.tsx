@@ -31,14 +31,50 @@ const SHIPMENT = {
   status: "new",
   transport_type: "tent",
   route: "Москва — Казань",
+  address_loading: "",
+  address_unloading: "",
+  contact_loading_name: "",
+  contact_loading_phone: "",
+  contact_unloading_name: "",
+  contact_unloading_phone: "",
+  cargo_weight: null,
+  cargo_volume: null,
+  comment: "",
+  customer_price: null,
+  customer_tax: "vat_22",
+  carrier_price: null,
+  carrier_tax: "vat_22",
+  customer_address: "",
+  customer_contact: "",
+  customer_signer: "",
+  loading_cities: [],
+  loading_date_from: null,
+  loading_date_to: null,
+  loading_time_from: "",
+  loading_time_to: "",
+  unloading_cities: [],
+  unloading_date_from: null,
+  unloading_date_to: null,
+  unloading_time_from: "",
+  unloading_time_to: "",
   carrier_name: "",
   carrier_inn: "",
-  created_at: "2026-01-15T09:30:00+00:00",
-  loading_cities: [],
-  unloading_cities: [],
+  carrier_contact: "",
+  vehicle: "",
+  vehicle_number: "",
+  has_trailer: false,
+  trailer_number: "",
+  driver_name: "",
+  driver_phone: "",
+  driver_passport: "",
+  carrier_signer: "",
+  cargo_type: "",
+  cargo_packaging: "",
+  capacity: null,
   body_type: [],
   loading_method: [],
   tags: [],
+  created_at: "2026-01-15T09:30:00+00:00",
 };
 
 let server: FakeServer | undefined;
@@ -91,7 +127,16 @@ it("изменённая дата создания уходит на серве�
     {
       method: "PATCH",
       path: "/shipments/101",
-      response: (body: unknown) => ({ ...SHIPMENT, ...(body as object) }),
+      response: (body: unknown) => {
+        const updates = body as { created_at?: string };
+        return {
+          ...SHIPMENT,
+          ...updates,
+          created_at: updates.created_at
+            ? new Date(updates.created_at).toISOString()
+            : SHIPMENT.created_at,
+        };
+      },
     },
   ]);
 

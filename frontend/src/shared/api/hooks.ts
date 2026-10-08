@@ -9,6 +9,7 @@ import { useMutation, useQuery, useQueryClient, type QueryClient } from "@tansta
 
 import type {
   Attachment,
+  Colleague,
   Customer,
   LauncherApp,
   Lead,
@@ -16,6 +17,7 @@ import type {
   Meta,
   Pager,
   Shipment,
+  ShipmentListItem,
   ShipmentTotals,
   Stage,
   Tag,
@@ -24,6 +26,31 @@ import type {
 } from "@/shared/types";
 import { clearTokens, startSession } from "./auth";
 import { ApiError, api, apiBlob, apiUpload, type Page } from "./client";
+import {
+  accessTokenResponseSchema,
+  arraySchema,
+  attachmentSchema,
+  backupTaskResponseSchema,
+  backupsResponseSchema,
+  colleagueSchema,
+  customerSchema,
+  launcherAppSchema,
+  leadSchema,
+  loginAttemptSchema,
+  lossReasonSchema,
+  metaSchema,
+  pagerSchema,
+  pageSchema,
+  stageSchema,
+  tagSchema,
+  timelineEntrySchema,
+  userSchema,
+  voidResponseSchema,
+  shipmentListItemSchema,
+  shipmentSchema,
+  shipmentsPageSchema,
+} from "./schemas";
+import type { AccessTokenResponse, BackupsResponse, LoginAttempt } from "./schemas";
 
 /**
  * Сколько записей запрашиваем у сервера за раз. Постраничного перелистывания
@@ -32,6 +59,15 @@ import { ApiError, api, apiBlob, apiUpload, type Page } from "./client";
  */
 const LIST_LIMIT = 200;
 const CUSTOMERS_LIMIT = 500;
+
+type VoidApiOptions = Omit<RequestInit, "body"> & {
+  body?: unknown;
+  auth?: boolean;
+};
+
+function apiVoid(path: string, options: VoidApiOptions = {}): Promise<void> {
+  return api<undefined>(path, { ...options, schema: voidResponseSchema });
+}
 
 /** Список с сервера вместе с общим количеством записей. */
 export interface ListResult<T> {
@@ -110,10 +146,6 @@ function invalidateLeadDetails(qc: QueryClient, id: string | number): void {
 }
 
 // --- авторизация -------------------------------------------------------------
-interface AccessTokenResponse {
-  access_token: string;
-}
-
 export function useLogin() {
   return useMutation({
     mutationFn: (credentials: { email: string; password: string }) =>
@@ -121,6 +153,7 @@ export function useLogin() {
         method: "POST",
         body: credentials,
         auth: false,
+        schema: accessTokenResponseSchema,
       }),
     // Обновляющий токен сервер кладёт в куку сам, нам приходит только короткий.
     // Новая учётная запись всегда начинает с пустого Query cache.
@@ -138,7 +171,7 @@ export function logout(): void {
 export function useMe() {
   return useQuery({
     queryKey: keys.me,
-    queryFn: () => api<User>("/auth/me"),
+    queryFn: () => api<User>("/auth/me", { schema: userSchema }),
     staleTime: 5 * 60_000,
     retry: false,
   });
@@ -167,7 +200,10 @@ const REFERENCE_DATA = {
 export function useStages(ownerId?: number | null) {
   return useQuery({
     queryKey: [...keys.stages, ownerId ?? "me"],
-    queryFn: () => api<Stage[]>(`/crm/stages${ownerId ? `?owner_id=${ownerId}` : ""}`),
+    queryFn: () =>
+      api<Stage[]>(`/crm/stages${ownerId ? `?owner_id=${ownerId}` : ""}`, {
+        schema: arraySchema(stageSchema),
+      }),
     ...REFERENCE_DATA,
   });
 }
@@ -179,7 +215,7 @@ export function useStages(ownerId?: number | null) {
 export function useMeta() {
   return useQuery({
     queryKey: keys.meta,
-    queryFn: () => api<Meta>("/meta"),
+    queryFn: () => api<Meta>("/meta", { schema: metaSchema }),
     ...REFERENCE_DATA,
   });
 }
@@ -187,7 +223,7 @@ export function useMeta() {
 export function useTags() {
   return useQuery({
     queryKey: keys.tags,
-    queryFn: () => api<Tag[]>("/crm/tags"),
+    queryFn: () => api<Tag[]>("/crm/tags", { schema: arraySchema(tagSchema) }),
     ...REFERENCE_DATA,
   });
 }
@@ -201,7 +237,7 @@ export function useCreateTag() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: { name: string; color: string }) =>
-      api<Tag>("/crm/tags", { method: "POST", body }),
+      api<Tag>("/crm/tags", { method: "POST", body, schema: tagSchema }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: keys.tags }),
   });
 }
@@ -211,7 +247,7 @@ export function useUpdateTag() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, ...body }: { id: number; name?: string; color?: string }) =>
-      api<Tag>(`/crm/tags/${id}`, { method: "PATCH", body }),
+      api<Tag>(`/crm/tags/${id}`, { method: "PATCH", body, schema: tagSchema }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.tags });
       // Название/цвет тега показаны везде, где он проставлен.
@@ -227,7 +263,7 @@ export function useUpdateTag() {
 export function useDeleteTag() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => api<void>(`/crm/tags/${id}`, { method: "DELETE" }),
+    mutationFn: (id: number) => apiVoid(`/crm/tags/${id}`, { method: "DELETE" }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.tags });
       void qc.invalidateQueries({ queryKey: ["leads"] });
@@ -242,7 +278,8 @@ export function useDeleteTag() {
 export function useLossReasons() {
   return useQuery({
     queryKey: keys.lossReasons,
-    queryFn: () => api<LossReason[]>("/crm/loss-reasons"),
+    queryFn: () =>
+      api<LossReason[]>("/crm/loss-reasons", { schema: arraySchema(lossReasonSchema) }),
     ...REFERENCE_DATA,
   });
 }
@@ -250,7 +287,7 @@ export function useLossReasons() {
 export function useLauncherApps() {
   return useQuery({
     queryKey: keys.apps,
-    queryFn: () => api<LauncherApp[]>("/launcher/apps"),
+    queryFn: () => api<LauncherApp[]>("/launcher/apps", { schema: arraySchema(launcherAppSchema) }),
     ...REFERENCE_DATA,
   });
 }
@@ -262,6 +299,7 @@ export function useCreateStage() {
       api<Stage>(`/crm/stages${ownerId ? `?owner_id=${ownerId}` : ""}`, {
         method: "POST",
         body: { name },
+        schema: stageSchema,
       }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: keys.stages }),
   });
@@ -271,7 +309,7 @@ export function useUpdateStage() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, ...body }: { id: number } & Partial<Stage>) =>
-      api<Stage>(`/crm/stages/${id}`, { method: "PATCH", body }),
+      api<Stage>(`/crm/stages/${id}`, { method: "PATCH", body, schema: stageSchema }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.stages });
       void qc.invalidateQueries({ queryKey: ["leads"] });
@@ -289,6 +327,7 @@ export function useReorderStages() {
       api<Stage[]>("/crm/stages/reorder", {
         method: "POST",
         body: { stage_ids: stageIds },
+        schema: arraySchema(stageSchema),
       }),
     onMutate: async (stageIds) => {
       await qc.cancelQueries({ queryKey: keys.stages });
@@ -316,7 +355,7 @@ export function useDeleteStage() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, fallbackId }: { id: number; fallbackId?: number }) =>
-      api<void>(`/crm/stages/${id}${fallbackId ? `?fallback_stage_id=${fallbackId}` : ""}`, {
+      apiVoid(`/crm/stages/${id}${fallbackId ? `?fallback_stage_id=${fallbackId}` : ""}`, {
         method: "DELETE",
       }),
     onSuccess: () => {
@@ -334,7 +373,10 @@ export function useDeleteStage() {
 export function useLeads(filters: LeadFilters = {}) {
   return useQuery({
     queryKey: keys.leads(filters),
-    queryFn: () => api<Page<Lead>>(`/crm/leads?${leadsQueryString(filters)}`),
+    queryFn: () =>
+      api<Page<Lead>>(`/crm/leads?${leadsQueryString(filters)}`, {
+        schema: pageSchema(leadSchema),
+      }),
     select: (page) => toListResult(page, LIST_LIMIT),
   });
 }
@@ -352,7 +394,9 @@ export function useCustomers(search: string) {
     queryFn: () => {
       const params = new URLSearchParams({ page_size: String(CUSTOMERS_LIMIT) });
       if (search) params.set("search", search);
-      return api<Page<Customer>>(`/crm/customers?${params.toString()}`);
+      return api<Page<Customer>>(`/crm/customers?${params.toString()}`, {
+        schema: pageSchema(customerSchema),
+      });
     },
     select: (page) => toListResult(page, CUSTOMERS_LIMIT),
   });
@@ -370,7 +414,9 @@ export function useCustomersByInn(inn: string, excludeId?: number) {
     queryFn: () => {
       const params = new URLSearchParams({ inn });
       if (excludeId != null) params.set("exclude_id", String(excludeId));
-      return api<Customer[]>(`/crm/customers/by-inn?${params.toString()}`);
+      return api<Customer[]>(`/crm/customers/by-inn?${params.toString()}`, {
+        schema: arraySchema(customerSchema),
+      });
     },
     enabled: inn.length >= 10,
     staleTime: 10_000,
@@ -380,7 +426,7 @@ export function useCustomersByInn(inn: string, excludeId?: number) {
 export function useLead(id: string | undefined) {
   return useQuery({
     queryKey: keys.lead(id ?? "new"),
-    queryFn: () => api<Lead>(`/crm/leads/${id}`),
+    queryFn: () => api<Lead>(`/crm/leads/${id}`, { schema: leadSchema }),
     enabled: Boolean(id) && id !== "new",
   });
 }
@@ -388,7 +434,10 @@ export function useLead(id: string | undefined) {
 export function useLeadTimeline(id: string | undefined) {
   return useQuery({
     queryKey: keys.timeline(id ?? "new"),
-    queryFn: () => api<TimelineEntry[]>(`/crm/leads/${id}/timeline`),
+    queryFn: () =>
+      api<TimelineEntry[]>(`/crm/leads/${id}/timeline`, {
+        schema: arraySchema(timelineEntrySchema),
+      }),
     enabled: Boolean(id) && id !== "new",
   });
 }
@@ -396,7 +445,7 @@ export function useLeadTimeline(id: string | undefined) {
 export function useLeadPager(id: string | undefined) {
   return useQuery({
     queryKey: keys.pager(id ?? "new"),
-    queryFn: () => api<Pager>(`/crm/leads/${id}/pager`),
+    queryFn: () => api<Pager>(`/crm/leads/${id}/pager`, { schema: pagerSchema }),
     enabled: Boolean(id) && id !== "new",
   });
 }
@@ -422,7 +471,8 @@ export interface LeadUpdatePayload extends Partial<LeadPayload> {
 export function useCreateLead() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: LeadPayload) => api<Lead>("/crm/leads", { method: "POST", body }),
+    mutationFn: (body: LeadPayload) =>
+      api<Lead>("/crm/leads", { method: "POST", body, schema: leadSchema }),
     onSuccess: () => invalidateLeadLists(qc),
   });
 }
@@ -431,7 +481,7 @@ export function useUpdateLead(id: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (body: LeadUpdatePayload) =>
-      api<Lead>(`/crm/leads/${id}`, { method: "PATCH", body }),
+      api<Lead>(`/crm/leads/${id}`, { method: "PATCH", body, schema: leadSchema }),
     onSuccess: () => {
       invalidateLeadDetails(qc, id ?? "");
       invalidateLeadLists(qc);
@@ -461,6 +511,7 @@ export function useMoveLead() {
       api<Lead>(`/crm/leads/${id}`, {
         method: "PATCH",
         body: { stage_id, expected_updated_at },
+        schema: leadSchema,
       }),
     // Оптимистично: карточка переезжает сразу, до ответа сервера.
     onMutate: async ({ id, stage_id }) => {
@@ -506,6 +557,7 @@ export function useUpdateLeadPriority() {
       api<Lead>(`/crm/leads/${id}`, {
         method: "PATCH",
         body: { priority, expected_updated_at },
+        schema: leadSchema,
       }),
     onMutate: async ({ id, priority }) => {
       await qc.cancelQueries({ queryKey: ["leads"] });
@@ -547,7 +599,7 @@ export function useLoseLead() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, reasonId }: { id: number | string; reasonId: number }) =>
-      api<void>(`/crm/leads/${id}/lose`, { method: "POST", body: { reason_id: reasonId } }),
+      apiVoid(`/crm/leads/${id}/lose`, { method: "POST", body: { reason_id: reasonId } }),
     onSuccess: (_data, { id }) => {
       invalidateLeadLists(qc);
       invalidateLeadDetails(qc, id);
@@ -559,7 +611,7 @@ export function useLoseLead() {
 export function useRestoreLead() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number | string) => api<void>(`/crm/leads/${id}/restore`, { method: "POST" }),
+    mutationFn: (id: number | string) => apiVoid(`/crm/leads/${id}/restore`, { method: "POST" }),
     onSuccess: (_data, id) => {
       invalidateLeadLists(qc);
       invalidateLeadDetails(qc, id);
@@ -573,7 +625,7 @@ export function useDeleteLead() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (id: number | string) =>
-      api<void>(`/crm/leads/${id}/permanent`, { method: "DELETE" }),
+      apiVoid(`/crm/leads/${id}/permanent`, { method: "DELETE" }),
     onSuccess: (_data, id) => {
       invalidateLeadLists(qc);
       void qc.invalidateQueries({ queryKey: ["shipments"] });
@@ -596,6 +648,7 @@ export function useAddNote(id: string | undefined) {
       api<TimelineEntry>(`/crm/leads/${id}/notes`, {
         method: "POST",
         body: { body },
+        schema: timelineEntrySchema,
       }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: keys.timeline(id ?? "") }),
   });
@@ -608,6 +661,7 @@ export function useEditNote(id: string | undefined) {
       api<TimelineEntry>(`/crm/leads/${id}/timeline/${entryId}`, {
         method: "PATCH",
         body: { body },
+        schema: timelineEntrySchema,
       }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: keys.timeline(id ?? "") }),
   });
@@ -617,24 +671,17 @@ export function useDeleteTimelineEntry(id: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (entryId: number) =>
-      api<void>(`/crm/leads/${id}/timeline/${entryId}`, { method: "DELETE" }),
+      apiVoid(`/crm/leads/${id}/timeline/${entryId}`, { method: "DELETE" }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: keys.timeline(id ?? "") }),
   });
 }
 
 // --- передача лида -----------------------------------------------------------
-export interface Colleague {
-  id: number;
-  first_name: string;
-  last_name: string;
-  full_name: string;
-}
-
 /** Активные сотрудники, кроме себя, — для выбора нового продавца. */
 export function useColleagues() {
   return useQuery({
     queryKey: keys.colleagues,
-    queryFn: () => api<Colleague[]>("/users/colleagues"),
+    queryFn: () => api<Colleague[]>("/users/colleagues", { schema: arraySchema(colleagueSchema) }),
     staleTime: 5 * 60_000,
   });
 }
@@ -643,7 +690,7 @@ export function useTransferLead(leadId: string | number | undefined) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (userId: number) =>
-      api<void>(`/crm/leads/${leadId}/transfer`, {
+      apiVoid(`/crm/leads/${leadId}/transfer`, {
         method: "POST",
         body: { user_id: userId },
       }),
@@ -660,7 +707,10 @@ export function useTransferLead(leadId: string | number | undefined) {
 export function useLeadAttachments(id: string | number | undefined) {
   return useQuery({
     queryKey: keys.attachments(id ?? "new"),
-    queryFn: () => api<Attachment[]>(`/crm/leads/${id}/attachments`),
+    queryFn: () =>
+      api<Attachment[]>(`/crm/leads/${id}/attachments`, {
+        schema: arraySchema(attachmentSchema),
+      }),
     enabled: Boolean(id) && id !== "new",
   });
 }
@@ -672,6 +722,7 @@ export function useUploadAttachment(leadId: string | number | undefined) {
       apiUpload<Attachment>(
         `/crm/leads/${leadId}/attachments${entryId ? `?entry_id=${entryId}` : ""}`,
         file,
+        attachmentSchema,
       ),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.attachments(leadId ?? "") });
@@ -684,7 +735,7 @@ export function useDeleteAttachment(leadId: string | number | undefined) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (attachmentId: number) =>
-      api<void>(`/crm/attachments/${attachmentId}`, { method: "DELETE" }),
+      apiVoid(`/crm/attachments/${attachmentId}`, { method: "DELETE" }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.attachments(leadId ?? "") });
       void qc.invalidateQueries({ queryKey: keys.timeline(leadId ?? "") });
@@ -696,7 +747,10 @@ export function useDeleteAttachment(leadId: string | number | undefined) {
 export function useShipmentAttachments(id: string | number | undefined) {
   return useQuery({
     queryKey: keys.shipmentAttachments(id ?? "new"),
-    queryFn: () => api<Attachment[]>(`/shipments/${id}/attachments`),
+    queryFn: () =>
+      api<Attachment[]>(`/shipments/${id}/attachments`, {
+        schema: arraySchema(attachmentSchema),
+      }),
     enabled: Boolean(id) && id !== "new",
   });
 }
@@ -708,6 +762,7 @@ export function useUploadShipmentAttachment(shipmentId: string | number | undefi
       apiUpload<Attachment>(
         `/shipments/${shipmentId}/attachments${entryId ? `?entry_id=${entryId}` : ""}`,
         file,
+        attachmentSchema,
       ),
     onSuccess: () => {
       void qc.invalidateQueries({
@@ -725,7 +780,7 @@ export function useDeleteShipmentAttachment(shipmentId: string | number | undefi
   return useMutation({
     // Удаление общее для всех вложений — ручка различает их по номеру файла.
     mutationFn: (attachmentId: number) =>
-      api<void>(`/crm/attachments/${attachmentId}`, { method: "DELETE" }),
+      apiVoid(`/crm/attachments/${attachmentId}`, { method: "DELETE" }),
     onSuccess: () => {
       void qc.invalidateQueries({
         queryKey: keys.shipmentAttachments(shipmentId ?? ""),
@@ -741,7 +796,10 @@ export function useDeleteShipmentAttachment(shipmentId: string | number | undefi
 export function useShipmentTimeline(id: string | undefined) {
   return useQuery({
     queryKey: keys.shipmentTimeline(id ?? "new"),
-    queryFn: () => api<TimelineEntry[]>(`/shipments/${id}/timeline`),
+    queryFn: () =>
+      api<TimelineEntry[]>(`/shipments/${id}/timeline`, {
+        schema: arraySchema(timelineEntrySchema),
+      }),
     enabled: Boolean(id) && id !== "new",
   });
 }
@@ -753,6 +811,7 @@ export function useAddShipmentNote(id: string | undefined) {
       api<TimelineEntry>(`/shipments/${id}/notes`, {
         method: "POST",
         body: { body },
+        schema: timelineEntrySchema,
       }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: keys.shipmentTimeline(id ?? "") }),
   });
@@ -765,6 +824,7 @@ export function useEditShipmentNote(id: string | undefined) {
       api<TimelineEntry>(`/shipments/${id}/timeline/${entryId}`, {
         method: "PATCH",
         body: { body },
+        schema: timelineEntrySchema,
       }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: keys.shipmentTimeline(id ?? "") }),
   });
@@ -774,7 +834,7 @@ export function useDeleteShipmentTimelineEntry(id: string | undefined) {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (entryId: number) =>
-      api<void>(`/shipments/${id}/timeline/${entryId}`, { method: "DELETE" }),
+      apiVoid(`/shipments/${id}/timeline/${entryId}`, { method: "DELETE" }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: keys.shipmentTimeline(id ?? "") }),
   });
 }
@@ -802,7 +862,7 @@ export async function downloadAttachment(attachment: Attachment): Promise<void> 
 
 // --- заявки ------------------------------------------------------------------
 /** Ответ списка заявок: обычная страница плюс итоги по всему фильтру. */
-type ShipmentsPageData = Page<Shipment> & { totals: ShipmentTotals };
+type ShipmentsPageData = Page<ShipmentListItem> & { totals: ShipmentTotals };
 
 export function useShipments(status = "", search = "", assignedTo: number | null = null) {
   return useQuery({
@@ -813,7 +873,9 @@ export function useShipments(status = "", search = "", assignedTo: number | null
       if (search) params.set("search", search);
       // Отбор «заявки сотрудника» — админский; сервер сам проверит права.
       if (assignedTo !== null) params.set("assigned_to", String(assignedTo));
-      return api<ShipmentsPageData>(`/shipments?${params.toString()}`);
+      return api<ShipmentsPageData>(`/shipments?${params.toString()}`, {
+        schema: shipmentsPageSchema,
+      });
     },
     select: (page) => ({ ...toListResult(page, LIST_LIMIT), totals: page.totals }),
   });
@@ -822,7 +884,7 @@ export function useShipments(status = "", search = "", assignedTo: number | null
 export function useShipment(id: string | undefined) {
   return useQuery({
     queryKey: keys.shipment(id ?? "new"),
-    queryFn: () => api<Shipment>(`/shipments/${id}`),
+    queryFn: () => api<Shipment>(`/shipments/${id}`, { schema: shipmentSchema }),
     enabled: Boolean(id) && id !== "new",
   });
 }
@@ -830,7 +892,10 @@ export function useShipment(id: string | undefined) {
 export function useLeadShipments(id: number | string | undefined) {
   return useQuery({
     queryKey: keys.leadShipments(id ?? 0),
-    queryFn: () => api<Shipment[]>(`/leads/${id}/shipments`),
+    queryFn: () =>
+      api<ShipmentListItem[]>(`/leads/${id}/shipments`, {
+        schema: arraySchema(shipmentListItemSchema),
+      }),
     enabled: Boolean(id),
   });
 }
@@ -908,8 +973,8 @@ export function useSaveShipment(id: string | undefined) {
   return useMutation({
     mutationFn: (body: ShipmentPayload) =>
       isNew
-        ? api<Shipment>("/shipments", { method: "POST", body })
-        : api<Shipment>(`/shipments/${id}`, { method: "PATCH", body }),
+        ? api<Shipment>("/shipments", { method: "POST", body, schema: shipmentSchema })
+        : api<Shipment>(`/shipments/${id}`, { method: "PATCH", body, schema: shipmentSchema }),
     onSuccess: (data) => {
       void qc.invalidateQueries({ queryKey: ["shipments"] });
       void qc.invalidateQueries({ queryKey: keys.shipment(data.id) });
@@ -928,6 +993,7 @@ export function useSetShipmentStatus(id: string | undefined) {
       api<Shipment>(`/shipments/${id}/status`, {
         method: "PATCH",
         body: { status },
+        schema: shipmentSchema,
       }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.shipment(id ?? "") });
@@ -941,7 +1007,7 @@ export function useSetShipmentStatus(id: string | undefined) {
 export function useUsers() {
   return useQuery({
     queryKey: keys.users,
-    queryFn: () => api<User[]>("/admin/users"),
+    queryFn: () => api<User[]>("/admin/users", { schema: arraySchema(userSchema) }),
   });
 }
 
@@ -956,7 +1022,8 @@ interface UserPayload {
 export function useCreateUser() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (body: UserPayload) => api<User>("/admin/users", { method: "POST", body }),
+    mutationFn: (body: UserPayload) =>
+      api<User>("/admin/users", { method: "POST", body, schema: userSchema }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: keys.users }),
   });
 }
@@ -965,7 +1032,7 @@ export function useUpdateUser() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: ({ id, ...body }: { id: number } & Partial<UserPayload>) =>
-      api<User>(`/admin/users/${id}`, { method: "PATCH", body }),
+      api<User>(`/admin/users/${id}`, { method: "PATCH", body, schema: userSchema }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: keys.users }),
   });
 }
@@ -973,30 +1040,26 @@ export function useUpdateUser() {
 export function useDeleteUser() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: (id: number) => api<void>(`/admin/users/${id}`, { method: "DELETE" }),
+    mutationFn: (id: number) => apiVoid(`/admin/users/${id}`, { method: "DELETE" }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: keys.users }),
   });
-}
-
-interface BackupsResponse {
-  storage: { files: number; bytes: number; free_bytes: number };
-  results: { name: string; size: number }[];
-  last_backup_at: string | null;
-  age_hours: number | null;
-  is_stale: boolean;
 }
 
 export function useBackups() {
   return useQuery({
     queryKey: keys.backups,
-    queryFn: () => api<BackupsResponse>("/admin/backups"),
+    queryFn: () => api<BackupsResponse>("/admin/backups", { schema: backupsResponseSchema }),
   });
 }
 
 export function useRunBackup() {
   const qc = useQueryClient();
   return useMutation({
-    mutationFn: () => api<{ task_id: string }>("/admin/backup", { method: "POST" }),
+    mutationFn: () =>
+      api<{ task_id: string; detail: string }>("/admin/backup", {
+        method: "POST",
+        schema: backupTaskResponseSchema,
+      }),
     onSuccess: () => {
       // Файл появится через несколько секунд — обновим список с задержкой.
       setTimeout(() => void qc.invalidateQueries({ queryKey: keys.backups }), 4000);
@@ -1008,7 +1071,7 @@ export function useDeleteBackup() {
   const qc = useQueryClient();
   return useMutation({
     mutationFn: (name: string) =>
-      api<void>(`/admin/backups/${encodeURIComponent(name)}`, { method: "DELETE" }),
+      apiVoid(`/admin/backups/${encodeURIComponent(name)}`, { method: "DELETE" }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.backups });
     },
@@ -1019,14 +1082,8 @@ export function useLoginAttempts() {
   return useQuery({
     queryKey: keys.loginAttempts,
     queryFn: () =>
-      api<
-        {
-          id: number;
-          username: string;
-          ip_address: string;
-          attempt_time: string;
-          failures: number;
-        }[]
-      >("/admin/login-attempts"),
+      api<LoginAttempt[]>("/admin/login-attempts", {
+        schema: arraySchema(loginAttemptSchema),
+      }),
   });
 }

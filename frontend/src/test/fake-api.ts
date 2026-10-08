@@ -62,7 +62,8 @@ export function startFakeApi(routes: FakeRoute[]): FakeServer {
         ? (route.response as (requestBody: unknown) => unknown)(body)
         : route.response;
 
-    return jsonResponse(payload, route.status ?? 200);
+    const status = route.status ?? (payload === null ? 204 : 200);
+    return status === 204 ? new Response(null, { status }) : jsonResponse(payload, status);
   });
 
   vi.stubGlobal("fetch", handler);
@@ -93,6 +94,11 @@ function safeParse(raw: string): unknown {
 }
 
 /** Страница списка в формате пагинации бэкенда. */
-export function page<T>(items: T[]): { results: T[]; count: number } {
-  return { results: items, count: items.length };
+export function page<T>(items: T[]): {
+  results: T[];
+  count: number;
+  next: number | null;
+  previous: number | null;
+} {
+  return { results: items, count: items.length, next: null, previous: null };
 }

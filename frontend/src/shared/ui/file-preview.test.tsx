@@ -23,6 +23,7 @@ it("закрывает просмотр файла кнопкой-фоном", a
         name: "договор.pdf",
         size: 1024,
         content_type: "application/pdf",
+        uploaded_by_name: "Мария Иванова",
         created_at: "2026-10-02T10:00:00Z",
       }}
       onClose={onClose}

@@ -8,7 +8,8 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 
 import { clearTokens, setAccessToken } from "@/shared/api/auth";
-import { api, apiBlob, apiUpload, ApiError } from "@/shared/api/client";
+import { api, apiBlob, apiUpload, ApiError, ApiResponseError } from "@/shared/api/client";
+import { z } from "zod";
 
 afterEach(() => {
   vi.unstubAllGlobals();
@@ -67,7 +68,11 @@ describe("401 посреди запроса -> тихий refresh и один п
     vi.stubGlobal("fetch", fetchMock);
 
     const file = new File(["содержимое"], "doc.pdf", { type: "application/pdf" });
-    const result = await apiUpload<{ id: number }>("/attachments", file);
+    const result = await apiUpload<{ id: number }>(
+      "/attachments",
+      file,
+      z.object({ id: z.number() }),
+    );
 
     expect(result).toEqual({ id: 7 });
     expect(fetchMock).toHaveBeenCalledTimes(3);
@@ -110,7 +115,9 @@ describe("401 посреди запроса -> тихий refresh и один п
     });
     vi.stubGlobal("fetch", fetchMock);
 
-    const result = await api<{ ok: boolean }>("/crm/leads/1");
+    const result = await api<{ ok: boolean }>("/crm/leads/1", {
+      schema: z.object({ ok: z.boolean() }),
+    });
 
     expect(result).toEqual({ ok: true });
     expect(fetchMock).toHaveBeenCalledTimes(3);
@@ -129,7 +136,9 @@ describe("кеш справочников (tags и т.п.) не должен о�
       );
       vi.stubGlobal("fetch", fetchMock);
 
-      await api("/crm/tags");
+      await api("/crm/tags", {
+        schema: z.array(z.object({ id: z.number(), name: z.string(), color: z.string() })),
+      });
 
       expect(fetchMock).toHaveBeenCalledTimes(1);
       const [, init] = fetchMock.mock.calls[0] as unknown as [unknown, RequestInit];
@@ -154,7 +163,7 @@ it("несколько запросов с 401 продлевают сессию
       if (url.endsWith("/auth/refresh")) {
         refreshCalls += 1;
         await new Promise((resolve) => setTimeout(resolve, 10));
-        return new Response(JSON.stringify({ access_token: "новый" }), { status: 200 });
+        return jsonResponse({ access_token: "новый", token_type: "bearer", expires_in: 1800 });
       }
       const token = (init?.headers as Record<string, string>)?.Authorization;
       if (token !== "Bearer новый") {
@@ -164,7 +173,52 @@ it("несколько запросов с 401 продлевают сессию
     }),
   );
 
-  await Promise.all([api("/crm/leads"), api("/crm/tags"), api("/crm/stages")]);
+  const responseSchema = z.object({ ok: z.boolean() });
+  await Promise.all([
+    api("/crm/leads", { schema: responseSchema }),
+    api("/crm/tags", { schema: responseSchema }),
+    api("/crm/stages", { schema: responseSchema }),
+  ]);
 
   expect(refreshCalls).toBe(1);
+});
+
+describe("проверка успешных JSON-ответов", () => {
+  it("отклоняет JSON, который не соответствует схеме ответа", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => jsonResponse({ id: "не число" })),
+    );
+
+    await expect(
+      api("/crm/leads/1", { schema: z.object({ id: z.number() }) }),
+    ).rejects.toMatchObject({
+      status: 502,
+      code: "invalid_response",
+      endpoint: "GET /crm/leads/1",
+      issues: [expect.objectContaining({ path: "id" })],
+    });
+  });
+
+  it("проверяет пустой ответ 204 как undefined, не пытаясь читать JSON", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(null, { status: 204 })),
+    );
+
+    await expect(api("/admin/users/1", { method: "DELETE", schema: z.undefined() })).resolves.toBe(
+      undefined,
+    );
+  });
+
+  it("сообщает ApiResponseError, если схема не принимает JSON 204", async () => {
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => new Response(null, { status: 204 })),
+    );
+
+    await expect(
+      api("/admin/users/1", { method: "DELETE", schema: z.object({ ok: z.boolean() }) }),
+    ).rejects.toBeInstanceOf(ApiResponseError);
+  });
 });

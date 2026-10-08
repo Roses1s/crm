@@ -9,6 +9,27 @@ import { useMoveLead, useUpdateLeadPriority } from "@/shared/api/hooks";
 import { startFakeApi, type FakeServer } from "@/test/fake-api";
 
 const VERSION = "2026-10-01T10:00:00.123456Z";
+const LEAD_RESPONSE = {
+  id: 10,
+  name: "ООО Ромашка",
+  inn: "7701234567",
+  logist_contact: "",
+  logist_phone: "",
+  logist_email: null,
+  accountant_name: null,
+  priority: 0,
+  is_archived: false,
+  loss_reason_id: null,
+  loss_reason_name: null,
+  stage_id: 1,
+  stage_name: "Новый",
+  assigned_to_id: 1,
+  assigned_to_email: "manager@example.test",
+  assigned_to_name: "Мария",
+  tags: [],
+  created_at: VERSION,
+  updated_at: VERSION,
+};
 
 function makeWrapper() {
   const client = new QueryClient({
@@ -29,9 +50,7 @@ afterEach(() => {
 
 it("перемещение карточки передаёт прочитанную версию", async () => {
   setAccessToken("токен");
-  server = startFakeApi([
-    { method: "PATCH", path: "/crm/leads/10", response: { id: 10, updated_at: VERSION } },
-  ]);
+  server = startFakeApi([{ method: "PATCH", path: "/crm/leads/10", response: LEAD_RESPONSE }]);
   const { result } = renderHook(() => useMoveLead(), { wrapper: makeWrapper() });
 
   act(() => {
@@ -47,9 +66,7 @@ it("перемещение карточки передаёт прочитанн�
 
 it("смена приоритета передаёт прочитанную версию", async () => {
   setAccessToken("токен");
-  server = startFakeApi([
-    { method: "PATCH", path: "/crm/leads/10", response: { id: 10, updated_at: VERSION } },
-  ]);
+  server = startFakeApi([{ method: "PATCH", path: "/crm/leads/10", response: LEAD_RESPONSE }]);
   const { result } = renderHook(() => useUpdateLeadPriority(), { wrapper: makeWrapper() });
 
   act(() => {

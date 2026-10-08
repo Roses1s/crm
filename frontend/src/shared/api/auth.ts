@@ -10,6 +10,7 @@
 
 import { useSyncExternalStore } from "react";
 
+import { accessTokenResponseSchema } from "./schemas";
 import { clearSessionCache } from "./query-client";
 
 let accessToken: string | null = null;
@@ -103,10 +104,11 @@ export async function refreshSession(): Promise<boolean> {
     try {
       const response = await fetch("/api/v1/auth/refresh", { method: "POST" });
       if (!response.ok || generationAtStart !== sessionGeneration) return false;
-      const data = (await response.json()) as { access_token: string };
+      const parsed = accessTokenResponseSchema.safeParse(await response.json());
+      if (!parsed.success) return false;
       // Это продление той же сессии, поэтому кеш сбрасывать не нужно. Если пока
       // ждали ответ случился logout/login, проверка поколения выше его отбросит.
-      setAccessToken(data.access_token);
+      setAccessToken(parsed.data.access_token);
       return true;
     } catch {
       return false;

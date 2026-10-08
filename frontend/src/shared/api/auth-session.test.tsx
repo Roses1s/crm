@@ -43,6 +43,7 @@ function leadPayload(kind: "admin" | "manager") {
     logist_contact: "",
     logist_phone: "",
     logist_email: null,
+    accountant_name: null,
     priority: 0,
     is_archived: false,
     loss_reason_id: null,
@@ -114,6 +115,17 @@ describe("изоляция Query cache между учётными сессия�
     expect(fetchMock.mock.calls.filter(([url]) => String(url).includes("/crm/leads"))).toHaveLength(
       2,
     );
+  });
+
+  it("не принимает неполный JSON успешного refresh", async () => {
+    clearTokens();
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => Response.json({ access_token: "incomplete-token" })),
+    );
+
+    await expect(refreshSession()).resolves.toBe(false);
+    expect(getAccessToken()).toBeNull();
   });
 
   it("поздний refresh не воскрешает уже завершённую сессию", async () => {

@@ -26,6 +26,7 @@ const FILE: Attachment = {
   name: "фото.jpg",
   size: 2048,
   content_type: "image/jpeg",
+  uploaded_by_name: "Мария Иванова",
   created_at: "2026-10-05T10:00:00Z",
 };
 

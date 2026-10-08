@@ -15,6 +15,28 @@ import { renderWithProviders } from "@/test/utils";
 
 const STAGES = [{ id: 1, name: "Новый", sequence: 1, color: "" }];
 
+const CREATED_LEAD = {
+  id: 42,
+  name: "ООО Вектор",
+  inn: "7701234567",
+  logist_contact: "Иванов",
+  logist_phone: "+7 900 111-22-33",
+  logist_email: null,
+  accountant_name: null,
+  priority: 0,
+  is_archived: false,
+  loss_reason_id: null,
+  loss_reason_name: null,
+  stage_id: 1,
+  stage_name: "Новый",
+  assigned_to_id: 1,
+  assigned_to_email: "manager@example.test",
+  assigned_to_name: "Мария",
+  tags: [],
+  created_at: "2026-10-01T10:00:00+03:00",
+  updated_at: "2026-10-01T10:00:00+03:00",
+};
+
 let server: FakeServer | undefined;
 
 afterEach(() => {
@@ -39,11 +61,18 @@ describe("Быстрое создание лида", () => {
             assigned_to_name: "Пётр Сидоров",
             is_archived: false,
             can_open: false,
+            loss_reason_name: null,
             logist_contact: null,
+            logist_phone: null,
+            logist_email: null,
+            priority: null,
+            stage_name: null,
+            tags: [],
+            updated_at: "2026-10-01T10:00:00+03:00",
           },
         ],
       },
-      { method: "POST", path: "/crm/leads", response: { id: 42 } },
+      { method: "POST", path: "/crm/leads", response: CREATED_LEAD },
     ]);
 
     const user = userEvent.setup();
