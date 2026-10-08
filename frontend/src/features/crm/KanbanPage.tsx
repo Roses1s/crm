@@ -33,6 +33,7 @@ import { BoardBanner } from "@/features/crm/board/BoardBanner";
 import { BoardSuggestions } from "@/features/crm/board/BoardSuggestions";
 import { Column } from "@/features/crm/board/Column";
 import { LeadCard } from "@/features/crm/board/LeadCard";
+import { useFoldedStages } from "@/features/crm/board/folded-stages";
 import { isStageDragId, reorderedStageIds, stageDragId } from "@/features/crm/board/stage-order";
 import { LeadListView } from "@/features/crm/list/LeadListView";
 import { QuickCreateLeadDialog } from "@/features/crm/lead-form/QuickCreateLeadDialog";
@@ -74,25 +75,17 @@ export function KanbanPage() {
   const view = params.get("view") === "list" ? "list" : "kanban";
 
   const [searchInput, setSearchInput] = useState(search);
-  // Остаток Ф-08: общий ключ localStorage не разделяет пользователей и доски.
-  // При исправлении ключ должен включать владельца доски и id текущей доски.
-  const [folded, setFolded] = useState<number[]>(() => {
-    try {
-      return JSON.parse(localStorage.getItem("crm-folded-stages") ?? "[]") as number[];
-    } catch {
-      return [];
-    }
-  });
+  const { data: me } = useMe();
+  const isAdmin = me?.role === "admin";
+  const boardUserId = isAdmin && boardParam ? Number(boardParam) : null;
+  const boardOwnerId = boardUserId ?? me?.id ?? null;
+  const [folded, setFolded] = useFoldedStages(me?.id ?? null, boardOwnerId);
   const [activeLead, setActiveLead] = useState<Lead | null>(null);
   const [newStage, setNewStage] = useState(false);
   // Кнопка «Новый»: вместо перехода на полную карточку — простая форма
   // с четырьмя обязательными полями (см. QuickCreateLeadDialog).
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const [stageName, setStageName] = useState("");
-
-  useEffect(() => {
-    localStorage.setItem("crm-folded-stages", JSON.stringify(folded));
-  }, [folded]);
 
   // Поиск уходит на сервер с задержкой — иначе запрос на каждую букву.
   useEffect(() => {
@@ -110,9 +103,6 @@ export function KanbanPage() {
     return () => clearTimeout(timer);
   }, [searchInput, setParams]);
 
-  const { data: me } = useMe();
-  const isAdmin = me?.role === "admin";
-  const boardUserId = isAdmin && boardParam ? Number(boardParam) : null;
   // Фильтров в интерфейсе больше нет: доска у каждого своя, а нужную карточку
   // ищут поиском. Из параметров остаётся чужая доска для администратора.
   const { data: leadsPage } = useLeads({ search, assigned: boardUserId });
