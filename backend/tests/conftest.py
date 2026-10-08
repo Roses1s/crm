@@ -35,7 +35,8 @@ os.environ.update(
     DATABASE_URL=TEST_DATABASE_URL,
     ATTACHMENTS_DIR=_ATTACHMENTS_TMP,
     MAX_UPLOAD_MB="1",
-    SECRET_KEY="test-secret",
+    # HS256 использует тестовый ключ длиной не меньше рекомендованных 32 байт.
+    SECRET_KEY="test-secret-key-for-crm-jwt-tests-only-32-bytes",
     RATE_LIMIT_ENABLED="false",
     LOG_JSON="false",
     LOG_LEVEL="WARNING",

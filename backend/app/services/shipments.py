@@ -8,7 +8,7 @@ from uuid import uuid4
 
 from sqlalchemy import Numeric, case, func, literal, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
-from sqlalchemy.orm import noload, selectinload
+from sqlalchemy.orm import joinedload, load_only, raiseload, selectinload
 
 from app.core.errors import AppError, NotFoundError, PermissionDeniedError
 from app.core.logging import get_logger
@@ -199,14 +199,18 @@ async def list_shipments(
         )
     items, total = await paginate(
         session,
-        # В таблице списка из связей лида нужны только название и продавец:
-        # этап, причина проигрыша и теги лида не показываются — не тянем их
-        # в каждый запрос страницы (Б-23 ревью 06.10). Теги самой заявки
-        # остаются в ответе, поэтому их не трогаем.
+        # В ответе нужны название лида и имя продавца. Этап, причина проигрыша
+        # и теги лида не показываются — не загружаем их; теги самой заявки
+        # остаются в ответе. Явные связи вместо устаревшего noload сохраняют
+        # поля ответа и не тянут лишние данные (Б-23 ревью 06.10).
         stmt.options(
-            noload(Shipment.lead).noload(Lead.stage),
-            noload(Shipment.lead).noload(Lead.loss_reason),
-            noload(Shipment.lead).noload(Lead.tags),
+            joinedload(Shipment.lead).options(
+                load_only(Lead.id, Lead.name, Lead.assigned_to_id),
+                joinedload(Lead.assigned_to).load_only(User.id, User.first_name, User.last_name),
+                raiseload(Lead.stage),
+                raiseload(Lead.loss_reason),
+                raiseload(Lead.tags),
+            ),
         ),
         params,
     )

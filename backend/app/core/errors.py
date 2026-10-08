@@ -91,7 +91,7 @@ def _classify_integrity_error(exc: IntegrityError) -> tuple[str, str, int]:
         return (
             "not_null_violation",
             "Обязательное поле осталось пустым",
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
         )
     if sqlstate == "23503" or "foreign key" in text:
         return (
@@ -103,7 +103,7 @@ def _classify_integrity_error(exc: IntegrityError) -> tuple[str, str, int]:
         return (
             "check_violation",
             "Значение не прошло проверку базы данных",
-            status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status.HTTP_422_UNPROCESSABLE_CONTENT,
         )
     return "conflict", "Не удалось сохранить: данные нарушают ограничения базы", 409
 
@@ -134,7 +134,7 @@ def register_exception_handlers(app: FastAPI) -> None:
             for err in exc.errors()
         ]
         return JSONResponse(
-            status_code=status.HTTP_422_UNPROCESSABLE_ENTITY,
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
             content={
                 **_payload("Проверьте переданные данные", "validation_error"),
                 "errors": errors,

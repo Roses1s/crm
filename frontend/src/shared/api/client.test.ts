@@ -76,6 +76,11 @@ describe("401 посреди запроса -> тихий refresh и один п
   it("если refresh тоже не удался, apiBlob/apiUpload честно падают с 401", async () => {
     setAccessToken("stale-token");
 
+    // jsdom не умеет переходить на другую страницу: подменяем только эту
+    // возможность браузера и проверяем, что клиент просит открыть /login.
+    const location = { pathname: "/", assign: vi.fn() };
+    vi.stubGlobal("window", { location });
+
     const fetchMock = vi.fn(async (input: RequestInfo | URL) => {
       const url = String(input);
       if (url.endsWith("/auth/refresh")) return jsonResponse({ detail: "no session" }, 401);
@@ -84,6 +89,7 @@ describe("401 посреди запроса -> тихий refresh и один п
     vi.stubGlobal("fetch", fetchMock);
 
     await expect(apiBlob("/attachments/1/file")).rejects.toBeInstanceOf(ApiError);
+    expect(location.assign).toHaveBeenCalledWith("/login");
   });
 
   it("api() сохраняет прежнее поведение (контрольный пример)", async () => {

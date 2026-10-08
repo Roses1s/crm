@@ -152,7 +152,8 @@ async def test_refresh_rotates_and_old_token_stops_working(
     )
     old_cookie = login.cookies["crm_refresh"]
 
-    first = await client.post("/api/v1/auth/refresh", cookies={"crm_refresh": old_cookie})
+    client.cookies.set("crm_refresh", old_cookie)
+    first = await client.post("/api/v1/auth/refresh")
     assert first.status_code == 200
 
     # Сразу после ротации прежний токен ещё принимается — это защита от гонки
@@ -162,7 +163,8 @@ async def test_refresh_rotates_and_old_token_stops_working(
     original_grace = auth_module.REFRESH_GRACE_SECONDS
     auth_module.REFRESH_GRACE_SECONDS = -1
     try:
-        replay = await client.post("/api/v1/auth/refresh", cookies={"crm_refresh": old_cookie})
+        client.cookies.set("crm_refresh", old_cookie)
+        replay = await client.post("/api/v1/auth/refresh")
     finally:
         auth_module.REFRESH_GRACE_SECONDS = original_grace
 
@@ -196,14 +198,16 @@ async def test_concurrent_refresh_requests_do_not_conflict(
             AsyncClient(transport=transport, base_url="http://test") as first_client,
             AsyncClient(transport=transport, base_url="http://test") as second_client,
         ):
+            first_client.cookies.set("crm_refresh", old_cookie)
+            second_client.cookies.set("crm_refresh", old_cookie)
             first, second = await asyncio.gather(
-                first_client.post("/api/v1/auth/refresh", cookies={"crm_refresh": old_cookie}),
-                second_client.post("/api/v1/auth/refresh", cookies={"crm_refresh": old_cookie}),
+                first_client.post("/api/v1/auth/refresh"),
+                second_client.post("/api/v1/auth/refresh"),
             )
 
-        assert first.status_code == second.status_code == 200, (first.text, second.text)
-        assert first.cookies.get("crm_refresh")
-        assert second.cookies.get("crm_refresh")
+            assert first.status_code == second.status_code == 200, (first.text, second.text)
+            assert first.cookies.get("crm_refresh")
+            assert second.cookies.get("crm_refresh")
     finally:
         if previous_override is None:
             app.dependency_overrides.pop(get_session, None)
@@ -227,12 +231,15 @@ async def test_logout_of_recently_rotated_token_is_immediate(
         json={"email": "admin@crmdetroid.ru", "password": TEST_PASSWORD},
     )
     old_cookie = login.cookies["crm_refresh"]
-    refreshed = await client.post("/api/v1/auth/refresh", cookies={"crm_refresh": old_cookie})
+    client.cookies.set("crm_refresh", old_cookie)
+    refreshed = await client.post("/api/v1/auth/refresh")
     assert refreshed.status_code == 200
 
-    logout = await client.post("/api/v1/auth/logout", cookies={"crm_refresh": old_cookie})
+    client.cookies.set("crm_refresh", old_cookie)
+    logout = await client.post("/api/v1/auth/logout")
     assert logout.status_code == 204
-    replay = await client.post("/api/v1/auth/refresh", cookies={"crm_refresh": old_cookie})
+    client.cookies.set("crm_refresh", old_cookie)
+    replay = await client.post("/api/v1/auth/refresh")
     assert replay.status_code == 401
 
 

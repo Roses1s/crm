@@ -59,7 +59,10 @@ async def test_create_and_read_shipment(auth_client: AsyncClient, seeded: dict) 
     assert body["number"] == str(body["id"])
 
     listed = await auth_client.get("/api/v1/shipments")
-    assert listed.json()["count"] == 1
+    listed_body = listed.json()
+    assert listed_body["count"] == 1
+    assert listed_body["results"][0]["lead_name"] == "ООО «Уралпромснаб»"
+    assert listed_body["results"][0]["seller_name"] == "Артём Соколов"
 
     by_lead = await auth_client.get(f"/api/v1/leads/{lead_id}/shipments")
     assert len(by_lead.json()) == 1

@@ -122,7 +122,7 @@ async def _save_upload(upload: UploadFile, target: Path) -> int:
                 raise AppError(
                     f"Файл больше {settings.max_upload_mb} МБ",
                     code="file_too_large",
-                    status_code=status.HTTP_413_REQUEST_ENTITY_TOO_LARGE,
+                    status_code=status.HTTP_413_CONTENT_TOO_LARGE,
                 )
             await run_in_threadpool(out.write, chunk)
     except BaseException:
