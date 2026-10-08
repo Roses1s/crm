@@ -26,8 +26,9 @@ _IS_SQLITE = TEST_DATABASE_URL.startswith("sqlite")
 # Вложения в тестах пишутся во временный каталог, который чистится после прогона.
 _ATTACHMENTS_TMP = tempfile.mkdtemp(prefix="crm-test-attachments-")
 
-# Тесты не подключают Valkey/Celery: кеш заменён памятью, лимитер выключен.
-# Это ускоряет обычный прогон, но оставляет интеграционные проверки Т-06.
+# Обычные тесты быстрые и не подключают Valkey/Celery: кеш заменён памятью,
+# ограничитель выключен. Реальные сервисы проверяет отдельный набор
+# integration_tests, который CI запускает на PostgreSQL и Valkey.
 os.environ.update(
     DATABASE_URL=TEST_DATABASE_URL,
     ATTACHMENTS_DIR=_ATTACHMENTS_TMP,

@@ -68,7 +68,9 @@ async def get_shipment_or_404(
     )
     if for_update:
         # Перенос заявки меняет сразу три таблицы; блокировка не даёт двум
-        # одновременным PATCH разнести их по разным лидам.
+        # одновременным PATCH разнести их по разным лидам. Та же блокировка
+        # нужна при смене статуса: иначе два запроса запишут одну и ту же
+        # старую стадию в историю.
         # `Shipment.lead` тянет nullable joined-связи этапа/ответственного.
         # PostgreSQL запрещает FOR UPDATE всей такой выборки, поэтому явно
         # блокируем только базовую строку shipments.
@@ -290,7 +292,7 @@ async def update_shipment(
 async def set_status(
     session: AsyncSession, user: User, shipment_id: int, payload: ShipmentStatusUpdate
 ) -> Shipment:
-    shipment = await get_shipment_or_404(session, shipment_id, user)
+    shipment = await get_shipment_or_404(session, shipment_id, user, for_update=True)
     previous = shipment.status
     shipment.status = payload.status
     if previous != payload.status:

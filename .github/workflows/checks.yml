@@ -3,10 +3,9 @@
 # Запускаются при каждой отправке в рабочую ветку и при открытии pull request.
 # Повторяют то, что агент делает вручную: линтеры, типы, тесты, сборка.
 #
-# Быстрый прогон бэкенда идёт на SQLite (секунды). Дополнительно есть отдельная
-# джоба на настоящем PostgreSQL той же версии, что и в проде: она гоняет
-# миграции и тесты на реальной базе, чтобы ловить несовместимости, которых
-# на SQLite не видно (например, SQLite-only функции в миграциях).
+# Быстрый прогон бэкенда идёт на SQLite. Отдельная джоба на настоящих
+# PostgreSQL и Valkey гоняет миграции, параллельные запросы, ограничитель,
+# кеш и Celery worker — то, что нельзя проверить только в памяти.
 
 name: Проверки
 
@@ -94,7 +93,7 @@ jobs:
           pip-audit -r requirements-dev.lock
 
   backend-postgres:
-    name: Бэкенд на PostgreSQL — миграции и тесты
+    name: Бэкенд на PostgreSQL и Valkey — миграции и интеграции
     runs-on: ubuntu-24.04
     defaults:
       run:
@@ -112,6 +111,16 @@ jobs:
         # Джоба стартует только когда база готова принимать соединения.
         options: >-
           --health-cmd "pg_isready -U crm"
+          --health-interval 5s
+          --health-timeout 5s
+          --health-retries 10
+      valkey:
+        image: valkey/valkey:8-alpine@sha256:081c2f5cb575efc901aa80ff9cdbd1ec6a301682fd35e1ebb4b0990a4a4a8507
+        ports:
+          - 6379:6379
+        # И кеш, и ограничитель, и Celery используют один настоящий Valkey.
+        options: >-
+          --health-cmd "valkey-cli ping"
           --health-interval 5s
           --health-timeout 5s
           --health-retries 10
@@ -149,22 +158,65 @@ jobs:
           set -o pipefail
           python -m pytest -q 2>&1 | tee /tmp/postgres-pytest.log
 
-      - name: Причина падения PostgreSQL-тестов
+      - name: Проверки на настоящих Valkey и Celery
+        env:
+          DATABASE_URL: postgresql+asyncpg://crm:crm@localhost:5432/crm_test
+          VALKEY_URL: redis://localhost:6379/0
+          RATE_LIMIT_ENABLED: "true"
+          RATE_LIMIT_LOGIN: 3/minute
+          SECRET_KEY: test-secret-key-for-live-service-tests-only-32-bytes
+          ATTACHMENTS_DIR: /tmp/crm-t06-attachments
+          MAX_UPLOAD_MB: "1"
+          LOG_JSON: "false"
+          LOG_LEVEL: WARNING
+          ENVIRONMENT: local
+          RUN_SERVICE_INTEGRATION: "1"
+        run: |
+          set -euo pipefail
+          celery -A app.worker.celery_app.celery worker --pool=solo \
+            --loglevel=WARNING --hostname=t06@%h > /tmp/t06-celery-worker.log 2>&1 &
+          worker_pid=$!
+          cleanup() {
+            kill "$worker_pid" 2>/dev/null || true
+            wait "$worker_pid" 2>/dev/null || true
+          }
+          trap cleanup EXIT
+
+          ready=false
+          for attempt in $(seq 1 30); do
+            celery -A app.worker.celery_app.celery inspect ping --timeout=1 \
+              > /tmp/t06-celery-ping.log 2>&1 || true
+            if grep -q "pong" /tmp/t06-celery-ping.log; then
+              ready=true
+              break
+            fi
+            if ! kill -0 "$worker_pid" 2>/dev/null; then
+              cat /tmp/t06-celery-worker.log
+              exit 1
+            fi
+            sleep 1
+          done
+          if [ "$ready" != true ]; then
+            cat /tmp/t06-celery-worker.log
+            cat /tmp/t06-celery-ping.log
+            exit 1
+          fi
+          python -m pytest -q integration_tests 2>&1 | tee /tmp/t06-integration-pytest.log
+
+      - name: Причина падения проверок backend
         if: failure()
         run: |
-          {
-            echo '### Последние строки PostgreSQL-тестов'
-            echo '```text'
-            tail -120 /tmp/postgres-pytest.log
-            echo '```'
-          } >> "$GITHUB_STEP_SUMMARY"
-          python - <<'PY'
-          from pathlib import Path
-
-          text = "\n".join(Path("/tmp/postgres-pytest.log").read_text().splitlines()[-80:])
-          escaped = text.replace("%", "%25").replace("\r", "%0D").replace("\n", "%0A")
-          print(f"::error title=PostgreSQL pytest::{escaped}")
-          PY
+          for log in /tmp/postgres-pytest.log /tmp/t06-integration-pytest.log \
+            /tmp/t06-celery-worker.log /tmp/t06-celery-ping.log; do
+            if [ -f "$log" ]; then
+              {
+                echo "### Последние строки: $log"
+                echo '```text'
+                tail -100 "$log"
+                echo '```'
+              } >> "$GITHUB_STEP_SUMMARY"
+            fi
+          done
 
   frontend:
     name: Фронтенд — типы, тесты и покрытие

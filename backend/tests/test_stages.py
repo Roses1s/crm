@@ -2,9 +2,15 @@
 
 from __future__ import annotations
 
-from httpx import AsyncClient
+import asyncio
 
-from tests.conftest import TEST_PASSWORD
+import pytest
+from httpx import AsyncClient, Response
+from sqlalchemy import select
+from sqlalchemy.ext.asyncio import AsyncSession
+
+from app.models.crm import Stage
+from tests.conftest import TEST_DATABASE_URL, TEST_PASSWORD
 
 DEFAULT_NAMES = [
     "Новый",
@@ -37,6 +43,34 @@ async def test_first_visit_creates_default_board(
     # Повторный заход не должен плодить дубликаты.
     again = await client.get("/api/v1/crm/stages", headers=headers)
     assert [s["name"] for s in again.json()] == DEFAULT_NAMES
+
+
+@pytest.mark.skipif(
+    TEST_DATABASE_URL.startswith("sqlite"), reason="Параллельное создание проверяется на PostgreSQL"
+)
+async def test_concurrent_first_visit_creates_one_default_board(
+    client: AsyncClient,
+    seeded: dict[str, object],
+    session: AsyncSession,
+) -> None:
+    """Два первых запроса одновременно создают ровно одну личную доску."""
+    manager_id = seeded["manager"].id  # type: ignore[attr-defined]
+    headers = {"Authorization": f"Bearer {await manager_token(client)}"}
+    barrier = asyncio.Barrier(2)
+
+    async def open_board() -> Response:
+        await barrier.wait()
+        return await client.get("/api/v1/crm/stages", headers=headers)
+
+    first, second = await asyncio.gather(open_board(), open_board())
+    assert first.status_code == second.status_code == 200
+    first_stages = first.json()
+    second_stages = second.json()
+    assert [stage["id"] for stage in first_stages] == [stage["id"] for stage in second_stages]
+    assert [stage["name"] for stage in first_stages] == DEFAULT_NAMES
+
+    created = list((await session.scalars(select(Stage).where(Stage.owner_id == manager_id))).all())
+    assert len(created) == len(DEFAULT_NAMES)
 
 
 async def test_manager_sees_only_own_stages(

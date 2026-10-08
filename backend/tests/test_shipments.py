@@ -2,14 +2,16 @@
 
 from __future__ import annotations
 
+import asyncio
 from decimal import Decimal
 
+import pytest
 from asyncpg.exceptions import UniqueViolationError
-from httpx import AsyncClient
+from httpx import AsyncClient, Response
 from sqlalchemy.exc import IntegrityError
 
 from app.core.errors import _classify_integrity_error
-from tests.conftest import TEST_PASSWORD
+from tests.conftest import TEST_DATABASE_URL, TEST_PASSWORD
 
 
 async def manager_headers(client: AsyncClient) -> dict[str, str]:
@@ -237,6 +239,45 @@ async def test_status_transition(auth_client: AsyncClient, seeded: dict) -> None
     )
     assert response.status_code == 200
     assert response.json()["status"] == "loaded"
+
+
+@pytest.mark.skipif(
+    TEST_DATABASE_URL.startswith("sqlite"),
+    reason="Параллельная смена статуса проверяется на PostgreSQL",
+)
+async def test_concurrent_status_changes_write_a_consistent_timeline(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    """Одновременные смены статуса идут по цепочке, а не от одного старого значения."""
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    shipment = await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})
+    shipment_id = shipment.json()["id"]
+    barrier = asyncio.Barrier(2)
+
+    async def change_status(status: str) -> Response:
+        await barrier.wait()
+        return await auth_client.patch(
+            f"/api/v1/shipments/{shipment_id}/status", json={"status": status}
+        )
+
+    responses = await asyncio.gather(change_status("loaded"), change_status("unloaded"))
+    assert all(response.status_code == 200 for response in responses)
+
+    timeline = await auth_client.get(f"/api/v1/shipments/{shipment_id}/timeline")
+    transitions = [(entry["old_value"], entry["new_value"]) for entry in timeline.json()]
+    assert len(transitions) == 2
+
+    first = next((transition for transition in transitions if transition[0] == "Новая"), None)
+    assert first is not None
+    second = next((transition for transition in transitions if transition[0] == first[1]), None)
+    assert second is not None
+    final_status = {
+        "Машина загрузилась": "loaded",
+        "Машина выгрузилась": "unloaded",
+    }
+    assert second[1] in final_status
+    current = await auth_client.get(f"/api/v1/shipments/{shipment_id}")
+    assert current.json()["status"] == final_status[second[1]]
 
 
 async def test_status_cannot_bypass_history_through_generic_patch(
