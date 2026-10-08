@@ -131,9 +131,7 @@ async def test_shipment_number_conflict_on_create(auth_client: AsyncClient, seed
     assert duplicate.json()["detail"] == "Номер заявки уже используется"
 
 
-async def test_shipment_number_conflict_on_update(
-    auth_client: AsyncClient, seeded: dict, session
-) -> None:
+async def test_shipment_number_conflict_on_update(auth_client: AsyncClient, seeded: dict) -> None:
     lead_id = seeded["lead"].id  # type: ignore[attr-defined]
     first = (await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})).json()
     second = (await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})).json()
@@ -148,11 +146,9 @@ async def test_shipment_number_conflict_on_update(
     )
     assert duplicate.status_code == 409, duplicate.text
     assert duplicate.json()["code"] == "shipment_number_conflict"
-    # В тестовой обвязке одна сессия переиспользуется между запросами;
-    # реальная зависимость FastAPI откатывает её после IntegrityError сама.
-    await session.rollback()
-
+    # Следующий запрос должен пройти на новой сессии после ошибки целостности.
     unchanged = await auth_client.get(f"/api/v1/shipments/{second['id']}")
+    assert unchanged.status_code == 200, unchanged.text
     assert unchanged.json()["number"] == str(second["id"])
 
 

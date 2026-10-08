@@ -5,12 +5,9 @@
 ``TEST_DATABASE_URL`` (например, на настоящий PostgreSQL), тот же набор тестов
 прогонится на этой базе — так в CI мы ловим отличия поведения PostgreSQL от
 SQLite. Схема создаётся из моделей; миграции проверяются отдельным шагом
-``alembic upgrade head`` на настоящем PostgreSQL.
-
-Тестовый HTTP-клиент переиспользует одну ``AsyncSession`` для всех запросов
-внутри теста; в рабочем приложении зависимость создаёт отдельную сессию на
-каждый запрос. Это упрощает тестовые данные, но не проверяет жизненный цикл сессии
-и восстановление после ошибки транзакции (остаток Т-03).
+``alembic upgrade head`` на настоящем PostgreSQL. HTTP-клиент тестов открывает
+отдельную ``AsyncSession`` на каждый запрос, как и рабочее приложение; набор
+тестовых данных при этом подготавливается отдельной сессией теста.
 """
 
 from __future__ import annotations
@@ -107,10 +104,29 @@ async def engine() -> AsyncGenerator:
 
 
 @pytest.fixture
-async def session(engine) -> AsyncGenerator[AsyncSession, None]:
-    maker = async_sessionmaker(bind=engine, expire_on_commit=False)
-    async with maker() as s:
+def session_factory(engine) -> async_sessionmaker[AsyncSession]:
+    """Фабрика с настройками, совпадающими с рабочим SessionLocal."""
+    return async_sessionmaker(
+        bind=engine,
+        class_=AsyncSession,
+        expire_on_commit=False,
+        autoflush=False,
+    )
+
+
+@pytest.fixture
+async def session(
+    session_factory: async_sessionmaker[AsyncSession],
+) -> AsyncGenerator[AsyncSession, None]:
+    """Сессия для подготовки и проверки данных напрямую в тесте."""
+    async with session_factory() as s:
         yield s
+
+
+@pytest.fixture
+def request_sessions() -> list[AsyncSession]:
+    """Сессии, созданные HTTP-клиентом в текущем тесте; нужны для проверок изоляции."""
+    return []
 
 
 @pytest.fixture
@@ -165,17 +181,32 @@ async def seeded(session: AsyncSession) -> dict[str, object]:
 
 
 @pytest.fixture
-async def client(session: AsyncSession) -> AsyncGenerator[AsyncClient, None]:
-    """HTTP-клиент теста: все запросы используют одну сессию (ограничение Т-03)."""
+async def client(
+    session_factory: async_sessionmaker[AsyncSession],
+    request_sessions: list[AsyncSession],
+) -> AsyncGenerator[AsyncClient, None]:
+    """HTTP-клиент: открывает отдельную сессию БД для каждого запроса."""
 
     async def _override() -> AsyncGenerator[AsyncSession, None]:
-        yield session
+        async with session_factory() as request_session:
+            request_sessions.append(request_session)
+            try:
+                yield request_session
+            except Exception:
+                await request_session.rollback()
+                raise
 
+    previous_override = app.dependency_overrides.get(get_session)
     app.dependency_overrides[get_session] = _override
     transport = ASGITransport(app=app)
-    async with AsyncClient(transport=transport, base_url="http://test") as ac:
-        yield ac
-    app.dependency_overrides.clear()
+    try:
+        async with AsyncClient(transport=transport, base_url="http://test") as ac:
+            yield ac
+    finally:
+        if previous_override is None:
+            app.dependency_overrides.pop(get_session, None)
+        else:
+            app.dependency_overrides[get_session] = previous_override
 
 
 @pytest.fixture

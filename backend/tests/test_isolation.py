@@ -3,6 +3,7 @@
 from __future__ import annotations
 
 from httpx import AsyncClient
+from sqlalchemy.ext.asyncio import AsyncSession
 
 from tests.conftest import TEST_PASSWORD
 
@@ -13,6 +14,18 @@ async def manager_headers(client: AsyncClient) -> dict[str, str]:
         json={"email": "manager@crmdetroid.ru", "password": TEST_PASSWORD},
     )
     return {"Authorization": f"Bearer {login.json()['access_token']}"}
+
+
+async def test_client_opens_a_new_database_session_for_each_request(
+    client: AsyncClient, request_sessions: list[AsyncSession]
+) -> None:
+    """HTTP-клиент повторяет рабочий жизненный цикл сессии БД: одна на запрос."""
+    first = await client.get("/api/v1/auth/me")
+    second = await client.get("/api/v1/auth/me")
+
+    assert first.status_code == second.status_code == 401
+    assert len(request_sessions) == 2
+    assert request_sessions[0] is not request_sessions[1]
 
 
 async def test_foreign_lead_is_invisible(client: AsyncClient, seeded: dict) -> None:
