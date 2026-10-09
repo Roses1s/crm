@@ -111,6 +111,14 @@ async def delete_stage(
     leads = list(
         (await session.execute(select(Lead).where(Lead.stage_id == stage_id))).unique().scalars()
     )
+    # Проигранные лиды read-only до восстановления. Удаление этапа не должно
+    # менять их stage_id/версию/историю исподтишка.
+    if any(lead.is_archived for lead in leads):
+        raise AppError(
+            "В этапе есть проигранные лиды. Восстановите их перед удалением этапа",
+            code="stage_contains_lost_leads",
+            status_code=409,
+        )
     if leads:
         if fallback_stage_id is None or fallback_stage_id == stage_id:
             raise AppError(
