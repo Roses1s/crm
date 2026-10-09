@@ -405,9 +405,7 @@ async def test_owner_cannot_upload_or_delete_shipment_attachment_on_lost_lead(
 ) -> None:
     """Запрет записи распространяется и на документы самой заявки проигранного лида."""
     lead_id = seeded["lead"].id  # type: ignore[attr-defined]
-    shipment = (
-        await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})
-    ).json()
+    shipment = (await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})).json()
     shipment_id = shipment["id"]
     original = await auth_client.post(
         f"/api/v1/shipments/{shipment_id}/attachments",
