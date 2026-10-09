@@ -22,13 +22,13 @@ class StageRead(ORMModel):
 class StageCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
     sequence: int = 0
-    color: str = "purple"
+    color: str = Field(default="purple", max_length=20)
 
 
 class StageUpdate(PatchModel):
     name: str | None = Field(default=None, min_length=1, max_length=100)
     sequence: int | None = None
-    color: str | None = None
+    color: str | None = Field(default=None, max_length=20)
 
 
 class StageReorder(BaseModel):
@@ -75,7 +75,7 @@ class TagCreate(BaseModel):
 
 class TagUpdate(PatchModel):
     name: str | None = Field(default=None, min_length=1, max_length=64)
-    color: str | None = None
+    color: str | None = Field(default=None, max_length=20)
 
     @field_validator("color")
     @classmethod
