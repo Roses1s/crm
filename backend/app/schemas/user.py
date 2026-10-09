@@ -40,7 +40,7 @@ def _password_fits_bcrypt(value: str) -> str:
 
 
 class UserCreate(BaseModel):
-    email: EmailStr
+    email: EmailStr = Field(max_length=255)
     password: str = Field(min_length=8, max_length=128)
     first_name: str = Field(default="", max_length=100)
     last_name: str = Field(default="", max_length=100)
