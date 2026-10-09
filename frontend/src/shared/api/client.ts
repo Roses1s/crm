@@ -8,7 +8,7 @@
 
 import type { ZodType } from "zod";
 
-import { clearTokens, getAccessToken, refreshSession } from "./auth";
+import { clearTokens, getAccessToken, getSessionGeneration, refreshSession } from "./auth";
 
 const BASE = "/api/v1";
 
@@ -55,6 +55,7 @@ async function request(
   retry = true,
 ): Promise<Response> {
   const token = auth ? getAccessToken() : null;
+  const generationAtStart = getSessionGeneration();
 
   const response = await fetch(`${BASE}${path}`, {
     // Браузерный кеш отключён: за актуальность данных отвечают React Query
@@ -68,7 +69,14 @@ async function request(
   });
 
   if (response.status === 401 && auth) {
+    // Не обновляем сессию и не повторяем старый запрос токеном другого пользователя.
+    if (generationAtStart !== getSessionGeneration()) {
+      throw new ApiError(401, "Запрос относится к предыдущей сессии", "session_changed");
+    }
     if (retry && (await refreshSession())) {
+      if (generationAtStart !== getSessionGeneration()) {
+        throw new ApiError(401, "Запрос относится к предыдущей сессии", "session_changed");
+      }
       return request(path, init, auth, false);
     }
     clearTokens();
