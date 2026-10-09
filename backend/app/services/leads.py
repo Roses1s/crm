@@ -548,7 +548,7 @@ async def update_timeline_entry(
 async def delete_timeline_entry(
     session: AsyncSession, user: User, lead_id: int, entry_id: int
 ) -> None:
-    await get_editable_lead(session, lead_id, user)
+    await get_editable_lead(session, lead_id, user, for_update=True)
     entry = await _get_entry_or_404(session, lead_id, entry_id)
     # История передач и проигрыша — системный аудит, а не пользовательская
     # заметка: она остаётся неизменяемой даже при прямом вызове API.
