@@ -257,25 +257,68 @@ def cleanup_orphan_files() -> dict[str, Any]:
         return {"removed": 0, "freed_bytes": 0}
 
     cutoff = (datetime.now(tz=UTC) - timedelta(hours=1)).timestamp()
-    with _session() as session:
-        known: set[str] = set()
-        for (path,) in session.execute(select(Attachment.storage_path)).all():
-            if not path:
-                continue
-            original = Path(path)
-            known.add(str(original))
-            # Миниатюра — производный кеш, в таблице отдельной строки для неё
-            # нет. Сохраняем sidecar, пока существует исходное вложение.
-            known.add(str(thumbnail_path(original)))
-
     removed = 0
     freed = 0
+    batch_size = 500
+    batch: list[Path] = []
+
+    def clean_batch(files: list[Path]) -> tuple[int, int]:
+        # Проверяем существование только старых файлов текущей партии, а не
+        # загружаем в память пути всех вложений из большой базы.
+        candidates = {str(file) for file in files}
+        # Для миниатюр проверяем также путь оригинала: у миниатюр нет своей
+        # строки Attachment, но они должны жить, пока жив оригинал.
+        candidates.update(
+            str(file.with_name(file.name.removesuffix(".thumbnail.webp")))
+            for file in files
+            if file.name.endswith(".thumbnail.webp")
+        )
+        with _session() as session:
+            known_originals = {
+                path
+                for (path,) in session.execute(
+                    select(Attachment.storage_path).where(
+                        Attachment.storage_path.in_(candidates)
+                    )
+                )
+                if path
+            }
+
+        known_files = set(known_originals)
+        known_files.update(str(thumbnail_path(Path(path))) for path in known_originals)
+        batch_removed = 0
+        batch_freed = 0
+        for file in files:
+            if str(file) in known_files:
+                continue
+            try:
+                size = file.stat().st_size
+                file.unlink(missing_ok=True)
+            except FileNotFoundError:
+                continue
+            batch_freed += size
+            batch_removed += 1
+        return batch_removed, batch_freed
+
     for file in root.rglob("*"):
-        if not file.is_file() or str(file) in known or file.stat().st_mtime > cutoff:
+        if not file.is_file():
             continue
-        freed += file.stat().st_size
-        file.unlink(missing_ok=True)
-        removed += 1
+        try:
+            if file.stat().st_mtime > cutoff:
+                continue
+        except FileNotFoundError:
+            continue
+        batch.append(file)
+        if len(batch) >= batch_size:
+            batch_removed, batch_freed = clean_batch(batch)
+            removed += batch_removed
+            freed += batch_freed
+            batch = []
+
+    if batch:
+        batch_removed, batch_freed = clean_batch(batch)
+        removed += batch_removed
+        freed += batch_freed
 
     log.info("cleanup.orphan_files", removed=removed, freed_bytes=freed)
     return {"removed": removed, "freed_bytes": freed}
