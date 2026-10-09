@@ -111,6 +111,7 @@ export function FormStatusbar({
   visibleCount?: number;
 }) {
   const [moreOpen, setMoreOpen] = useState<StatusbarOverflowSide | null>(null);
+  const [morePosition, setMorePosition] = useState<{ top: number; left: number } | null>(null);
   const count = Math.max(1, visibleCount);
   const visibleLength = Math.min(count, items.length);
   const currentIndex = Math.max(
@@ -165,9 +166,21 @@ export function FormStatusbar({
                 disabled={disabled}
                 aria-current={active ? "step" : undefined}
                 aria-label={overflowSide ? overflowLabel : undefined}
-                onClick={() => {
+                onClick={(event) => {
                   if (overflowSide) {
-                    setMoreOpen((side) => (side === overflowSide ? null : overflowSide));
+                    const rect = event.currentTarget.getBoundingClientRect();
+                    const menuWidth = 220;
+                    const requestedLeft =
+                      overflowSide === "before" ? rect.left : rect.right - menuWidth;
+                    const left = Math.max(8, Math.min(requestedLeft, window.innerWidth - menuWidth - 8));
+                    setMoreOpen((side) => {
+                      if (side === overflowSide) {
+                        setMorePosition(null);
+                        return null;
+                      }
+                      setMorePosition({ top: rect.bottom, left });
+                      return overflowSide;
+                    });
                   } else if (segment.item) {
                     onSelect(segment.item.id);
                   }
@@ -207,9 +220,12 @@ export function FormStatusbar({
             onClick={() => setMoreOpen(null)}
           />
           <div
-            className={`absolute top-full z-50 max-h-[260px] min-w-[220px] overflow-auto rounded-[3px] border border-odoo-border bg-odoo-surface py-1 shadow-lg ${
-              moreOpen === "before" ? "left-0" : "right-0"
-            }`}
+            style={{
+              position: "fixed",
+              top: morePosition?.top ?? 0,
+              left: morePosition?.left ?? 8,
+            }}
+            className="z-50 max-h-[260px] min-w-[220px] overflow-auto rounded-[3px] border border-odoo-border bg-odoo-surface py-1 shadow-lg"
           >
             {moreItems.map((item) => (
               <button
