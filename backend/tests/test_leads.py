@@ -538,6 +538,29 @@ async def test_restore_rejects_second_restore(auth_client: AsyncClient, seeded: 
     assert second.json()["code"] == "not_lost"
 
 
+async def test_concurrent_restore_only_succeeds_once(
+    auth_client: AsyncClient, seeded: dict, session
+) -> None:
+    """На PostgreSQL два параллельных запроса не должны оба восстановить один лид."""
+    if session.get_bind().dialect.name == "sqlite":
+        pytest.skip("FOR UPDATE concurrency is verified by the PostgreSQL integration job")
+
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    reason_id = seeded["loss_reason"].id  # type: ignore[attr-defined]
+    lost = await auth_client.post(
+        f"/api/v1/crm/leads/{lead_id}/lose", json={"reason_id": reason_id}
+    )
+    assert lost.status_code == 204
+
+    first, second = await asyncio.gather(
+        auth_client.post(f"/api/v1/crm/leads/{lead_id}/restore"),
+        auth_client.post(f"/api/v1/crm/leads/{lead_id}/restore"),
+    )
+    assert sorted([first.status_code, second.status_code]) == [204, 400]
+    failed = first if first.status_code != 204 else second
+    assert failed.json()["code"] == "not_lost"
+
+
 async def test_restore_fails_for_active_lead(auth_client: AsyncClient, seeded: dict) -> None:
     lead_id = seeded["lead"].id  # type: ignore[attr-defined]
     response = await auth_client.post(f"/api/v1/crm/leads/{lead_id}/restore")
