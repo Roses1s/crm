@@ -81,9 +81,7 @@ async def get_shipment_or_404(
         # Если переносим заявку, блокируем обе карточки в одном порядке по id.
         # Так встречные переносы A→B и B→A не берут блокировки в разном порядке.
         lead_ids = sorted(
-            lead_id
-            for lead_id in {initial.lead_id, target_lead_id}
-            if lead_id is not None
+            lead_id for lead_id in {initial.lead_id, target_lead_id} if lead_id is not None
         )
         for lead_id in lead_ids:
             await get_editable_lead(session, lead_id, user, for_update=True)
@@ -407,9 +405,7 @@ async def add_note(
 async def update_entry(
     session: AsyncSession, user: User, shipment_id: int, entry_id: int, payload: NoteUpdate
 ) -> TimelineEntry:
-    await get_shipment_or_404(
-        session, shipment_id, user, for_update=True, for_write=True
-    )
+    await get_shipment_or_404(session, shipment_id, user, for_update=True, for_write=True)
     entry = await _get_entry_or_404(session, shipment_id, entry_id)
     if entry.type is not EntryType.note:
         raise AppError("Изменять можно только примечания", code="not_editable")
@@ -438,8 +434,10 @@ async def delete_entry(session: AsyncSession, user: User, shipment_id: int, entr
             code="history_immutable",
         )
     attachment_rows = (
-        await session.execute(select(Attachment).where(Attachment.entry_id == entry.id))
-    ).scalars().all()
+        (await session.execute(select(Attachment).where(Attachment.entry_id == entry.id)))
+        .scalars()
+        .all()
+    )
     paths: list[Path] = []
     for attachment in attachment_rows:
         if attachment.storage_path:
