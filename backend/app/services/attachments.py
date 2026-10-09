@@ -19,6 +19,7 @@ import os
 import shutil
 import threading
 import uuid
+import weakref
 import warnings
 from contextlib import suppress
 from io import BytesIO
@@ -79,11 +80,25 @@ _THUMBNAIL_SLOT = threading.BoundedSemaphore(1)
 
 # В каждом gunicorn worker одновременно записывается не больше одного файла.
 # Асинхронный семафор не занимает поток, пока запрос ждёт своей очереди.
-_UPLOAD_SLOT = asyncio.Semaphore(1)
+_UPLOAD_SLOTS: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Semaphore] = (
+    weakref.WeakKeyDictionary()
+)
+_UPLOAD_SLOTS_LOCK = threading.Lock()
 try:
     _UPLOAD_WORKERS = max(1, int(os.getenv("GUNICORN_WORKERS", "3")))
 except ValueError:
     _UPLOAD_WORKERS = 3
+
+
+def _upload_slot() -> asyncio.Semaphore:
+    """Семафор на event loop: тесты могут запускать разные loop в одном процессе."""
+    loop = asyncio.get_running_loop()
+    with _UPLOAD_SLOTS_LOCK:
+        slot = _UPLOAD_SLOTS.get(loop)
+        if slot is None:
+            slot = asyncio.Semaphore(1)
+            _UPLOAD_SLOTS[loop] = slot
+        return slot
 
 
 def storage_root() -> Path:
@@ -174,11 +189,12 @@ async def _store_upload(file: UploadFile, relative_dir: Path) -> tuple[str, str,
     target = storage_root() / relative_dir / f"{uuid.uuid4().hex}{suffix}"
     # Один активный upload на worker. Семафор не блокирует event loop и
     # вместе с резервом на все worker-процессы предотвращает гонку диска.
-    await _UPLOAD_SLOT.acquire()
+    slot = _upload_slot()
+    await slot.acquire()
     try:
         size = await _save_upload(file, target)
     finally:
-        _UPLOAD_SLOT.release()
+        slot.release()
     return original[:255], ALLOWED_EXTENSIONS[suffix], size, target
 
 
