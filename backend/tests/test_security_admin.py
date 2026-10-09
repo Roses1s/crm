@@ -19,6 +19,22 @@ from app.services.admin import delete_user, update_user
 from tests.conftest import TEST_DATABASE_URL, TEST_PASSWORD
 
 
+async def test_user_name_fields_respect_database_length(
+    auth_client: AsyncClient,
+) -> None:
+    response = await auth_client.post(
+        "/api/v1/admin/users",
+        json={
+            "email": "too-long-name@crmdetroid.ru",
+            "password": TEST_PASSWORD,
+            "first_name": "А" * 101,
+            "last_name": "Фамилия",
+        },
+    )
+    assert response.status_code == 422
+    assert response.json()["code"] == "validation_error"
+
+
 async def test_failed_login_is_recorded(client: AsyncClient, seeded: dict[str, object]) -> None:
     await client.post(
         "/api/v1/auth/login",
