@@ -173,13 +173,11 @@ it("не повторяет запоздавший 401 запросом ново
   const fetchMock = vi.fn((input: RequestInfo | URL) => {
     const url = String(input);
     if (url.endsWith("/auth/refresh")) {
-      return Promise.resolve(
-        jsonResponse({
-          access_token: "unexpected-token",
-          token_type: "bearer",
-          expires_in: 1800,
-        }),
-      );
+      return jsonResponse({
+        access_token: "unexpected-token",
+        token_type: "bearer",
+        expires_in: 1800,
+      });
     }
     return oldResponse;
   });
