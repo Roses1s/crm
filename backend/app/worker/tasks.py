@@ -135,13 +135,16 @@ def backup_attachments() -> dict[str, Any]:
     target = BACKUP_DIR / f"files-{stamp}-{unique}.tar.gz"
     temporary = target.with_name(f".{target.name}.tmp")
 
-    with tarfile.open(temporary, "w:gz") as archive:
-        # В архив входят оригиналы и уже созданные WebP-миниатюры. При
-        # восстановлении пустые кеши также будут автоматически пересозданы.
-        archive.add(source, arcname="attachments")
-
-    # Финальное имя появляется только после успешного завершения архивации.
-    temporary.replace(target)
+    try:
+        with tarfile.open(temporary, "w:gz") as archive:
+            # В архив входят оригиналы и уже созданные WebP-миниатюры. При
+            # восстановлении пустые кеши также будут автоматически пересозданы.
+            archive.add(source, arcname="attachments")
+        # Финальное имя появляется только после успешного завершения архивации.
+        temporary.replace(target)
+    except BaseException:
+        temporary.unlink(missing_ok=True)
+        raise
 
     # Оставляем только N последних архивов файлов.
     archives = sorted(BACKUP_DIR.glob("files-*.tar.gz"), key=lambda f: f.stat().st_mtime)
