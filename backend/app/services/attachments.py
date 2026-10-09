@@ -305,9 +305,10 @@ async def upload_lead_attachment(
     )
     session.add(attachment)
     try:
+        await get_editable_lead(session, lead_id, user, for_update=True)
         await session.commit()
     except BaseException:
-        # Файл уже записан на диск; при неудачной транзакции удаляем только его.
+        # Файл уже записан на диск; при неудачной проверке/транзакции удаляем только его.
         await run_in_threadpool(target.unlink, missing_ok=True)
         raise
     await session.refresh(attachment)
@@ -357,7 +358,7 @@ async def upload_shipment_attachment(
     file: UploadFile,
     entry_id: int | None = None,
 ) -> Attachment:
-    shipment = await _shipment_or_404(session, user, shipment_id, for_write=True)
+    shipment = await _shipment_or_404(session, user, shipment_id, allow_lost=True)
 
     if entry_id is not None:
         entry = await session.get(TimelineEntry, entry_id)
@@ -383,6 +384,7 @@ async def upload_shipment_attachment(
     )
     session.add(attachment)
     try:
+        await get_editable_lead(session, shipment.lead_id, user, for_update=True)
         await session.commit()
     except BaseException:
         await run_in_threadpool(target.unlink, missing_ok=True)
@@ -445,7 +447,7 @@ async def delete_attachment(session: AsyncSession, user: User, attachment_id: in
     if attachment is None:
         raise NotFoundError(f"Вложение {attachment_id} не найдено")
     # Удаление любого вложения — операция записи, в том числе у заявки.
-    await get_editable_lead(session, attachment.lead_id, user)
+    await get_editable_lead(session, attachment.lead_id, user, for_update=True)
 
     # Свой файл удаляет автор, чужой — только администратор.
     if attachment.uploaded_by_id != user.id and user.role != Role.admin:
