@@ -98,10 +98,10 @@ async function request(
       // после входа другого пользователя, чью сессию нельзя очищать.
       if (generationAtStart !== getSessionGeneration()) {
         throw new ApiError(
-        401,
-        "Запрос относится к предыдущей сессии",
-        "session_changed",
-      );
+          401,
+          "Запрос относится к предыдущей сессии",
+          "session_changed",
+        );
       }
       if (refreshed) return request(path, init, auth, false);
     }
