@@ -378,6 +378,39 @@ async def test_colleague_can_view_but_not_upload_lost_lead_attachments(
     assert uploaded.status_code == 404
 
 
+async def test_owner_cannot_upload_or_delete_shipment_attachment_on_lost_lead(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    """Запрет записи распространяется и на документы самой заявки проигранного лида."""
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    shipment = (
+        await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})
+    ).json()
+    shipment_id = shipment["id"]
+    original = await auth_client.post(
+        f"/api/v1/shipments/{shipment_id}/attachments",
+        files={"file": ("document.pdf", b"%PDF-1.4 test", "application/pdf")},
+    )
+    assert original.status_code == 201, original.text
+
+    lost = await auth_client.post(
+        f"/api/v1/crm/leads/{lead_id}/lose",
+        json={"reason_id": seeded["loss_reason"].id},  # type: ignore[attr-defined]
+    )
+    assert lost.status_code == 204
+
+    uploaded = await auth_client.post(
+        f"/api/v1/shipments/{shipment_id}/attachments",
+        files={"file": ("another.pdf", b"%PDF-1.4 test", "application/pdf")},
+    )
+    assert uploaded.status_code == 409
+    assert uploaded.json()["code"] == "lead_lost"
+
+    deleted = await auth_client.delete(f"/api/v1/crm/attachments/{original.json()['id']}")
+    assert deleted.status_code == 409
+    assert deleted.json()["code"] == "lead_lost"
+
+
 async def test_previous_owner_cannot_change_lost_lead_attachments_until_restored(
     auth_client: AsyncClient, seeded: dict
 ) -> None:
