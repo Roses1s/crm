@@ -113,7 +113,7 @@ class LeadBase(BaseModel):
     inn: str = Field(min_length=10, max_length=12)
     logist_contact: str = Field(default="", max_length=255)
     logist_phone: str = Field(default="", max_length=32)
-    logist_email: EmailStr | None = None
+    logist_email: EmailStr | None = Field(default=None, max_length=255)
     priority: int = Field(default=0, ge=0, le=3)
 
     _validate_inn = field_validator("inn")(staticmethod(validate_inn))
