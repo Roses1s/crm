@@ -428,7 +428,7 @@ async def transfer_lead(
     if lead is None:
         raise NotFoundError(f"Лид {lead_id} не найден")
     forbidden = user.role != Role.admin and lead.assigned_to_id != user.id
-    if forbidden and not lead.is_archived:
+    if forbidden:
         raise NotFoundError(f"Лид {lead_id} не найден")
     was_lost = lead.is_archived
 
