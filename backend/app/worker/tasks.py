@@ -277,17 +277,28 @@ def cleanup_orphan_files() -> dict[str, Any]:
             for file in files
             if file.name.endswith(".thumbnail.webp")
             for suffix in (
-                ".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".txt", ".csv",
-                ".doc", ".docx", ".xls", ".xlsx", ".zip", ".rar", ".7z",
+                ".pdf",
+                ".png",
+                ".jpg",
+                ".jpeg",
+                ".gif",
+                ".webp",
+                ".txt",
+                ".csv",
+                ".doc",
+                ".docx",
+                ".xls",
+                ".xlsx",
+                ".zip",
+                ".rar",
+                ".7z",
             )
         )
         with _session() as session:
             known_originals = {
                 path
                 for (path,) in session.execute(
-                    select(Attachment.storage_path).where(
-                        Attachment.storage_path.in_(candidates)
-                    )
+                    select(Attachment.storage_path).where(Attachment.storage_path.in_(candidates))
                 )
                 if path
             }
