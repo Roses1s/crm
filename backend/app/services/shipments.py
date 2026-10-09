@@ -67,24 +67,40 @@ async def get_shipment_or_404(
         .options(selectinload(Shipment.tags))
         .execution_options(populate_existing=True)
     )
-    if for_update:
-        # Перенос заявки меняет сразу три таблицы; блокировка не даёт двум
-        # одновременным PATCH разнести их по разным лидам. Та же блокировка
-        # нужна при смене статуса: иначе два запроса запишут одну и ту же
-        # старую стадию в историю.
-        # `Shipment.lead` тянет nullable joined-связи этапа/ответственного.
-        # PostgreSQL запрещает FOR UPDATE всей такой выборки, поэтому явно
-        # блокируем только базовую строку shipments.
-        stmt = stmt.with_for_update(of=Shipment)
-    shipment = (await session.execute(stmt)).unique().scalar_one_or_none()
-    if shipment is None:
-        raise NotFoundError(f"Заявка {shipment_id} не найдена")
-    # Заявка наследует видимость своего лида: чужая для менеджера не существует.
+    # Единый порядок блокировок — сначала лид, потом заявка. Иначе PATCH
+    # заявки (shipment -> lead) мог бы deadlock-нуться с удалением лида
+    # (lead -> cascade shipment).
     if user is not None and for_write:
-        # Запись в заявку запрещена, пока связанный лид проигран, включая владельца и администратора.
-        await get_editable_lead(session, shipment.lead_id, user, for_update=True)
-    elif user is not None and user.role != Role.admin:
-        await get_lead_or_404(session, shipment.lead_id, user, allow_lost=allow_lost)
+        initial = (await session.execute(stmt)).unique().scalar_one_or_none()
+        if initial is None:
+            raise NotFoundError(f"Заявка {shipment_id} не найдена")
+        locked_lead = await get_editable_lead(
+            session, initial.lead_id, user, for_update=True
+        )
+        if for_update:
+            locked_stmt = stmt.with_for_update(of=Shipment)
+            shipment = (await session.execute(locked_stmt)).unique().scalar_one_or_none()
+            if shipment is None:
+                raise NotFoundError(f"Заявка {shipment_id} не найдена")
+            if shipment.lead_id != locked_lead.id:
+                raise AppError(
+                    "Заявка одновременно изменена другим пользователем. Обновите страницу",
+                    code="shipment_conflict",
+                    status_code=409,
+                )
+        else:
+            shipment = initial
+    else:
+        if for_update:
+            # `Shipment.lead` тянет nullable joined-связи этапа/ответственного.
+            # PostgreSQL запрещает FOR UPDATE всей такой выборки, поэтому явно
+            # блокируем только базовую строку shipments.
+            stmt = stmt.with_for_update(of=Shipment)
+        shipment = (await session.execute(stmt)).unique().scalar_one_or_none()
+        if shipment is None:
+            raise NotFoundError(f"Заявка {shipment_id} не найдена")
+        if user is not None and user.role != Role.admin:
+            await get_lead_or_404(session, shipment.lead_id, user, allow_lost=allow_lost)
     return shipment
 
 
