@@ -242,9 +242,7 @@ async def test_deleting_lead_note_removes_its_attachment_files(
     new_files = {p for p in root.rglob("*") if p.is_file()} - before
     assert new_files
 
-    deleted = await auth_client.delete(
-        f"/api/v1/crm/leads/{lead_id}/timeline/{entry_id}"
-    )
+    deleted = await auth_client.delete(f"/api/v1/crm/leads/{lead_id}/timeline/{entry_id}")
     assert deleted.status_code == 204
     assert all(not path.exists() for path in new_files)
 
@@ -254,9 +252,7 @@ async def test_lead_attachment_rejects_shipment_timeline_entry(
 ) -> None:
     """Вложение лида нельзя прикрепить к записи ленты заявки, даже у того же лида."""
     lead_id = seeded["lead"].id  # type: ignore[attr-defined]
-    shipment = (
-        await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})
-    ).json()
+    shipment = (await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})).json()
     note = await auth_client.post(
         f"/api/v1/shipments/{shipment['id']}/notes", json={"body": "Заметка заявки"}
     )
