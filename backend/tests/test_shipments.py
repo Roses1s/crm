@@ -4,12 +4,14 @@ from __future__ import annotations
 
 import asyncio
 from decimal import Decimal
+from pathlib import Path
 
 import pytest
 from asyncpg.exceptions import UniqueViolationError
 from httpx import AsyncClient, Response
 from sqlalchemy.exc import IntegrityError
 
+from app.core.config import settings
 from app.core.errors import _classify_integrity_error
 from tests.conftest import TEST_DATABASE_URL, TEST_PASSWORD
 
