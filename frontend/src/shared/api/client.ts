@@ -71,20 +71,32 @@ async function request(
   // Защищаем не только от запоздавшего 401: успешный ответ старой сессии
   // тоже нельзя отдавать вызывающему коду после смены пользователя.
   if (auth && generationAtStart !== getSessionGeneration()) {
-    throw new ApiError(401, "Запрос относится к предыдущей сессии", "session_changed");
+    throw new ApiError(
+      401,
+      "Запрос относится к предыдущей сессии",
+      "session_changed",
+    );
   }
 
   if (response.status === 401 && auth) {
     // Не обновляем сессию и не повторяем старый запрос токеном другого пользователя.
     if (generationAtStart !== getSessionGeneration()) {
-      throw new ApiError(401, "Запрос относится к предыдущей сессии", "session_changed");
+      throw new ApiError(
+      401,
+      "Запрос относится к предыдущей сессии",
+      "session_changed",
+    );
     }
     if (retry) {
       const refreshed = await refreshSession();
       // Проверяем поколение и при неудачном refresh: он мог завершиться уже
       // после входа другого пользователя, чью сессию нельзя очищать.
       if (generationAtStart !== getSessionGeneration()) {
-        throw new ApiError(401, "Запрос относится к предыдущей сессии", "session_changed");
+        throw new ApiError(
+      401,
+      "Запрос относится к предыдущей сессии",
+      "session_changed",
+    );
       }
       if (refreshed) return request(path, init, auth, false);
     }
