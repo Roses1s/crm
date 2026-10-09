@@ -505,10 +505,20 @@ def _scan_disk_usage() -> dict[str, int]:
     root = storage_root()
     if not root.exists():
         return {"files": 0, "bytes": 0, "free_bytes": 0}
-    files = [p for p in root.rglob("*") if p.is_file()]
+    files = 0
+    total_bytes = 0
+    for path in root.rglob("*"):
+        try:
+            if not path.is_file():
+                continue
+            total_bytes += path.stat().st_size
+            files += 1
+        except OSError:
+            # Вложение могло исчезнуть во время обхода или быть недоступно.
+            continue
     return {
-        "files": len(files),
-        "bytes": sum(p.stat().st_size for p in files),
+        "files": files,
+        "bytes": total_bytes,
         "free_bytes": shutil.disk_usage(root).free,
     }
 
