@@ -256,6 +256,10 @@ celery -A app.worker.celery_app.celery worker -l info
 celery -A app.worker.celery_app.celery beat   -l info
 ```
 
+Расписание указано по часовому поясу **Europe/Moscow** (он задан в Celery
+через `timezone="Europe/Moscow"`). Системное время контейнера может быть UTC;
+оно не меняет часовой пояс расписания.
+
 | Задача | Расписание | Что делает |
 |---|---|---|
 | `backup_database` | 03:00 ежедневно | `pg_dump` в `/var/backups/crm`, хранит 14 дней |
