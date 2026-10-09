@@ -47,6 +47,8 @@ export function setAccessToken(token: string | null): void {
 /** Начинает новую учётную сессию, не переиспользуя данные предыдущей. */
 export function startSession(token: string): void {
   sessionGeneration += 1;
+  // Продление предыдущей сессии не должно блокировать refresh нового пользователя.
+  refreshInFlight = null;
   clearSessionCache();
   accessToken = token;
   notify();
@@ -63,6 +65,7 @@ export function isRestored(): boolean {
 
 export function clearTokens(): void {
   sessionGeneration += 1;
+  refreshInFlight = null;
   accessToken = null;
   clearSessionCache();
   notify();
@@ -118,7 +121,8 @@ export async function refreshSession(): Promise<boolean> {
     } catch {
       return false;
     } finally {
-      refreshInFlight = null;
+      // Старый refresh не должен очистить ссылку на новый запрос другой сессии.
+      if (generationAtStart === sessionGeneration) refreshInFlight = null;
     }
   })();
 
