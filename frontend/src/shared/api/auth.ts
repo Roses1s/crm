@@ -34,6 +34,11 @@ export function getAccessToken(): string | null {
   return accessToken;
 }
 
+/** Версия учётной сессии для защиты запросов, начатых до смены пользователя. */
+export function getSessionGeneration(): number {
+  return sessionGeneration;
+}
+
 export function setAccessToken(token: string | null): void {
   accessToken = token;
   notify();
