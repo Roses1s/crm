@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import asyncio
 import os
 import shutil
 import threading
@@ -77,8 +78,8 @@ THUMBNAIL_QUALITY = 82
 _THUMBNAIL_SLOT = threading.BoundedSemaphore(1)
 
 # В каждом gunicorn worker одновременно записывается не больше одного файла.
-# Поэтому общий резерв диска можно безопасно посчитать по числу процессов.
-_UPLOAD_SLOT = threading.BoundedSemaphore(1)
+# Асинхронный семафор не занимает поток, пока запрос ждёт своей очереди.
+_UPLOAD_SLOT = asyncio.Semaphore(1)
 try:
     _UPLOAD_WORKERS = max(1, int(os.getenv("GUNICORN_WORKERS", "3")))
 except ValueError:
@@ -173,7 +174,7 @@ async def _store_upload(file: UploadFile, relative_dir: Path) -> tuple[str, str,
     target = storage_root() / relative_dir / f"{uuid.uuid4().hex}{suffix}"
     # Один активный upload на worker. Семафор не блокирует event loop и
     # вместе с резервом на все worker-процессы предотвращает гонку диска.
-    await run_in_threadpool(_UPLOAD_SLOT.acquire)
+    await _UPLOAD_SLOT.acquire()
     try:
         size = await _save_upload(file, target)
     finally:
