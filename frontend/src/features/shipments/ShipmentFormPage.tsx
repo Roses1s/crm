@@ -130,7 +130,9 @@ function toDatetimeLocal(iso: string): string {
   const d = new Date(iso);
   if (Number.isNaN(d.getTime())) return "";
   const pad = (n: number) => String(n).padStart(2, "0");
-  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(d.getHours())}:${pad(d.getMinutes())}`;
+  return `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}T${pad(
+    d.getHours(),
+  )}:${pad(d.getMinutes())}`;
 }
 
 /** Обратное преобразование для отправки на сервер: datetime-local без пояса
@@ -378,7 +380,9 @@ function ShipmentForm({ id }: { id?: string }) {
     created_at: toDatetimeLocal(new Date().toISOString()),
   }));
   const [pristine, setPristine] = useState<FormState>(form);
-  const { data: selectedLeadDetails } = useLead(isNew && form.lead_id ? String(form.lead_id) : undefined);
+  const { data: selectedLeadDetails } = useLead(
+    isNew && form.lead_id ? String(form.lead_id) : undefined,
+  );
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<Attachment | null>(null);
   const [tab, setTab] = useState("lines");
