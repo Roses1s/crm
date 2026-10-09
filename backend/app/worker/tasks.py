@@ -23,6 +23,7 @@ import tarfile
 from datetime import UTC, datetime, timedelta
 from pathlib import Path
 from typing import Any, cast
+from uuid import uuid4
 
 from celery import shared_task
 from sqlalchemy import CursorResult, Engine, create_engine, delete, select
@@ -79,14 +80,16 @@ def _pg_dump_command(target: Path) -> tuple[list[str], dict[str, str]]:
 def backup_database() -> dict[str, Any]:
     """Ночной дамп базы через pg_dump. Хранит копии 14 дней."""
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now(tz=UTC).strftime("%Y-%m-%d-%H%M")
-    target = BACKUP_DIR / f"crm-{stamp}.dump"
+    stamp = datetime.now(tz=UTC).strftime("%Y-%m-%d-%H%M%S")
+    unique = uuid4().hex[:8]
+    target = BACKUP_DIR / f"crm-{stamp}-{unique}.dump"
+    temporary = target.with_suffix(".dump.tmp")
 
     if shutil.which("pg_dump") is None:
         log.error("backup.no_pg_dump")
         return {"ok": False, "error": "pg_dump не установлен в образе"}
 
-    cmd, env = _pg_dump_command(target)
+    cmd, env = _pg_dump_command(temporary)
     result = subprocess.run(
         cmd,
         env=env,
@@ -100,8 +103,10 @@ def backup_database() -> dict[str, Any]:
         if "server version" in error:
             error += " | нужен postgresql-client той же мажорной версии, что и сервер"
         log.error("backup.failed", stderr=error)
-        target.unlink(missing_ok=True)
+        temporary.unlink(missing_ok=True)
         return {"ok": False, "error": error}
+
+    temporary.replace(target)
 
     cutoff = datetime.now(tz=UTC) - timedelta(days=settings.backup_keep_days)
     removed = 0
@@ -125,13 +130,18 @@ def backup_attachments() -> dict[str, Any]:
         return {"ok": True, "skipped": "вложений нет"}
 
     BACKUP_DIR.mkdir(parents=True, exist_ok=True)
-    stamp = datetime.now(tz=UTC).strftime("%Y-%m-%d-%H%M")
-    target = BACKUP_DIR / f"files-{stamp}.tar.gz"
+    stamp = datetime.now(tz=UTC).strftime("%Y-%m-%d-%H%M%S")
+    unique = uuid4().hex[:8]
+    target = BACKUP_DIR / f"files-{stamp}-{unique}.tar.gz"
+    temporary = target.with_name(f".{target.name}.tmp")
 
-    with tarfile.open(target, "w:gz") as archive:
+    with tarfile.open(temporary, "w:gz") as archive:
         # В архив входят оригиналы и уже созданные WebP-миниатюры. При
         # восстановлении пустые кеши также будут автоматически пересозданы.
         archive.add(source, arcname="attachments")
+
+    # Финальное имя появляется только после успешного завершения архивации.
+    temporary.replace(target)
 
     # Оставляем только N последних архивов файлов.
     archives = sorted(BACKUP_DIR.glob("files-*.tar.gz"), key=lambda f: f.stat().st_mtime)
