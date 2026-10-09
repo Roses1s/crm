@@ -106,11 +106,13 @@ async def transfer_leads(session: AsyncSession, *, from_user: User, to_user: Use
     от имени удаляющего администратора; запись и удаление сотрудника
     фиксируются одной транзакцией.
     """
-    leads = list(
-        (await session.execute(select(Lead).where(Lead.assigned_to_id == from_user.id)))
-        .unique()
-        .scalars()
+    leads_stmt = (
+        select(Lead)
+        .where(Lead.assigned_to_id == from_user.id)
+        .execution_options(populate_existing=True)
+        .with_for_update(of=Lead)
     )
+    leads = list((await session.execute(leads_stmt)).unique().scalars())
     if not leads:
         return 0
 
