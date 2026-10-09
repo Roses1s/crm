@@ -74,8 +74,25 @@ async def get_lead_or_404(
 
 
 async def get_editable_lead(session: AsyncSession, lead_id: int, user: User) -> Lead:
-    """Доступный для изменения лид; проигранный сначала нужно восстановить."""
-    lead = await get_lead_or_404(session, lead_id, user)
+    """Доступный для изменения лид; блокирует строку до конца операции записи.
+
+    Блокировка сериализует запись заметок, вложений и заявок с операцией
+    проигрыша: нельзя пройти проверку на активном лиде и завершить запись уже
+    после того, как другой запрос отметил его проигранным.
+    """
+    stmt = (
+        select(Lead)
+        .where(Lead.id == lead_id)
+        .options(selectinload(Lead.tags))
+        .execution_options(populate_existing=True)
+        .with_for_update(of=Lead)
+    )
+    lead = (await session.execute(stmt)).unique().scalar_one_or_none()
+    if lead is None:
+        raise NotFoundError(f"Лид {lead_id} не найден")
+    forbidden = user.role != Role.admin and lead.assigned_to_id != user.id
+    if forbidden:
+        raise NotFoundError(f"Лид {lead_id} не найден")
     if lead.is_archived:
         raise AppError(
             "Сначала восстановите проигранный лид, затем редактируйте его",
