@@ -111,6 +111,7 @@ async def delete_stage(
     leads_stmt = (
         select(Lead)
         .where(Lead.stage_id == stage_id)
+        .order_by(Lead.id)
         .execution_options(populate_existing=True)
         .with_for_update(of=Lead)
     )
