@@ -51,6 +51,7 @@ async def test_upload_and_download(auth_client: AsyncClient, seeded: dict) -> No
     assert downloaded.content == b"%PDF-1.4 fake"
     # PDF показывается в окне, произвольный файл — только скачиванием.
     assert downloaded.headers["content-disposition"].startswith("inline")
+    assert downloaded.headers["cache-control"] == "private, no-store"
     assert downloaded.headers["x-content-type-options"] == "nosniff"
     assert (
         await auth_client.get(f"/api/v1/crm/attachments/{body['id']}/thumbnail")
