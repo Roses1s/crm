@@ -19,8 +19,8 @@ import os
 import shutil
 import threading
 import uuid
-import weakref
 import warnings
+import weakref
 from contextlib import suppress
 from io import BytesIO
 from pathlib import Path
