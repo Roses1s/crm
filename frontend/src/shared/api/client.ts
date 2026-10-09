@@ -8,12 +8,7 @@
 
 import type { ZodType } from "zod";
 
-import {
-  clearTokens,
-  getAccessToken,
-  getSessionGeneration,
-  refreshSession,
-} from "./auth";
+import { clearTokens, getAccessToken, getSessionGeneration, refreshSession } from "./auth";
 
 const BASE = "/api/v1";
 
