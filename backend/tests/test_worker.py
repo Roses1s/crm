@@ -194,8 +194,11 @@ def test_backup_attachments_includes_original_and_thumbnail(
     monkeypatch.setattr(worker_tasks, "BACKUP_DIR", backup_dir)
 
     result = worker_tasks.backup_attachments()
+    second_result = worker_tasks.backup_attachments()
 
     assert result["ok"] is True
+    assert second_result["ok"] is True
+    assert result["file"] != second_result["file"]
     with tarfile.open(backup_dir / result["file"], "r:gz") as archive:
         names = set(archive.getnames())
     assert "attachments/photo.jpg" in names
