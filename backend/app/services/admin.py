@@ -101,10 +101,10 @@ async def delete_user(session: AsyncSession, *, current: User, user_id: int) -> 
 async def transfer_leads(session: AsyncSession, *, from_user: User, to_user: User) -> int:
     """Переносит лиды сотрудника на доску администратора и пишет это в историю.
 
-    Этап подбираем по названию: если у администратора есть колонка с таким же
-    именем, карточка встаёт в неё, иначе — в первую. Каждая карточка получает
-    запись «Продавец: старый → новый» от имени удаляющего администратора; запись
-    и удаление сотрудника фиксируются одной транзакцией.
+    Все карточки, включая проигранные, переводятся в первый этап доски
+    администратора. Каждая карточка получает запись «Продавец: старый → новый»
+    от имени удаляющего администратора; запись и удаление сотрудника
+    фиксируются одной транзакцией.
     """
     leads = list(
         (await session.execute(select(Lead).where(Lead.assigned_to_id == from_user.id)))
@@ -125,22 +125,14 @@ async def transfer_leads(session: AsyncSession, *, from_user: User, to_user: Use
             )
         ).scalars()
     )
-    by_name = {stage.name: stage for stage in target_stages}
+    # По правилу продукта все лиды удаляемого сотрудника идут в первый этап
+    # доски администратора — не пытаемся сохранять название старого этапа.
     fallback = target_stages[0]
-
-    old_stages = {
-        stage.id: stage
-        for stage in (
-            await session.execute(select(Stage).where(Stage.owner_id == from_user.id))
-        ).scalars()
-    }
 
     previous_owner = (from_user.full_name or from_user.email)[:255]
     next_owner = (to_user.full_name or to_user.email)[:255]
     for lead in leads:
-        old = old_stages.get(lead.stage_id)
-        same_name = by_name.get(old.name) if old else None
-        lead.stage_id = (same_name or fallback).id
+        lead.stage_id = fallback.id
         lead.assigned_to_id = to_user.id
         advance_lead_version(lead)
         session.add(
