@@ -373,7 +373,7 @@ async def upload_shipment_attachment(
     file: UploadFile,
     entry_id: int | None = None,
 ) -> Attachment:
-    shipment = await _shipment_or_404(session, user, shipment_id, allow_lost=True)
+    shipment = await _shipment_or_404(session, user, shipment_id, for_write=True)
 
     if entry_id is not None:
         entry = await session.get(TimelineEntry, entry_id)
