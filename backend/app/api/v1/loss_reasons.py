@@ -48,7 +48,13 @@ async def create_loss_reason(
     "/{reason_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Удалить причину проигрыша"
 )
 async def delete_loss_reason(reason_id: int, session: SessionDep, _: AdminUser) -> None:
-    reason = await session.get(LossReason, reason_id)
+    # Сериализуем удаление со сменой причины у лида: иначе проверка count()
+    # могла пройти одновременно с назначением этой причины.
+    reason = (
+        await session.execute(
+            select(LossReason).where(LossReason.id == reason_id).with_for_update()
+        )
+    ).scalar_one_or_none()
     if reason is None:
         raise NotFoundError(f"Причина {reason_id} не найдена")
     # Причина «в работе» — часть истории проигранных лидов: у причины в базе
