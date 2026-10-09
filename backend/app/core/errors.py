@@ -17,7 +17,7 @@ import structlog
 from fastapi import FastAPI, Request, status
 from fastapi.exceptions import RequestValidationError
 from fastapi.responses import JSONResponse
-from sqlalchemy.exc import IntegrityError
+from sqlalchemy.exc import DataError, IntegrityError
 from starlette.exceptions import HTTPException as StarletteHTTPException
 
 from app.core.logging import get_logger
@@ -146,6 +146,16 @@ def register_exception_handlers(app: FastAPI) -> None:
         log.warning("db.integrity_error", error=str(exc.orig))
         code, detail, http_status = _classify_integrity_error(exc)
         return JSONResponse(status_code=http_status, content=_payload(detail, code))
+
+    @app.exception_handler(DataError)
+    async def _data_error(_: Request, exc: DataError) -> JSONResponse:
+        # Например, число вышло за точность Numeric или строка за пределы
+        # колонки. Это некорректные данные запроса, а не необработанный 500.
+        log.warning("db.data_error", error=str(exc.orig))
+        return JSONResponse(
+            status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,
+            content=_payload("Переданные данные выходят за допустимые ограничения", "data_error"),
+        )
 
     @app.exception_handler(Exception)
     async def _unhandled(_: Request, exc: Exception) -> JSONResponse:
