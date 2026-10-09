@@ -111,8 +111,8 @@ AccountantName = Literal[
 class LeadBase(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     inn: str = Field(min_length=10, max_length=12)
-    logist_contact: str = ""
-    logist_phone: str = ""
+    logist_contact: str = Field(default="", max_length=255)
+    logist_phone: str = Field(default="", max_length=32)
     logist_email: EmailStr | None = None
     priority: int = Field(default=0, ge=0, le=3)
 
@@ -143,8 +143,8 @@ class LeadUpdate(PatchModel):
 
     name: str | None = Field(default=None, min_length=1, max_length=255)
     inn: str | None = None
-    logist_contact: str | None = None
-    logist_phone: str | None = None
+    logist_contact: str | None = Field(default=None, max_length=255)
+    logist_phone: str | None = Field(default=None, max_length=32)
     logist_email: EmailStr | None = None
     accountant_name: AccountantName | None = None
     priority: int | None = Field(default=None, ge=0, le=3)
