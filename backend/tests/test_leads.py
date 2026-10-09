@@ -586,6 +586,22 @@ async def test_manager_cannot_edit_or_note_foreign_lost_lead(
     assert noted.status_code == 404
 
 
+async def test_manager_cannot_transfer_lost_lead_before_restoring(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    reason_id = seeded["loss_reason"].id  # type: ignore[attr-defined]
+    await auth_client.post(f"/api/v1/crm/leads/{lead_id}/lose", json={"reason_id": reason_id})
+
+    headers = await manager_headers(auth_client)
+    response = await auth_client.post(
+        f"/api/v1/crm/leads/{lead_id}/transfer",
+        json={"user_id": seeded["manager"].id},  # type: ignore[attr-defined]
+        headers=headers,
+    )
+    assert response.status_code == 404
+
+
 async def test_lost_lead_is_read_only_until_restored(
     auth_client: AsyncClient, seeded: dict, session
 ) -> None:
