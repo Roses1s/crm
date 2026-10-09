@@ -145,7 +145,7 @@ class LeadUpdate(PatchModel):
     inn: str | None = None
     logist_contact: str | None = Field(default=None, max_length=255)
     logist_phone: str | None = Field(default=None, max_length=32)
-    logist_email: EmailStr | None = None
+    logist_email: EmailStr | None = Field(default=None, max_length=255)
     accountant_name: AccountantName | None = None
     priority: int | None = Field(default=None, ge=0, le=3)
     stage_id: int | None = None
