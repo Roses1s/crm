@@ -384,9 +384,20 @@ async def delete_lead_permanently(session: AsyncSession, user: User, lead_id: in
     поэтому их приходится собирать и удалять вручную, не полагаясь на
     ORM-каскад (он покрывает только вложения, прицепленные к записям ленты).
     """
-    lead = await get_lead_or_404(session, lead_id, user)
     if user.role != Role.admin:
         raise PermissionDeniedError("Безвозвратно удалить лид может только администратор")
+    # Сериализуем удаление с загрузкой файлов: uploader блокирует эту же строку
+    # перед commit, поэтому список файлов будет полным либо upload отменится.
+    stmt = (
+        select(Lead)
+        .where(Lead.id == lead_id)
+        .options(selectinload(Lead.tags))
+        .execution_options(populate_existing=True)
+        .with_for_update(of=Lead)
+    )
+    lead = (await session.execute(stmt)).unique().scalar_one_or_none()
+    if lead is None:
+        raise NotFoundError(f"Лид {lead_id} не найден")
 
     # lead_id у вложений заявки тоже указывает на лид (см. комментарий в
     # models/timeline.py), поэтому один запрос находит файлы и самого лида,
