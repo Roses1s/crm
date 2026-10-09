@@ -170,9 +170,11 @@ export function FormStatusbar({
                   if (overflowSide) {
                     const rect = event.currentTarget.getBoundingClientRect();
                     const menuWidth = 220;
-                    const requestedLeft =
-                      overflowSide === "before" ? rect.left : rect.right - menuWidth;
-                    const left = Math.max(8, Math.min(requestedLeft, window.innerWidth - menuWidth - 8));
+                    const requestedLeft = overflowSide === "before" ? rect.left : rect.right - menuWidth;
+                    const left = Math.max(
+                      8,
+                      Math.min(requestedLeft, window.innerWidth - menuWidth - 8),
+                    );
                     setMoreOpen((side) => {
                       if (side === overflowSide) {
                         setMorePosition(null);
