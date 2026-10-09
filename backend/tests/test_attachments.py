@@ -224,6 +224,31 @@ async def test_attachment_can_be_linked_to_timeline_entry(
     assert [a["name"] for a in entry["attachments"]] == ["act.pdf"]
 
 
+async def test_deleting_lead_note_removes_its_attachment_files(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    root = Path(settings.attachments_dir)
+    before = {p for p in root.rglob("*") if p.is_file()}
+    note = await auth_client.post(
+        f"/api/v1/crm/leads/{lead_id}/notes", json={"body": "Удаляемая заметка"}
+    )
+    entry_id = note.json()["id"]
+    uploaded = await auth_client.post(
+        f"/api/v1/crm/leads/{lead_id}/attachments?entry_id={entry_id}",
+        files={"file": ("delete-me.pdf", b"%PDF-1.4 test", "application/pdf")},
+    )
+    assert uploaded.status_code == 201
+    new_files = {p for p in root.rglob("*") if p.is_file()} - before
+    assert new_files
+
+    deleted = await auth_client.delete(
+        f"/api/v1/crm/leads/{lead_id}/timeline/{entry_id}"
+    )
+    assert deleted.status_code == 204
+    assert all(not path.exists() for path in new_files)
+
+
 async def test_lead_attachment_rejects_shipment_timeline_entry(
     auth_client: AsyncClient, seeded: dict
 ) -> None:
