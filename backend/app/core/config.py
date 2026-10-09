@@ -76,7 +76,7 @@ class Settings(BaseSettings):
 
     # --- вложения ----------------------------------------------------------
     attachments_dir: str = "/var/lib/crm/attachments"
-    # Должно совпадать с client_max_body_size в конфиге nginx.
+    # Лимит файла; client_max_body_size nginx должен быть чуть выше из-за multipart overhead.
     max_upload_mb: int = 25
     # Предохранитель по месту: если на диске останется меньше, загрузка файлов
     # перестаёт приниматься. Нужен, чтобы заполненный диск не остановил
