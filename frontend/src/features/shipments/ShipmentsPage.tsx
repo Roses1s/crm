@@ -88,6 +88,7 @@ export function ShipmentsPage() {
     <AppShell>
       <ControlPanel
         title="Заявки"
+        createTo="/shipments/new"
         status={statusFilter}
         count={shipmentsPage?.total ?? 0}
         loadedCount={shipments.length}
