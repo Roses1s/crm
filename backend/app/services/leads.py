@@ -17,6 +17,7 @@ from sqlalchemy.orm import selectinload
 from starlette.concurrency import run_in_threadpool
 
 from app.core.errors import AppError, NotFoundError, PermissionDeniedError
+from app.core.attachment_paths import thumbnail_path
 from app.core.logging import get_logger
 from app.core.pagination import PageParams, build_page, paginate
 from app.models.crm import Lead, LossReason, Stage, lead_tags
@@ -372,7 +373,11 @@ async def delete_lead_permanently(session: AsyncSession, user: User, lead_id: in
         .scalars()
         .all()
     )
-    paths = [Path(a.storage_path) for a in attachments if a.storage_path]
+    paths: list[Path] = []
+    for attachment in attachments:
+        if attachment.storage_path:
+            original = Path(attachment.storage_path)
+            paths.extend((original, thumbnail_path(original)))
 
     # Строки из базы удаляются каскадом (заявки и лента — через ORM-cascade на
     # Lead, вложения — через ON DELETE CASCADE в базе), поэтому достаточно
