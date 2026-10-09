@@ -16,6 +16,7 @@ import {
   useDeleteShipmentAttachment,
   useDeleteShipmentTimelineEntry,
   useEditShipmentNote,
+  useLead,
   useLeads,
   useMe,
   useMeta,
@@ -351,13 +352,17 @@ function ShipmentForm({ id }: { id?: string }) {
   const navigate = useNavigate();
   const toast = useToast();
   const [searchParams] = useSearchParams();
+  const [leadSearch, setLeadSearch] = useState("");
 
   const { data: currentUser } = useMe();
   // Ставка вычета маржи — с сервера, единственная копия в бэкенде (Т-08).
   const { data: meta } = useMeta();
   const { data: shipment, isLoading } = useShipment(id);
-  const { data: leadsPage } = useLeads();
+  const { data: leadsPage } = useLeads(isNew ? { search: leadSearch } : {});
   const leads = leadsPage?.items ?? [];
+  const { data: selectedLeadDetails } = useLead(
+    isNew && form.lead_id ? String(form.lead_id) : undefined,
+  );
   const { data: timeline = [] } = useShipmentTimeline(id);
   const { data: attachments = [] } = useShipmentAttachments(savedId);
 
@@ -621,7 +626,9 @@ function ShipmentForm({ id }: { id?: string }) {
 
   const currentStageId = STAGES.find((s) => s.value === shipment?.status)?.id ?? 0;
 
-  const selectedLead = leads.find((l) => l.id === form.lead_id);
+  const selectedLead =
+    leads.find((l) => l.id === form.lead_id) ??
+    selectedLeadDetails;
   const title = shipment?.lead_name || selectedLead?.name || "Новая заявка";
 
   const composerInitial = (currentUser?.first_name || currentUser?.email || "Я")
@@ -721,11 +728,43 @@ function ShipmentForm({ id }: { id?: string }) {
                             onChange={(e) => set("created_at", e.target.value)}
                           />
                         </Field>
-                        <Field label="Заказчик">
-                          <span className="px-1.5 py-[3px] text-odoo-text">
-                            {selectedLead?.name || title}
-                          </span>
-                        </Field>
+                        {isNew ? (
+                          <Field label="Лид" htmlFor="ship-lead-select">
+                            <div className="space-y-1">
+                              <SInput
+                                aria-label="Поиск лида"
+                                placeholder="Поиск по названию или ИНН"
+                                value={leadSearch}
+                                onChange={(e) => setLeadSearch(e.target.value)}
+                              />
+                              <select
+                                id="ship-lead-select"
+                                className={selectStateCls(Boolean(form.lead_id))}
+                                value={form.lead_id || ""}
+                                onChange={(e) => set("lead_id", Number(e.target.value) || 0)}
+                              >
+                                <option value="">Выберите лид</option>
+                                {selectedLeadDetails &&
+                                  !leads.some((lead) => lead.id === selectedLeadDetails.id) && (
+                                    <option value={selectedLeadDetails.id}>
+                                      {selectedLeadDetails.name} · {selectedLeadDetails.inn}
+                                    </option>
+                                  )}
+                                {leads.map((lead) => (
+                                  <option key={lead.id} value={lead.id}>
+                                    {lead.name} · {lead.inn}
+                                  </option>
+                                ))}
+                              </select>
+                            </div>
+                          </Field>
+                        ) : (
+                          <Field label="Заказчик">
+                            <span className="px-1.5 py-[3px] text-odoo-text">
+                              {selectedLead?.name || title}
+                            </span>
+                          </Field>
+                        )}
                         <Field label="ИНН заказчика">
                           <span className="px-1.5 py-[3px] text-odoo-text-muted">
                             {selectedLead?.inn}
