@@ -288,7 +288,7 @@ async def upload_lead_attachment(
     await get_editable_lead(session, lead_id, user)
     if entry_id is not None:
         entry = await session.get(TimelineEntry, entry_id)
-        if entry is None or entry.lead_id != lead_id:
+        if entry is None or entry.lead_id != lead_id or entry.shipment_id is not None:
             raise NotFoundError(f"Запись ленты {entry_id} не найдена")
 
     # Тип берём из расширения, а не из заголовка клиента: заголовку верить нельзя.
