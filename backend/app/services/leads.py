@@ -298,7 +298,20 @@ async def restore_lead(session: AsyncSession, user: User, lead_id: int) -> None:
     проигранный лид и кому-то другому — см. `transfer_lead`, там та же логика
     восстановления работает для произвольного получателя.
     """
-    lead = await get_lead_or_404(session, lead_id, user, allow_lost=True)
+    # Блокируем строку до проверки состояния: два одновременных запроса не
+    # должны оба успешно восстановить один лид и перезаписать владельца.
+    stmt = (
+        select(Lead)
+        .where(Lead.id == lead_id)
+        .options(selectinload(Lead.tags))
+        .execution_options(populate_existing=True)
+        .with_for_update(of=Lead)
+    )
+    lead = (await session.execute(stmt)).unique().scalar_one_or_none()
+    if lead is None:
+        raise NotFoundError(f"Лид {lead_id} не найден")
+    if user.role != Role.admin and lead.assigned_to_id != user.id and not lead.is_archived:
+        raise NotFoundError(f"Лид {lead_id} не найден")
     if not lead.is_archived:
         raise AppError("Лид не в проигрыше — восстанавливать нечего", code="not_lost")
 
