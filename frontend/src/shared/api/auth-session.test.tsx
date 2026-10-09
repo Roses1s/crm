@@ -3,7 +3,13 @@ import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Providers } from "@/app/providers";
-import { clearTokens, getAccessToken, refreshSession, setAccessToken, startSession } from "@/shared/api/auth";
+import {
+  clearTokens,
+  getAccessToken,
+  refreshSession,
+  setAccessToken,
+  startSession,
+} from "@/shared/api/auth";
 import { useLeads, useMe } from "@/shared/api/hooks";
 
 let hideProbe: () => void;
