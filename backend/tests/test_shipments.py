@@ -648,6 +648,29 @@ async def test_owner_and_admin_cannot_write_shipment_of_lost_lead(
         f"/api/v1/crm/leads/{lead_id}/lose", json={"reason_id": reason_id}
     )
 
+    # Нельзя создавать новую заявку на проигранный лид.
+    create_lost = await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})
+    assert create_lost.status_code == 409
+
+    # Нельзя перенести существующую заявку к проигранному лиду.
+    active_lead = (
+        await auth_client.post(
+            "/api/v1/crm/leads",
+            json={
+                "name": "ООО «Активный лид для переноса»",
+                "inn": "5404123455",
+                "stage_id": seeded["stage_new"].id,  # type: ignore[attr-defined]
+            },
+        )
+    ).json()
+    active_shipment = (
+        await auth_client.post("/api/v1/shipments", json={"lead_id": active_lead["id"]})
+    ).json()
+    transfer_lost = await auth_client.patch(
+        f"/api/v1/shipments/{active_shipment['id']}", json={"lead_id": lead_id}
+    )
+    assert transfer_lost.status_code == 409
+
     # Администратор — владелец тестового лида; чтение остаётся разрешено.
     assert (await auth_client.get(f"/api/v1/shipments/{shipment_id}")).status_code == 200
     assert (await auth_client.get(f"/api/v1/shipments/{shipment_id}/timeline")).status_code == 200
