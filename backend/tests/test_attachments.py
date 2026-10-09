@@ -223,6 +223,26 @@ async def test_attachment_can_be_linked_to_timeline_entry(
     assert [a["name"] for a in entry["attachments"]] == ["act.pdf"]
 
 
+async def test_lead_attachment_rejects_shipment_timeline_entry(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    """Вложение лида нельзя прикрепить к записи ленты заявки, даже у того же лида."""
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    shipment = (
+        await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})
+    ).json()
+    note = await auth_client.post(
+        f"/api/v1/shipments/{shipment['id']}/notes", json={"body": "Заметка заявки"}
+    )
+    response = await auth_client.post(
+        f"/api/v1/crm/leads/{lead_id}/attachments?entry_id={note.json()['id']}",
+        files={"file": ("wrong-place.pdf", b"%PDF-1.4 test", "application/pdf")},
+    )
+    assert response.status_code == 404
+    listed = await auth_client.get(f"/api/v1/crm/leads/{lead_id}/attachments")
+    assert all(item["name"] != "wrong-place.pdf" for item in listed.json())
+
+
 async def test_manager_cannot_delete_foreign_attachment(
     client: AsyncClient, auth_client: AsyncClient, seeded: dict
 ) -> None:
