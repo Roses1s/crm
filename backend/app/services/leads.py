@@ -16,8 +16,8 @@ from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import selectinload
 from starlette.concurrency import run_in_threadpool
 
-from app.core.errors import AppError, NotFoundError, PermissionDeniedError
 from app.core.attachment_paths import thumbnail_path
+from app.core.errors import AppError, NotFoundError, PermissionDeniedError
 from app.core.logging import get_logger
 from app.core.pagination import PageParams, build_page, paginate
 from app.models.crm import Lead, LossReason, Stage, lead_tags
