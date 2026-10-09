@@ -382,7 +382,9 @@ async def shipment_timeline(
 async def add_note(
     session: AsyncSession, user: User, shipment_id: int, payload: NoteCreate
 ) -> TimelineEntry:
-    shipment = await get_shipment_or_404(session, shipment_id, user, for_write=True)
+    shipment = await get_shipment_or_404(
+        session, shipment_id, user, for_update=True, for_write=True
+    )
     entry = TimelineEntry(
         lead_id=shipment.lead_id,
         shipment_id=shipment.id,
@@ -399,7 +401,9 @@ async def add_note(
 async def update_entry(
     session: AsyncSession, user: User, shipment_id: int, entry_id: int, payload: NoteUpdate
 ) -> TimelineEntry:
-    await get_shipment_or_404(session, shipment_id, user, for_write=True)
+    await get_shipment_or_404(
+        session, shipment_id, user, for_update=True, for_write=True
+    )
     entry = await _get_entry_or_404(session, shipment_id, entry_id)
     if entry.type is not EntryType.note:
         raise AppError("Изменять можно только примечания", code="not_editable")
@@ -414,7 +418,9 @@ async def update_entry(
 
 
 async def delete_entry(session: AsyncSession, user: User, shipment_id: int, entry_id: int) -> None:
-    await get_shipment_or_404(session, shipment_id, user, for_write=True)
+    await get_shipment_or_404(
+        session, shipment_id, user, for_update=True, for_write=True
+    )
     entry = await _get_entry_or_404(session, shipment_id, entry_id)
     # Системная история — аудит изменения заявки. Если разрешить удалить её
     # через ту же ручку, поля можно переписать без проверяемого следа.
