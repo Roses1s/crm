@@ -279,9 +279,7 @@ async def lose_lead(session: AsyncSession, user: User, lead_id: int, payload: Le
     # причины тем самым сериализуются на PostgreSQL.
     reason = (
         await session.execute(
-            select(LossReason)
-            .where(LossReason.id == payload.reason_id)
-            .with_for_update()
+            select(LossReason).where(LossReason.id == payload.reason_id).with_for_update()
         )
     ).scalar_one_or_none()
     if reason is None:
@@ -571,8 +569,10 @@ async def delete_timeline_entry(
             code="history_immutable",
         )
     attachment_rows = (
-        await session.execute(select(Attachment).where(Attachment.entry_id == entry.id))
-    ).scalars().all()
+        (await session.execute(select(Attachment).where(Attachment.entry_id == entry.id)))
+        .scalars()
+        .all()
+    )
     paths: list[Path] = []
     for attachment in attachment_rows:
         if attachment.storage_path:
