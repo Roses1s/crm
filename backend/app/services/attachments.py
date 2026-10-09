@@ -348,7 +348,7 @@ async def _shipment_or_404(
         raise NotFoundError(f"Заявка {shipment_id} не найдена")
     # Запись во вложения запрещена, пока связанный лид проигран.
     if for_write:
-        await get_editable_lead(session, shipment.lead_id, user)
+        await get_editable_lead(session, shipment.lead_id, user, for_update=True)
     else:
         await get_lead_or_404(session, shipment.lead_id, user, allow_lost=allow_lost)
     return shipment
