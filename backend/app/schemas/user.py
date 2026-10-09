@@ -8,7 +8,7 @@ from app.schemas.common import ORMModel, PatchModel
 
 class UserRead(ORMModel):
     id: int
-    email: EmailStr
+    email: EmailStr = Field(max_length=255)
     first_name: str
     last_name: str
     role: Role
@@ -50,7 +50,7 @@ class UserCreate(BaseModel):
 
 
 class UserUpdate(PatchModel):
-    email: EmailStr | None = None
+    email: EmailStr | None = Field(default=None, max_length=255)
     password: str | None = Field(default=None, min_length=8, max_length=128)
     first_name: str | None = Field(default=None, max_length=100)
     last_name: str | None = Field(default=None, max_length=100)
