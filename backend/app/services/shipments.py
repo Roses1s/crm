@@ -80,7 +80,11 @@ async def get_shipment_or_404(
             raise NotFoundError(f"Заявка {shipment_id} не найдена")
         # Если переносим заявку, блокируем обе карточки в одном порядке по id.
         # Так встречные переносы A→B и B→A не берут блокировки в разном порядке.
-        lead_ids = sorted(lead_id for lead_id in {initial.lead_id, target_lead_id} if lead_id is not None)
+        lead_ids = sorted(
+            lead_id
+            for lead_id in {initial.lead_id, target_lead_id}
+            if lead_id is not None
+        )
         for lead_id in lead_ids:
             await get_editable_lead(session, lead_id, user, for_update=True)
         if for_update:
@@ -327,7 +331,9 @@ async def update_shipment(
 async def set_status(
     session: AsyncSession, user: User, shipment_id: int, payload: ShipmentStatusUpdate
 ) -> Shipment:
-    shipment = await get_shipment_or_404(session, shipment_id, user, for_update=True, for_write=True)
+    shipment = await get_shipment_or_404(
+        session, shipment_id, user, for_update=True, for_write=True
+    )
     previous = shipment.status
     shipment.status = payload.status
     if previous != payload.status:
