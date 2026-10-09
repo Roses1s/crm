@@ -3,7 +3,7 @@ import { useState } from "react";
 import { afterEach, beforeEach, describe, expect, it, vi } from "vitest";
 
 import { Providers } from "@/app/providers";
-import { clearTokens, getAccessToken, refreshSession, setAccessToken } from "@/shared/api/auth";
+import { clearTokens, getAccessToken, refreshSession, setAccessToken, startSession } from "@/shared/api/auth";
 import { useLeads, useMe } from "@/shared/api/hooks";
 
 let hideProbe: () => void;
@@ -126,6 +126,46 @@ describe("изоляция Query cache между учётными сессия�
 
     await expect(refreshSession()).resolves.toBe(false);
     expect(getAccessToken()).toBeNull();
+  });
+
+  it("refresh новой сессии не ждёт зависший refresh предыдущего пользователя", async () => {
+    let finishOld: ((response: Response) => void) | undefined;
+    let calls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(() => {
+        calls += 1;
+        if (calls === 1) {
+          return new Promise<Response>((resolve) => {
+            finishOld = resolve;
+          });
+        }
+        return Promise.resolve(
+          Response.json({
+            access_token: "fresh-user-b-token",
+            token_type: "bearer",
+            expires_in: 1800,
+          }),
+        );
+      }),
+    );
+
+    const oldRefresh = refreshSession();
+    startSession("user-b-login-token");
+
+    await expect(refreshSession()).resolves.toBe(true);
+    expect(getAccessToken()).toBe("fresh-user-b-token");
+
+    finishOld?.(
+      Response.json({
+        access_token: "stale-user-a-token",
+        token_type: "bearer",
+        expires_in: 1800,
+      }),
+    );
+    await expect(oldRefresh).resolves.toBe(false);
+    expect(getAccessToken()).toBe("fresh-user-b-token");
+    expect(calls).toBe(2);
   });
 
   it("поздний refresh не воскрешает уже завершённую сессию", async () => {
