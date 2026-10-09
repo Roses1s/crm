@@ -816,6 +816,23 @@ async def test_page_number_is_bounded(auth_client: AsyncClient) -> None:
     assert response.json()["code"] == "validation_error"
 
 
+async def test_lead_contact_fields_respect_database_lengths(
+    auth_client: AsyncClient, seeded: dict[str, object]
+) -> None:
+    lead = seeded["lead"]
+    response = await auth_client.post(
+        "/api/v1/crm/leads",
+        json={
+            "name": "Лид с чрезмерно длинным контактом",
+            "inn": lead.inn,  # type: ignore[attr-defined]
+            "stage_id": seeded["stage_new"].id,  # type: ignore[attr-defined]
+            "logist_contact": "x" * 256,
+        },
+    )
+    assert response.status_code == 422
+    assert response.json()["code"] == "validation_error"
+
+
 async def test_missing_lead_is_404(auth_client: AsyncClient) -> None:
     response = await auth_client.get("/api/v1/crm/leads/999")
     assert response.status_code == 404
