@@ -606,6 +606,28 @@ async def test_shipment_rejects_negative_price_and_weight(
     assert bad_weight.status_code == 422
 
 
+async def test_shipment_schema_rejects_database_overflow(auth_client: AsyncClient, seeded: dict) -> None:
+    """API отклоняет слишком длинные строки и числа до обращения к PostgreSQL."""
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    too_long = await auth_client.post(
+        "/api/v1/shipments",
+        json={"lead_id": lead_id, "address_loading": "x" * 256},
+    )
+    assert too_long.status_code == 422
+
+    too_large_weight = await auth_client.post(
+        "/api/v1/shipments",
+        json={"lead_id": lead_id, "cargo_weight": "1000000000"},
+    )
+    assert too_large_weight.status_code == 422
+
+    too_large_price = await auth_client.post(
+        "/api/v1/shipments",
+        json={"lead_id": lead_id, "customer_price": "10000000000"},
+    )
+    assert too_large_price.status_code == 422
+
+
 async def test_launcher_apps_depend_on_role(auth_client: AsyncClient) -> None:
     apps = await auth_client.get("/api/v1/launcher/apps")
     slugs = [a["slug"] for a in apps.json()]
