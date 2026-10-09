@@ -304,7 +304,12 @@ async def upload_lead_attachment(
         storage_path=str(target),
     )
     session.add(attachment)
-    await session.commit()
+    try:
+        await session.commit()
+    except BaseException:
+        # Файл уже записан на диск; при неудачной транзакции удаляем только его.
+        await run_in_threadpool(target.unlink, missing_ok=True)
+        raise
     await session.refresh(attachment)
 
     log.info("attachment.uploaded", lead_id=lead_id, size=size, by=user.id)
@@ -377,7 +382,11 @@ async def upload_shipment_attachment(
         storage_path=str(target),
     )
     session.add(attachment)
-    await session.commit()
+    try:
+        await session.commit()
+    except BaseException:
+        await run_in_threadpool(target.unlink, missing_ok=True)
+        raise
     await session.refresh(attachment)
 
     log.info("attachment.uploaded", shipment_id=shipment_id, size=size, by=user.id)
