@@ -628,6 +628,35 @@ async def test_shipment_schema_rejects_database_overflow(auth_client: AsyncClien
     assert too_large_price.status_code == 422
 
 
+async def test_deleting_shipment_note_removes_its_attachment_files(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    shipment = (
+        await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})
+    ).json()
+    shipment_id = shipment["id"]
+    root = Path(settings.attachments_dir)
+    before = {p for p in root.rglob("*") if p.is_file()}
+    note = await auth_client.post(
+        f"/api/v1/shipments/{shipment_id}/notes", json={"body": "Удаляемая заметка"}
+    )
+    entry_id = note.json()["id"]
+    uploaded = await auth_client.post(
+        f"/api/v1/shipments/{shipment_id}/attachments?entry_id={entry_id}",
+        files={"file": ("delete-me.pdf", b"%PDF-1.4 test", "application/pdf")},
+    )
+    assert uploaded.status_code == 201
+    new_files = {p for p in root.rglob("*") if p.is_file()} - before
+    assert new_files
+
+    deleted = await auth_client.delete(
+        f"/api/v1/shipments/{shipment_id}/timeline/{entry_id}"
+    )
+    assert deleted.status_code == 204
+    assert all(not path.exists() for path in new_files)
+
+
 async def test_launcher_apps_depend_on_role(auth_client: AsyncClient) -> None:
     apps = await auth_client.get("/api/v1/launcher/apps")
     slugs = [a["slug"] for a in apps.json()]
