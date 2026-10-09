@@ -229,8 +229,8 @@ async def list_shipments(
 
 
 async def create_shipment(session: AsyncSession, user: User, payload: ShipmentCreate) -> Shipment:
-    # Заявку можно завести только по своему лиду.
-    await get_lead_or_404(session, payload.lead_id, user)
+    # Заявка может ссылаться только на активный лид, который пользователь вправе менять.
+    await get_editable_lead(session, payload.lead_id, user)
     # created_at исключаем отдельно: колонка NOT NULL со server_default=now().
     # Если прислали None (поле не заполнили), явная передача None в конструктор
     # модели перекрыла бы server_default и упала бы на вставке NULL — вместо
@@ -265,7 +265,7 @@ async def update_shipment(
     if new_lead_id is not None and new_lead_id != shipment.lead_id:
         # Проверяем новый лид теми же строгими правами, что и при создании
         # заявки: менеджер не может записать свою заявку в карточку коллеги.
-        await get_lead_or_404(session, new_lead_id, user)
+        await get_editable_lead(session, new_lead_id, user)
 
         # lead_id у timeline и attachments денормализован для авторизации,
         # подсчёта места и каскадного удаления. Поэтому переносим весь агрегат
