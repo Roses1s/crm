@@ -51,6 +51,7 @@ async def get_shipment_or_404(
     allow_lost: bool = False,
     for_update: bool = False,
     for_write: bool = False,
+    target_lead_id: int | None = None,
 ) -> Shipment:
     """`allow_lost=True` — только для чтения: заявка проигранного лида тоже
     становится видна всем, как и сам лид (см. `get_lead_or_404`).
@@ -74,15 +75,17 @@ async def get_shipment_or_404(
         initial = (await session.execute(stmt)).unique().scalar_one_or_none()
         if initial is None:
             raise NotFoundError(f"Заявка {shipment_id} не найдена")
-        locked_lead = await get_editable_lead(
-            session, initial.lead_id, user, for_update=True
-        )
+        # Если переносим заявку, блокируем обе карточки в одном порядке по id.
+        # Так встречные переносы A→B и B→A не берут блокировки в разном порядке.
+        lead_ids = sorted({initial.lead_id, target_lead_id} - {None})
+        for lead_id in lead_ids:
+            await get_editable_lead(session, lead_id, user, for_update=True)
         if for_update:
             locked_stmt = stmt.with_for_update(of=Shipment)
             shipment = (await session.execute(locked_stmt)).unique().scalar_one_or_none()
             if shipment is None:
                 raise NotFoundError(f"Заявка {shipment_id} не найдена")
-            if shipment.lead_id != locked_lead.id:
+            if shipment.lead_id != initial.lead_id:
                 raise AppError(
                     "Заявка одновременно изменена другим пользователем. Обновите страницу",
                     code="shipment_conflict",
@@ -273,7 +276,14 @@ async def create_shipment(session: AsyncSession, user: User, payload: ShipmentCr
 async def update_shipment(
     session: AsyncSession, user: User, shipment_id: int, payload: ShipmentUpdate
 ) -> Shipment:
-    shipment = await get_shipment_or_404(session, shipment_id, user, for_update=True, for_write=True)
+    shipment = await get_shipment_or_404(
+        session,
+        shipment_id,
+        user,
+        for_update=True,
+        for_write=True,
+        target_lead_id=payload.lead_id,
+    )
     data = payload.model_dump(exclude_unset=True)
     tag_ids = data.pop("tag_ids", None)
 
@@ -281,7 +291,7 @@ async def update_shipment(
     if new_lead_id is not None and new_lead_id != shipment.lead_id:
         # Проверяем новый лид теми же строгими правами, что и при создании
         # заявки: менеджер не может записать свою заявку в карточку коллеги.
-        await get_editable_lead(session, new_lead_id, user, for_update=True)
+        # Целевой лид уже проверен и заблокирован get_shipment_or_404 выше.
 
         # lead_id у timeline и attachments денормализован для авторизации,
         # подсчёта места и каскадного удаления. Поэтому переносим весь агрегат
