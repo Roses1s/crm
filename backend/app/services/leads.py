@@ -428,7 +428,9 @@ async def transfer_lead(
     if lead is None:
         raise NotFoundError(f"Лид {lead_id} не найден")
     forbidden = user.role != Role.admin and lead.assigned_to_id != user.id
-    if forbidden:
+    # Передача не должна обходить общий запрет чтения проигранных лидов:
+    # их может передать только администратор через явную операцию восстановления.
+    if forbidden or (lead.is_archived and user.role != Role.admin):
         raise NotFoundError(f"Лид {lead_id} не найден")
     was_lost = lead.is_archived
 
