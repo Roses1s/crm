@@ -7,7 +7,7 @@
 
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { clearTokens, setAccessToken } from "@/shared/api/auth";
+import { clearTokens, setAccessToken, startSession } from "@/shared/api/auth";
 import { api, apiBlob, apiUpload, ApiError, ApiResponseError } from "@/shared/api/client";
 import { z } from "zod";
 
@@ -147,7 +147,6 @@ it("не повторяет запоздавший 401 запросом ново
   expect(fetchMock).toHaveBeenCalledTimes(1);
 
   // Пока запрос пользователя A в пути, пользователь B входит в систему.
-  const { startSession } = await import("@/shared/api/auth");
   startSession("token-user-b");
   resolveOldResponse(jsonResponse({ detail: "expired" }, 401));
 
