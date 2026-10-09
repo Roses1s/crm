@@ -111,7 +111,10 @@ async def download_attachment(
         media_type=attachment.content_type or "application/octet-stream",
         filename=attachment.name,
         content_disposition_type=disposition,
-        headers={"X-Content-Type-Options": "nosniff"},
+        headers={
+            "Cache-Control": "private, no-store",
+            "X-Content-Type-Options": "nosniff",
+        },
     )
 
 
