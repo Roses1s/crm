@@ -25,7 +25,7 @@ from app.models.timeline import SHIPMENT_STAGE_LABEL, Attachment, EntryType, Tim
 from app.models.user import Role, User
 from app.schemas.crm import NoteCreate, NoteUpdate
 from app.schemas.shipment import ShipmentCreate, ShipmentStatusUpdate, ShipmentUpdate
-from app.services.leads import get_lead_or_404
+from app.services.leads import get_editable_lead, get_lead_or_404
 from app.services.search import LIKE_ESCAPE, like_pattern
 from app.services.tags import fetch_tags
 
@@ -50,6 +50,7 @@ async def get_shipment_or_404(
     *,
     allow_lost: bool = False,
     for_update: bool = False,
+    for_write: bool = False,
 ) -> Shipment:
     """`allow_lost=True` — только для чтения: заявка проигранного лида тоже
     становится видна всем, как и сам лид (см. `get_lead_or_404`).
@@ -79,7 +80,10 @@ async def get_shipment_or_404(
     if shipment is None:
         raise NotFoundError(f"Заявка {shipment_id} не найдена")
     # Заявка наследует видимость своего лида: чужая для менеджера не существует.
-    if user is not None and user.role != Role.admin:
+    if user is not None and for_write:
+        # Запись в заявку запрещена, пока связанный лид проигран, включая владельца и администратора.
+        await get_editable_lead(session, shipment.lead_id, user)
+    elif user is not None and user.role != Role.admin:
         await get_lead_or_404(session, shipment.lead_id, user, allow_lost=allow_lost)
     return shipment
 
@@ -253,7 +257,7 @@ async def create_shipment(session: AsyncSession, user: User, payload: ShipmentCr
 async def update_shipment(
     session: AsyncSession, user: User, shipment_id: int, payload: ShipmentUpdate
 ) -> Shipment:
-    shipment = await get_shipment_or_404(session, shipment_id, user, for_update=True)
+    shipment = await get_shipment_or_404(session, shipment_id, user, for_update=True, for_write=True)
     data = payload.model_dump(exclude_unset=True)
     tag_ids = data.pop("tag_ids", None)
 
@@ -294,7 +298,7 @@ async def update_shipment(
 async def set_status(
     session: AsyncSession, user: User, shipment_id: int, payload: ShipmentStatusUpdate
 ) -> Shipment:
-    shipment = await get_shipment_or_404(session, shipment_id, user, for_update=True)
+    shipment = await get_shipment_or_404(session, shipment_id, user, for_update=True, for_write=True)
     previous = shipment.status
     shipment.status = payload.status
     if previous != payload.status:
@@ -349,7 +353,7 @@ async def shipment_timeline(
 async def add_note(
     session: AsyncSession, user: User, shipment_id: int, payload: NoteCreate
 ) -> TimelineEntry:
-    shipment = await get_shipment_or_404(session, shipment_id, user)
+    shipment = await get_shipment_or_404(session, shipment_id, user, for_write=True)
     entry = TimelineEntry(
         lead_id=shipment.lead_id,
         shipment_id=shipment.id,
@@ -366,7 +370,7 @@ async def add_note(
 async def update_entry(
     session: AsyncSession, user: User, shipment_id: int, entry_id: int, payload: NoteUpdate
 ) -> TimelineEntry:
-    await get_shipment_or_404(session, shipment_id, user)
+    await get_shipment_or_404(session, shipment_id, user, for_write=True)
     entry = await _get_entry_or_404(session, shipment_id, entry_id)
     if entry.type is not EntryType.note:
         raise AppError("Изменять можно только примечания", code="not_editable")
@@ -381,7 +385,7 @@ async def update_entry(
 
 
 async def delete_entry(session: AsyncSession, user: User, shipment_id: int, entry_id: int) -> None:
-    await get_shipment_or_404(session, shipment_id, user)
+    await get_shipment_or_404(session, shipment_id, user, for_write=True)
     entry = await _get_entry_or_404(session, shipment_id, entry_id)
     # Системная история — аудит изменения заявки. Если разрешить удалить её
     # через ту же ручку, поля можно переписать без проверяемого следа.
