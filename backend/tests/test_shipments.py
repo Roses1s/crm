@@ -608,7 +608,9 @@ async def test_shipment_rejects_negative_price_and_weight(
     assert bad_weight.status_code == 422
 
 
-async def test_shipment_schema_rejects_database_overflow(auth_client: AsyncClient, seeded: dict) -> None:
+async def test_shipment_schema_rejects_database_overflow(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
     """API отклоняет слишком длинные строки и числа до обращения к PostgreSQL."""
     lead_id = seeded["lead"].id  # type: ignore[attr-defined]
     too_long = await auth_client.post(
@@ -634,9 +636,7 @@ async def test_deleting_shipment_note_removes_its_attachment_files(
     auth_client: AsyncClient, seeded: dict
 ) -> None:
     lead_id = seeded["lead"].id  # type: ignore[attr-defined]
-    shipment = (
-        await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})
-    ).json()
+    shipment = (await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})).json()
     shipment_id = shipment["id"]
     root = Path(settings.attachments_dir)
     before = {p for p in root.rglob("*") if p.is_file()}
@@ -652,9 +652,7 @@ async def test_deleting_shipment_note_removes_its_attachment_files(
     new_files = {p for p in root.rglob("*") if p.is_file()} - before
     assert new_files
 
-    deleted = await auth_client.delete(
-        f"/api/v1/shipments/{shipment_id}/timeline/{entry_id}"
-    )
+    deleted = await auth_client.delete(f"/api/v1/shipments/{shipment_id}/timeline/{entry_id}")
     assert deleted.status_code == 204
     assert all(not path.exists() for path in new_files)
 
@@ -675,9 +673,7 @@ async def test_owner_and_admin_cannot_write_shipment_of_lost_lead(
         await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})
     ).json()
     shipment_id = shipment["id"]
-    await auth_client.post(
-        f"/api/v1/crm/leads/{lead_id}/lose", json={"reason_id": reason_id}
-    )
+    await auth_client.post(f"/api/v1/crm/leads/{lead_id}/lose", json={"reason_id": reason_id})
 
     # Нельзя создавать новую заявку на проигранный лид.
     create_lost = await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})
