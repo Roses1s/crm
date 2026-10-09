@@ -612,6 +612,38 @@ async def test_launcher_apps_depend_on_role(auth_client: AsyncClient) -> None:
     assert slugs == ["crm", "shipments", "customers", "admin", "accounting"]
 
 
+async def test_owner_and_admin_cannot_write_shipment_of_lost_lead(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    """Проигранная заявка доступна для чтения, но любые изменения требуют восстановления лида."""
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    reason_id = seeded["loss_reason"].id  # type: ignore[attr-defined]
+    shipment = (
+        await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})
+    ).json()
+    shipment_id = shipment["id"]
+    await auth_client.post(
+        f"/api/v1/crm/leads/{lead_id}/lose", json={"reason_id": reason_id}
+    )
+
+    # Администратор — владелец тестового лида; чтение остаётся разрешено.
+    assert (await auth_client.get(f"/api/v1/shipments/{shipment_id}")).status_code == 200
+    assert (await auth_client.get(f"/api/v1/shipments/{shipment_id}/timeline")).status_code == 200
+
+    changed = await auth_client.patch(
+        f"/api/v1/shipments/{shipment_id}", json={"carrier_name": "Не должно сохраниться"}
+    )
+    assert changed.status_code == 409
+    changed_status = await auth_client.patch(
+        f"/api/v1/shipments/{shipment_id}/status", json={"status": "checked"}
+    )
+    assert changed_status.status_code == 409
+    added_note = await auth_client.post(
+        f"/api/v1/shipments/{shipment_id}/notes", json={"body": "Не должно сохраниться"}
+    )
+    assert added_note.status_code == 409
+
+
 async def test_colleague_can_view_but_not_change_shipment_of_lost_lead(
     auth_client: AsyncClient, seeded: dict
 ) -> None:
