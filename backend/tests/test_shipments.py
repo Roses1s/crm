@@ -669,9 +669,7 @@ async def test_owner_and_admin_cannot_write_shipment_of_lost_lead(
     """Проигранная заявка доступна для чтения, но любые изменения требуют восстановления лида."""
     lead_id = seeded["lead"].id  # type: ignore[attr-defined]
     reason_id = seeded["loss_reason"].id  # type: ignore[attr-defined]
-    shipment = (
-        await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})
-    ).json()
+    shipment = (await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})).json()
     shipment_id = shipment["id"]
     await auth_client.post(f"/api/v1/crm/leads/{lead_id}/lose", json={"reason_id": reason_id})
 
