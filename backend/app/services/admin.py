@@ -109,6 +109,7 @@ async def transfer_leads(session: AsyncSession, *, from_user: User, to_user: Use
     leads_stmt = (
         select(Lead)
         .where(Lead.assigned_to_id == from_user.id)
+        .order_by(Lead.id)
         .execution_options(populate_existing=True)
         .with_for_update(of=Lead)
     )
