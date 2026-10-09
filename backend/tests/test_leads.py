@@ -771,6 +771,12 @@ async def test_pager_follows_board_reading_order(auth_client: AsyncClient, seede
     }
 
 
+async def test_page_number_is_bounded(auth_client: AsyncClient) -> None:
+    response = await auth_client.get("/api/v1/crm/leads?page=10001")
+    assert response.status_code == 422
+    assert response.json()["code"] == "validation_error"
+
+
 async def test_missing_lead_is_404(auth_client: AsyncClient) -> None:
     response = await auth_client.get("/api/v1/crm/leads/999")
     assert response.status_code == 404
