@@ -124,6 +124,23 @@ describe("401 посреди запроса -> тихий refresh и один п
   });
 });
 
+it("не возвращает успешный ответ от предыдущей сессии", async () => {
+  setAccessToken("token-user-a");
+  let resolveOldResponse!: (response: Response) => void;
+  const oldResponse = new Promise<Response>((resolve) => {
+    resolveOldResponse = resolve;
+  });
+  const fetchMock = vi.fn(() => oldResponse);
+  vi.stubGlobal("fetch", fetchMock);
+
+  const pending = api("/crm/leads/1", { schema: z.object({ ok: z.boolean() }) });
+  startSession("token-user-b");
+  resolveOldResponse(jsonResponse({ ok: true }));
+
+  await expect(pending).rejects.toMatchObject({ status: 401, code: "session_changed" });
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+
 it("не повторяет запоздавший 401 запросом новой учётной сессии", async () => {
   setAccessToken("token-user-a");
   let resolveOldResponse!: (response: Response) => void;
