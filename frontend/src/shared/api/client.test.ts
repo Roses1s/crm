@@ -6,11 +6,10 @@
  */
 
 import { afterEach, describe, expect, it, vi } from "vitest";
-
-import { clearTokens, setAccessToken, startSession } from "@/shared/api/auth";
-import { api, apiBlob, apiUpload, ApiError, ApiResponseError } from "@/shared/api/client";
 import { z } from "zod";
 
+import { clearTokens, getAccessToken, setAccessToken, startSession } from "@/shared/api/auth";
+import { api, apiBlob, apiUpload, ApiError, ApiResponseError } from "@/shared/api/client";
 afterEach(() => {
   vi.unstubAllGlobals();
   clearTokens();
@@ -144,9 +143,7 @@ it("не очищает новую сессию, если старый refresh �
   resolveRefresh(jsonResponse({ detail: "refresh expired" }, 401));
 
   await expect(pending).rejects.toMatchObject({ status: 401, code: "session_changed" });
-  expect(getAccessToken()).toBe(
-    "token-user-b",
-  );
+  expect(getAccessToken()).toBe("token-user-b");
 });
 
 it("не возвращает успешный ответ от предыдущей сессии", async () => {
@@ -203,9 +200,7 @@ describe("кеш справочников (tags и т.п.) не должен о�
     async () => {
       setAccessToken("токен");
 
-      const fetchMock = vi.fn(async () =>
-        jsonResponse([{ id: 1, name: "Важное", color: "#112233" }]),
-      );
+      const fetchMock = vi.fn(async () => jsonResponse([{ id: 1, name: "Важное", color: "#112233" }]));
       vi.stubGlobal("fetch", fetchMock);
 
       await api("/crm/tags", {
@@ -278,9 +273,9 @@ describe("проверка успешных JSON-ответов", () => {
       vi.fn(async () => new Response(null, { status: 204 })),
     );
 
-    await expect(api("/admin/users/1", { method: "DELETE", schema: z.undefined() })).resolves.toBe(
-      undefined,
-    );
+    await expect(
+      api("/admin/users/1", { method: "DELETE", schema: z.undefined() }),
+    ).resolves.toBe(undefined);
   });
 
   it("сообщает ApiResponseError, если схема не принимает JSON 204", async () => {
