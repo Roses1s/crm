@@ -29,9 +29,7 @@ async def manager_token(client: AsyncClient) -> str:
     return str(login.json()["access_token"])
 
 
-async def test_stage_color_respects_database_length(
-    auth_client: AsyncClient, seeded: dict
-) -> None:
+async def test_stage_color_respects_database_length(auth_client: AsyncClient) -> None:
     response = await auth_client.post(
         "/api/v1/crm/stages",
         json={"name": "Цвет слишком длинный", "color": "x" * 21},
