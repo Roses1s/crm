@@ -8,7 +8,12 @@
 import { afterEach, describe, expect, it, vi } from "vitest";
 import { z } from "zod";
 
-import { clearTokens, getAccessToken, setAccessToken, startSession } from "@/shared/api/auth";
+import {
+  clearTokens,
+  getAccessToken,
+  setAccessToken,
+  startSession,
+} from "@/shared/api/auth";
 import { api, apiBlob, apiUpload, ApiError, ApiResponseError } from "@/shared/api/client";
 
 afterEach(() => {
