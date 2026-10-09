@@ -522,6 +522,22 @@ async def test_restore_lets_colleague_claim_a_lost_lead(
     assert "Продавец" in labels
 
 
+async def test_restore_rejects_second_restore(auth_client: AsyncClient, seeded: dict) -> None:
+    """Повторное восстановление не должно повторно менять владельца и историю."""
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    reason_id = seeded["loss_reason"].id  # type: ignore[attr-defined]
+    lost = await auth_client.post(
+        f"/api/v1/crm/leads/{lead_id}/lose", json={"reason_id": reason_id}
+    )
+    assert lost.status_code == 204
+
+    first = await auth_client.post(f"/api/v1/crm/leads/{lead_id}/restore")
+    assert first.status_code == 204
+    second = await auth_client.post(f"/api/v1/crm/leads/{lead_id}/restore")
+    assert second.status_code == 400
+    assert second.json()["code"] == "not_lost"
+
+
 async def test_restore_fails_for_active_lead(auth_client: AsyncClient, seeded: dict) -> None:
     lead_id = seeded["lead"].id  # type: ignore[attr-defined]
     response = await auth_client.post(f"/api/v1/crm/leads/{lead_id}/restore")
