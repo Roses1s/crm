@@ -13,7 +13,7 @@
     "lint": "eslint .",
     "lint:fix": "eslint . --fix",
     "format": "prettier --write .",
-    "format:check": "prettier --write src/shared/api/client.ts src/shared/api/client.test.ts && git diff -- src/shared/api/client.ts src/shared/api/client.test.ts"
+    "format:check": "prettier --check ."
   },
   "dependencies": {
     "@dnd-kit/core": "^6.3.1",
