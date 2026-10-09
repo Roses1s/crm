@@ -42,8 +42,8 @@ def _password_fits_bcrypt(value: str) -> str:
 class UserCreate(BaseModel):
     email: EmailStr
     password: str = Field(min_length=8, max_length=128)
-    first_name: str = ""
-    last_name: str = ""
+    first_name: str = Field(default="", max_length=100)
+    last_name: str = Field(default="", max_length=100)
     role: Role = Role.manager
 
     _password_length = field_validator("password")(staticmethod(_password_fits_bcrypt))
@@ -52,8 +52,8 @@ class UserCreate(BaseModel):
 class UserUpdate(PatchModel):
     email: EmailStr | None = None
     password: str | None = Field(default=None, min_length=8, max_length=128)
-    first_name: str | None = None
-    last_name: str | None = None
+    first_name: str | None = Field(default=None, max_length=100)
+    last_name: str | None = Field(default=None, max_length=100)
     role: Role | None = None
     is_active: bool | None = None
 
