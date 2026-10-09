@@ -360,9 +360,6 @@ function ShipmentForm({ id }: { id?: string }) {
   const { data: shipment, isLoading } = useShipment(id);
   const { data: leadsPage } = useLeads(isNew ? { search: leadSearch } : {});
   const leads = leadsPage?.items ?? [];
-  const { data: selectedLeadDetails } = useLead(
-    isNew && form.lead_id ? String(form.lead_id) : undefined,
-  );
   const { data: timeline = [] } = useShipmentTimeline(id);
   const { data: attachments = [] } = useShipmentAttachments(savedId);
 
@@ -381,6 +378,9 @@ function ShipmentForm({ id }: { id?: string }) {
     created_at: toDatetimeLocal(new Date().toISOString()),
   }));
   const [pristine, setPristine] = useState<FormState>(form);
+  const { data: selectedLeadDetails } = useLead(
+    isNew && form.lead_id ? String(form.lead_id) : undefined,
+  );
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<Attachment | null>(null);
   const [tab, setTab] = useState("lines");
