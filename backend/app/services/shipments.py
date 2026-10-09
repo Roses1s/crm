@@ -82,7 +82,7 @@ async def get_shipment_or_404(
     # Заявка наследует видимость своего лида: чужая для менеджера не существует.
     if user is not None and for_write:
         # Запись в заявку запрещена, пока связанный лид проигран, включая владельца и администратора.
-        await get_editable_lead(session, shipment.lead_id, user)
+        await get_editable_lead(session, shipment.lead_id, user, for_update=True)
     elif user is not None and user.role != Role.admin:
         await get_lead_or_404(session, shipment.lead_id, user, allow_lost=allow_lost)
     return shipment
@@ -230,7 +230,7 @@ async def list_shipments(
 
 async def create_shipment(session: AsyncSession, user: User, payload: ShipmentCreate) -> Shipment:
     # Заявка может ссылаться только на активный лид, который пользователь вправе менять.
-    await get_editable_lead(session, payload.lead_id, user)
+    await get_editable_lead(session, payload.lead_id, user, for_update=True)
     # created_at исключаем отдельно: колонка NOT NULL со server_default=now().
     # Если прислали None (поле не заполнили), явная передача None в конструктор
     # модели перекрыла бы server_default и упала бы на вставке NULL — вместо
@@ -265,7 +265,7 @@ async def update_shipment(
     if new_lead_id is not None and new_lead_id != shipment.lead_id:
         # Проверяем новый лид теми же строгими правами, что и при создании
         # заявки: менеджер не может записать свою заявку в карточку коллеги.
-        await get_editable_lead(session, new_lead_id, user)
+        await get_editable_lead(session, new_lead_id, user, for_update=True)
 
         # lead_id у timeline и attachments денормализован для авторизации,
         # подсчёта места и каскадного удаления. Поэтому переносим весь агрегат
