@@ -268,10 +268,18 @@ def cleanup_orphan_files() -> dict[str, Any]:
         candidates = {str(file) for file in files}
         # Для миниатюр проверяем также путь оригинала: у миниатюр нет своей
         # строки Attachment, но они должны жить, пока жив оригинал.
+        # thumbnail_path(original) использует original.stem, поэтому из
+        # "uuid.thumbnail.webp" нельзя восстановить расширение оригинала.
+        # Добавляем все разрешённые расширения, иначе валидная миниатюра могла
+        # бы быть удалена как сирота, хотя оригинал ещё есть в БД.
         candidates.update(
-            str(file.with_name(file.name.removesuffix(".thumbnail.webp")))
+            str(file.with_name(file.name.removesuffix(".thumbnail.webp") + suffix))
             for file in files
             if file.name.endswith(".thumbnail.webp")
+            for suffix in (
+                ".pdf", ".png", ".jpg", ".jpeg", ".gif", ".webp", ".txt", ".csv",
+                ".doc", ".docx", ".xls", ".xlsx", ".zip", ".rar", ".7z",
+            )
         )
         with _session() as session:
             known_originals = {
