@@ -72,7 +72,7 @@ async def board_stage_for(session: AsyncSession, owner_id: int, name: str | None
     оставить прежний stage_id нельзя — лид оказался бы на колонке, которой нет
     на доске получателя, и просто пропал бы из интерфейса.
     """
-    await ensure_default_stages(session, owner_id)
+    await ensure_default_stages(session, owner_id, commit=False)
     stages = list(
         (
             await session.execute(
