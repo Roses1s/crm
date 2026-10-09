@@ -259,6 +259,30 @@ async def test_delete_stage_moves_leads_to_fallback(
     assert stage_from.id not in [s["id"] for s in stages.json()]  # type: ignore[attr-defined]
 
 
+async def test_delete_stage_is_rejected_when_it_contains_lost_lead(
+    auth_client: AsyncClient, seeded: dict[str, object]
+) -> None:
+    lead = seeded["lead"]
+    stage = seeded["stage_new"]
+    reason = seeded["loss_reason"]
+    lost = await auth_client.post(
+        f"/api/v1/crm/leads/{lead.id}/lose",  # type: ignore[attr-defined]
+        json={"reason_id": reason.id},  # type: ignore[attr-defined]
+    )
+    assert lost.status_code == 204
+
+    response = await auth_client.delete(
+        f"/api/v1/crm/stages/{stage.id}",  # type: ignore[attr-defined]
+        params={"fallback_stage_id": seeded["stage_talks"].id},  # type: ignore[attr-defined]
+    )
+    assert response.status_code == 409
+    assert response.json()["code"] == "stage_contains_lost_leads"
+
+    card = await auth_client.get(f"/api/v1/crm/leads/{lead.id}")  # type: ignore[attr-defined]
+    assert card.json()["is_archived"] is True
+    assert card.json()["stage_id"] == stage.id  # type: ignore[attr-defined]
+
+
 async def test_delete_stage_without_fallback_is_rejected(
     auth_client: AsyncClient, seeded: dict[str, object]
 ) -> None:
