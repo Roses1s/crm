@@ -201,7 +201,9 @@ describe("кеш справочников (tags и т.п.) не должен о�
     async () => {
       setAccessToken("токен");
 
-      const fetchMock = vi.fn(async () => jsonResponse([{ id: 1, name: "Важное", color: "#112233" }]));
+      const fetchMock = vi.fn(async () =>
+        jsonResponse([{ id: 1, name: "Важное", color: "#112233" }]),
+      );
       vi.stubGlobal("fetch", fetchMock);
 
       await api("/crm/tags", {
@@ -274,9 +276,9 @@ describe("проверка успешных JSON-ответов", () => {
       vi.fn(async () => new Response(null, { status: 204 })),
     );
 
-    await expect(
-      api("/admin/users/1", { method: "DELETE", schema: z.undefined() }),
-    ).resolves.toBe(undefined);
+    await expect(api("/admin/users/1", { method: "DELETE", schema: z.undefined() })).resolves.toBe(
+      undefined,
+    );
   });
 
   it("сообщает ApiResponseError, если схема не принимает JSON 204", async () => {
