@@ -420,9 +420,7 @@ async def update_entry(
 
 
 async def delete_entry(session: AsyncSession, user: User, shipment_id: int, entry_id: int) -> None:
-    await get_shipment_or_404(
-        session, shipment_id, user, for_update=True, for_write=True
-    )
+    await get_shipment_or_404(session, shipment_id, user, for_update=True, for_write=True)
     entry = await _get_entry_or_404(session, shipment_id, entry_id)
     # Системная история — аудит изменения заявки. Если разрешить удалить её
     # через ту же ручку, поля можно переписать без проверяемого следа.
