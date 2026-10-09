@@ -84,11 +84,14 @@ async function request(
     if (generationAtStart !== getSessionGeneration()) {
       throw new ApiError(401, "Запрос относится к предыдущей сессии", "session_changed");
     }
-    if (retry && (await refreshSession())) {
+    if (retry) {
+      const refreshed = await refreshSession();
+      // Проверяем поколение и при неудачном refresh: он мог завершиться уже
+      // после входа другого пользователя, чью сессию нельзя очищать.
       if (generationAtStart !== getSessionGeneration()) {
         throw new ApiError(401, "Запрос относится к предыдущей сессии", "session_changed");
       }
-      return request(path, init, auth, false);
+      if (refreshed) return request(path, init, auth, false);
     }
     clearTokens();
     if (window.location.pathname !== "/login") window.location.assign("/login");
