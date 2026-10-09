@@ -124,6 +124,31 @@ describe("401 посреди запроса -> тихий refresh и один п
   });
 });
 
+it("не очищает новую сессию, если старый refresh завершается ошибкой", async () => {
+  setAccessToken("token-user-a");
+  let resolveRefresh!: (response: Response) => void;
+  const fetchMock = vi.fn((input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.endsWith("/auth/refresh")) {
+      return new Promise<Response>((resolve) => {
+        resolveRefresh = resolve;
+      });
+    }
+    return Promise.resolve(jsonResponse({ detail: "expired" }, 401));
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  const pending = api("/crm/leads/1", { schema: z.object({ ok: z.boolean() }) });
+  await vi.waitFor(() => expect(fetchMock).toHaveBeenCalledTimes(2));
+  startSession("token-user-b");
+  resolveRefresh(jsonResponse({ detail: "refresh expired" }, 401));
+
+  await expect(pending).rejects.toMatchObject({ status: 401, code: "session_changed" });
+  expect(await import("@/shared/api/auth").then((auth) => auth.getAccessToken())).toBe(
+    "token-user-b",
+  );
+});
+
 it("не возвращает успешный ответ от предыдущей сессии", async () => {
   setAccessToken("token-user-a");
   let resolveOldResponse!: (response: Response) => void;
