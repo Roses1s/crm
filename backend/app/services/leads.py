@@ -559,9 +559,27 @@ async def delete_timeline_entry(
             "Удалить можно только примечание или запись о смене этапа",
             code="history_immutable",
         )
+    attachment_rows = (
+        await session.execute(select(Attachment).where(Attachment.entry_id == entry.id))
+    ).scalars().all()
+    paths: list[Path] = []
+    for attachment in attachment_rows:
+        if attachment.storage_path:
+            original = Path(attachment.storage_path)
+            paths.extend((original, thumbnail_path(original)))
+
     await session.delete(entry)
     await session.commit()
-    log.info("timeline.entry_deleted", lead_id=lead_id, entry_id=entry_id, by=user.id)
+    # Строки вложений удалены каскадом; удаляем файлы только после commit.
+    for path in paths:
+        await run_in_threadpool(path.unlink, missing_ok=True)
+    log.info(
+        "timeline.entry_deleted",
+        lead_id=lead_id,
+        entry_id=entry_id,
+        files=len(paths),
+        by=user.id,
+    )
 
 
 # --- переключатель «N / M» --------------------------------------------------
