@@ -14,6 +14,7 @@
 
 from __future__ import annotations
 
+import os
 import shutil
 import threading
 import uuid
@@ -75,6 +76,14 @@ THUMBNAIL_QUALITY = 82
 # нескольким запросам одновременно декодировать изображения в одном worker.
 _THUMBNAIL_SLOT = threading.BoundedSemaphore(1)
 
+# В каждом gunicorn worker одновременно записывается не больше одного файла.
+# Поэтому общий резерв диска можно безопасно посчитать по числу процессов.
+_UPLOAD_SLOT = threading.BoundedSemaphore(1)
+try:
+    _UPLOAD_WORKERS = max(1, int(os.getenv("GUNICORN_WORKERS", "3")))
+except ValueError:
+    _UPLOAD_WORKERS = 3
+
 
 def storage_root() -> Path:
     return Path(settings.attachments_dir)
@@ -110,7 +119,7 @@ async def _ensure_disk_space(target: Path) -> None:
     может случиться, поэтому последний гигабайт не отдаём под загрузки.
     """
     free_mb = await run_in_threadpool(_free_disk_mb, target.parent)
-    required = settings.min_free_disk_mb + settings.max_upload_mb
+    required = settings.min_free_disk_mb + settings.max_upload_mb * _UPLOAD_WORKERS
     if free_mb < required:
         raise AppError(
             "На сервере заканчивается место на диске — загрузка файлов временно "
@@ -162,7 +171,13 @@ async def _store_upload(file: UploadFile, relative_dir: Path) -> tuple[str, str,
     original = Path(file.filename or "file").name  # отбрасываем путь целиком
     suffix = _checked_suffix(original)
     target = storage_root() / relative_dir / f"{uuid.uuid4().hex}{suffix}"
-    size = await _save_upload(file, target)
+    # Один активный upload на worker. Семафор не блокирует event loop и
+    # вместе с резервом на все worker-процессы предотвращает гонку диска.
+    await run_in_threadpool(_UPLOAD_SLOT.acquire)
+    try:
+        size = await _save_upload(file, target)
+    finally:
+        _UPLOAD_SLOT.release()
     return original[:255], ALLOWED_EXTENSIONS[suffix], size, target
 
 
