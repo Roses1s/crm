@@ -51,6 +51,9 @@ async def paginate(
     """Возвращает срез записей и общее количество."""
     total_stmt = select(func.count()).select_from(statement.order_by(None).subquery())
     total = int((await session.execute(total_stmt)).scalar_one())
+    # Не отправляем в БД заведомо пустую страницу с огромным OFFSET.
+    if params.offset >= total:
+        return [], total
     rows = (
         (await session.execute(statement.limit(params.page_size).offset(params.offset)))
         .scalars()
