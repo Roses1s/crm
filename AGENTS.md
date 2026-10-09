@@ -23,7 +23,7 @@ CRM для транспортной компании: лиды, канбан-в�
    языком, команды давать готовыми к копированию.
 2. **Ветка — та, на которой вас запустили.** Определите её первой командой
    `git rev-parse --abbrev-ref HEAD` (для текущей сессии в документации
-   записана `arena/6d4bde73-crm`; площадка заводит под каждую сессию свою ветку —
+   записана `arena/de9052a9-crm`; площадка заводит под каждую сессию свою ветку —
    если имя отличается, работайте в текущей и обновите документацию в конце
    сессии). Не создавать новые ветки (`git branch`, `checkout -b`, `switch -c`,
    кнопки в GitHub), не переключаться на другие — включая ту, что указана в
@@ -59,8 +59,12 @@ CRM для транспортной компании: лиды, канбан-в�
 ```bash
 cd backend && .venv/bin/ruff check . && .venv/bin/ruff format --check . \
   && .venv/bin/mypy app \
-  && .venv/bin/python -m pytest --cov=app --cov-branch --cov-report=term-missing --cov-fail-under=70 \
-  && .venv/bin/alembic check
+  && .venv/bin/python -m pytest --cov=app --cov-branch --cov-report=term-missing --cov-fail-under=70
+# `alembic check` без DATABASE_URL берёт адрес PostgreSQL из настроек и в
+# песочнице падает на DNS. CI подставляет SQLite — повторяем то же самое:
+cd backend && rm -f /tmp/checks.db \
+  && DATABASE_URL=sqlite+aiosqlite:////tmp/checks.db .venv/bin/alembic upgrade head \
+  && DATABASE_URL=sqlite+aiosqlite:////tmp/checks.db .venv/bin/alembic check
 cd ../frontend && npm run lint && npm run format:check && npx tsc -b \
   && npm test -- --coverage \
   && npm run build
