@@ -19,41 +19,41 @@ class ShipmentBase(BaseModel):
     number: str = Field(default="", max_length=40)
 
     # Маршрут (адреса и контакты; города — списком тегов ниже).
-    address_loading: str = ""
-    address_unloading: str = ""
-    contact_loading_name: str = ""
-    contact_loading_phone: str = ""
-    contact_unloading_name: str = ""
-    contact_unloading_phone: str = ""
+    address_loading: str = Field(default="", max_length=255)
+    address_unloading: str = Field(default="", max_length=255)
+    contact_loading_name: str = Field(default="", max_length=255)
+    contact_loading_phone: str = Field(default="", max_length=32)
+    contact_unloading_name: str = Field(default="", max_length=255)
+    contact_unloading_phone: str = Field(default="", max_length=32)
     transport_type: TransportType = TransportType.tent
-    cargo_weight: Decimal | None = Field(default=None, ge=0)
-    cargo_volume: Decimal | None = Field(default=None, ge=0)
+    cargo_weight: Decimal | None = Field(default=None, ge=0, max_digits=10, decimal_places=2)
+    cargo_volume: Decimal | None = Field(default=None, ge=0, max_digits=10, decimal_places=2)
     comment: str = ""
 
     # Позиция заказа: цена заказчика/перевозчика, каждая со своей ставкой НДС.
-    customer_price: Decimal | None = Field(default=None, ge=0)
+    customer_price: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
     customer_tax: TaxRate = TaxRate.vat_22
-    carrier_price: Decimal | None = Field(default=None, ge=0)
+    carrier_price: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
     carrier_tax: TaxRate = TaxRate.vat_22
 
     # Заказчик (шапка).
     customer_address: str = ""
-    customer_contact: str = ""
-    customer_signer: str = ""
+    customer_contact: str = Field(default="", max_length=255)
+    customer_signer: str = Field(default="", max_length=255)
 
     # Погрузка.
     loading_cities: list[str] = Field(default_factory=list)
     loading_date_from: date | None = None
     loading_date_to: date | None = None
-    loading_time_from: str = ""
-    loading_time_to: str = ""
+    loading_time_from: str = Field(default="", max_length=40)
+    loading_time_to: str = Field(default="", max_length=40)
 
     # Выгрузка.
     unloading_cities: list[str] = Field(default_factory=list)
     unloading_date_from: date | None = None
     unloading_date_to: date | None = None
-    unloading_time_from: str = ""
-    unloading_time_to: str = ""
+    unloading_time_from: str = Field(default="", max_length=40)
+    unloading_time_to: str = Field(default="", max_length=40)
 
     # Перевозчик — свободный текст прямо в заявке, а не выбор из справочника:
     # его можно вписать любого, с любой компанией/ИНН/контактом. ИНН (если
@@ -61,21 +61,21 @@ class ShipmentBase(BaseModel):
     # записями (лидами, другими заявками) не сверяется — пересечений и
     # дублей по перевозчику в системе больше нет.
     carrier_name: str = Field(default="", max_length=255)
-    carrier_inn: str = ""
-    carrier_contact: str = ""
-    vehicle: str = ""
-    vehicle_number: str = ""
+    carrier_inn: str = Field(default="", max_length=12)
+    carrier_contact: str = Field(default="", max_length=255)
+    vehicle: str = Field(default="", max_length=120)
+    vehicle_number: str = Field(default="", max_length=40)
     has_trailer: bool = False
-    trailer_number: str = ""
-    driver_name: str = ""
-    driver_phone: str = ""
-    driver_passport: str = ""
-    carrier_signer: str = ""
+    trailer_number: str = Field(default="", max_length=40)
+    driver_name: str = Field(default="", max_length=255)
+    driver_phone: str = Field(default="", max_length=40)
+    driver_passport: str = Field(default="", max_length=255)
+    carrier_signer: str = Field(default="", max_length=255)
 
     # Груз.
-    cargo_type: str = ""
-    cargo_packaging: str = ""
-    capacity: Decimal | None = Field(default=None, ge=0)
+    cargo_type: str = Field(default="", max_length=255)
+    cargo_packaging: str = Field(default="", max_length=255)
+    capacity: Decimal | None = Field(default=None, ge=0, max_digits=10, decimal_places=2)
     body_type: list[str] = Field(default_factory=list)
     loading_method: list[str] = Field(default_factory=list)
 
@@ -124,52 +124,52 @@ class ShipmentUpdate(PatchModel):
     # передано явно (exclude_unset), значит его и меняем.
     created_at: datetime | None = None
     transport_type: TransportType | None = None
-    address_loading: str | None = None
-    address_unloading: str | None = None
-    contact_loading_name: str | None = None
-    contact_loading_phone: str | None = None
-    contact_unloading_name: str | None = None
-    contact_unloading_phone: str | None = None
-    cargo_weight: Decimal | None = Field(default=None, ge=0)
-    cargo_volume: Decimal | None = Field(default=None, ge=0)
+    address_loading: str | None = Field(default=None, max_length=255)
+    address_unloading: str | None = Field(default=None, max_length=255)
+    contact_loading_name: str | None = Field(default=None, max_length=255)
+    contact_loading_phone: str | None = Field(default=None, max_length=32)
+    contact_unloading_name: str | None = Field(default=None, max_length=255)
+    contact_unloading_phone: str | None = Field(default=None, max_length=32)
+    cargo_weight: Decimal | None = Field(default=None, ge=0, max_digits=10, decimal_places=2)
+    cargo_volume: Decimal | None = Field(default=None, ge=0, max_digits=10, decimal_places=2)
     comment: str | None = None
 
-    customer_price: Decimal | None = Field(default=None, ge=0)
+    customer_price: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
     customer_tax: TaxRate | None = None
-    carrier_price: Decimal | None = Field(default=None, ge=0)
+    carrier_price: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
     carrier_tax: TaxRate | None = None
 
     customer_address: str | None = None
-    customer_contact: str | None = None
-    customer_signer: str | None = None
+    customer_contact: str | None = Field(default=None, max_length=255)
+    customer_signer: str | None = Field(default=None, max_length=255)
 
     loading_cities: list[str] | None = None
     loading_date_from: date | None = None
     loading_date_to: date | None = None
-    loading_time_from: str | None = None
-    loading_time_to: str | None = None
+    loading_time_from: str | None = Field(default=None, max_length=40)
+    loading_time_to: str | None = Field(default=None, max_length=40)
 
     unloading_cities: list[str] | None = None
     unloading_date_from: date | None = None
     unloading_date_to: date | None = None
-    unloading_time_from: str | None = None
-    unloading_time_to: str | None = None
+    unloading_time_from: str | None = Field(default=None, max_length=40)
+    unloading_time_to: str | None = Field(default=None, max_length=40)
 
     carrier_name: str | None = Field(default=None, max_length=255)
-    carrier_inn: str | None = None
-    carrier_contact: str | None = None
-    vehicle: str | None = None
-    vehicle_number: str | None = None
+    carrier_inn: str | None = Field(default=None, max_length=12)
+    carrier_contact: str | None = Field(default=None, max_length=255)
+    vehicle: str | None = Field(default=None, max_length=120)
+    vehicle_number: str | None = Field(default=None, max_length=40)
     has_trailer: bool | None = None
-    trailer_number: str | None = None
-    driver_name: str | None = None
-    driver_phone: str | None = None
-    driver_passport: str | None = None
-    carrier_signer: str | None = None
+    trailer_number: str | None = Field(default=None, max_length=40)
+    driver_name: str | None = Field(default=None, max_length=255)
+    driver_phone: str | None = Field(default=None, max_length=40)
+    driver_passport: str | None = Field(default=None, max_length=255)
+    carrier_signer: str | None = Field(default=None, max_length=255)
 
-    cargo_type: str | None = None
-    cargo_packaging: str | None = None
-    capacity: Decimal | None = Field(default=None, ge=0)
+    cargo_type: str | None = Field(default=None, max_length=255)
+    cargo_packaging: str | None = Field(default=None, max_length=255)
+    capacity: Decimal | None = Field(default=None, ge=0, max_digits=10, decimal_places=2)
     body_type: list[str] | None = None
     loading_method: list[str] | None = None
 
