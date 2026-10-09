@@ -204,14 +204,15 @@ def cleanup_revoked_tokens() -> dict[str, Any]:
     """
     now = datetime.now(tz=UTC)
     with _session() as session:
-        expired = list(
-            session.execute(select(RevokedToken).where(RevokedToken.expires_at < now)).scalars()
+        result = cast(
+            "CursorResult[Any]",
+            session.execute(delete(RevokedToken).where(RevokedToken.expires_at < now)),
         )
-        for token in expired:
-            session.delete(token)
+        removed_rows = result.rowcount
         session.commit()
-    log.info("cleanup.revoked_tokens", removed=len(expired))
-    return {"removed": len(expired)}
+    removed = int(removed_rows or 0)
+    log.info("cleanup.revoked_tokens", removed=removed)
+    return {"removed": removed}
 
 
 @shared_task(name="app.worker.tasks.cleanup_login_attempts")
