@@ -108,9 +108,13 @@ async def delete_stage(
     """
     stage = await owned_stage(session, stage_id, user)
 
-    leads = list(
-        (await session.execute(select(Lead).where(Lead.stage_id == stage_id))).unique().scalars()
+    leads_stmt = (
+        select(Lead)
+        .where(Lead.stage_id == stage_id)
+        .execution_options(populate_existing=True)
+        .with_for_update(of=Lead)
     )
+    leads = list((await session.execute(leads_stmt)).unique().scalars())
     # Проигранные лиды read-only до восстановления. Удаление этапа не должно
     # менять их stage_id/версию/историю исподтишка.
     if any(lead.is_archived for lead in leads):
