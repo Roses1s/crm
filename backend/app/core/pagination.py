@@ -30,7 +30,7 @@ class PageParams:
 
 
 def page_params(
-    page: int = Query(1, ge=1, description="Номер страницы"),
+    page: int = Query(1, ge=1, le=10000, description="Номер страницы"),
     page_size: int = Query(50, ge=1, le=MAX_PAGE_SIZE, description="Размер страницы"),
 ) -> PageParams:
     return PageParams(page=page, page_size=page_size)
