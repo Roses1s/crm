@@ -112,5 +112,6 @@ export async function downloadAttachment(attachment: Attachment): Promise<void> 
   link.href = url;
   link.download = attachment.name;
   link.click();
-  URL.revokeObjectURL(url);
+  // Браузеру нужно время начать скачивание до освобождения object URL.
+  window.setTimeout(() => URL.revokeObjectURL(url), 1000);
 }
