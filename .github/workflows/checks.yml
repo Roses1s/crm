@@ -78,7 +78,7 @@ jobs:
         # не пересобрали — сборка падает с подсказкой. Пересобрать:
         #   python scripts/snapshot.py
         working-directory: .
-        run: python scripts/snapshot.py && git diff -- docs/SNAPSHOT.md
+        run: python scripts/snapshot.py --check
 
       - name: Аудит зависимостей на уязвимости
         # Проверяем ровно тот набор, который ставится в production-образ
