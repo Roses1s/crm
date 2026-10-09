@@ -124,6 +124,37 @@ describe("401 посреди запроса -> тихий refresh и один п
   });
 });
 
+it("не повторяет запоздавший 401 запросом новой учётной сессии", async () => {
+  setAccessToken("token-user-a");
+  let resolveOldResponse!: (response: Response) => void;
+  const oldResponse = new Promise<Response>((resolve) => {
+    resolveOldResponse = resolve;
+  });
+  const fetchMock = vi.fn((input: RequestInfo | URL) => {
+    const url = String(input);
+    if (url.endsWith("/auth/refresh")) {
+      return Promise.resolve(jsonResponse({
+        access_token: "unexpected-token",
+        token_type: "bearer",
+        expires_in: 1800,
+      }));
+    }
+    return oldResponse;
+  });
+  vi.stubGlobal("fetch", fetchMock);
+
+  const pending = api("/crm/leads/1", { schema: z.object({ ok: z.boolean() }) });
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+
+  // Пока запрос пользователя A в пути, пользователь B входит в систему.
+  const { startSession } = await import("@/shared/api/auth");
+  startSession("token-user-b");
+  resolveOldResponse(jsonResponse({ detail: "expired" }, 401));
+
+  await expect(pending).rejects.toMatchObject({ status: 401, code: "session_changed" });
+  expect(fetchMock).toHaveBeenCalledTimes(1);
+});
+
 describe("кеш справочников (tags и т.п.) не должен оседать в браузере", () => {
   it(
     "api() всегда запрашивает сеть с cache: no-store, даже если сервер " +
