@@ -3,14 +3,17 @@
 from __future__ import annotations
 
 from decimal import Decimal
+from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
 from sqlalchemy import Numeric, case, func, literal, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, load_only, raiseload, selectinload
+from starlette.concurrency import run_in_threadpool
 
 from app.core.errors import AppError, NotFoundError, PermissionDeniedError
+from app.core.attachment_paths import thumbnail_path
 from app.core.logging import get_logger
 from app.core.pagination import PageParams, build_page, paginate
 from app.models.crm import Lead
@@ -422,6 +425,23 @@ async def delete_entry(session: AsyncSession, user: User, shipment_id: int, entr
             "Удалить можно только примечание или запись о смене этапа",
             code="history_immutable",
         )
+    attachment_rows = (
+        await session.execute(select(Attachment).where(Attachment.entry_id == entry.id))
+    ).scalars().all()
+    paths: list[Path] = []
+    for attachment in attachment_rows:
+        if attachment.storage_path:
+            original = Path(attachment.storage_path)
+            paths.extend((original, thumbnail_path(original)))
+
     await session.delete(entry)
     await session.commit()
-    log.info("shipment.entry_deleted", shipment_id=shipment_id, entry_id=entry_id, by=user.id)
+    for path in paths:
+        await run_in_threadpool(path.unlink, missing_ok=True)
+    log.info(
+        "shipment.entry_deleted",
+        shipment_id=shipment_id,
+        entry_id=entry_id,
+        files=len(paths),
+        by=user.id,
+    )
