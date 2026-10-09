@@ -144,7 +144,7 @@ it("не очищает новую сессию, если старый refresh �
   resolveRefresh(jsonResponse({ detail: "refresh expired" }, 401));
 
   await expect(pending).rejects.toMatchObject({ status: 401, code: "session_changed" });
-  expect(await import("@/shared/api/auth").then((auth) => auth.getAccessToken())).toBe(
+  expect(getAccessToken()).toBe(
     "token-user-b",
   );
 });
