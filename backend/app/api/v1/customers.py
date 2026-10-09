@@ -39,5 +39,9 @@ async def list_customers(
     user: CurrentUser,
     params: PageParamsDep,
     search: Annotated[str | None, Query(description="Поиск по названию или ИНН")] = None,
+    archived: Annotated[
+        bool | None,
+        Query(description="True — только проигранные, False — только активные, не указан — все"),
+    ] = None,
 ) -> dict[str, Any]:
-    return await service.list_customers(session, user, params, search=search)
+    return await service.list_customers(session, user, params, search=search, archived=archived)

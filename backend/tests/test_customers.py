@@ -85,6 +85,62 @@ async def test_search_matches_name_or_inn_only(client: AsyncClient, seeded: dict
     assert miss.json()["count"] == 0
 
 
+async def test_customers_filter_by_archived(auth_client: AsyncClient, seeded: dict) -> None:
+    """Фильтр «все / активные / проигранные» сужает выдачу, а без него список
+    остался прежним — активные и проигранные вперемешку."""
+    second = await auth_client.post(
+        "/api/v1/crm/leads",
+        json={
+            "name": "ООО «Ромашка»",
+            "inn": "5404123455",
+            "stage_id": seeded["stage_new"].id,  # type: ignore[attr-defined]
+        },
+    )
+    assert second.status_code == 201, second.text
+    lose = await auth_client.post(
+        f"/api/v1/crm/leads/{seeded['lead'].id}/lose",  # type: ignore[attr-defined]
+        json={"reason_id": seeded["loss_reason"].id},  # type: ignore[attr-defined]
+    )
+    assert lose.status_code == 204
+
+    everything = (await auth_client.get("/api/v1/crm/customers")).json()["results"]
+    assert {r["name"] for r in everything} == {"ООО «Уралпромснаб»", "ООО «Ромашка»"}
+
+    active = (await auth_client.get("/api/v1/crm/customers", params={"archived": "false"})).json()[
+        "results"
+    ]
+    assert [r["name"] for r in active] == ["ООО «Ромашка»"]
+    assert active[0]["is_archived"] is False
+
+    lost = (await auth_client.get("/api/v1/crm/customers", params={"archived": "true"})).json()[
+        "results"
+    ]
+    assert [r["name"] for r in lost] == ["ООО «Уралпромснаб»"]
+    assert lost[0]["is_archived"] is True
+    assert lost[0]["loss_reason_name"] == "Перестал возить"
+
+
+async def test_customers_archived_filter_combines_with_search(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    """Фильтр состояния и поиск работают вместе, а не подменяют друг друга."""
+    lose = await auth_client.post(
+        f"/api/v1/crm/leads/{seeded['lead'].id}/lose",  # type: ignore[attr-defined]
+        json={"reason_id": seeded["loss_reason"].id},  # type: ignore[attr-defined]
+    )
+    assert lose.status_code == 204
+
+    hit = await auth_client.get(
+        "/api/v1/crm/customers", params={"archived": "true", "search": "Уралпром"}
+    )
+    assert [r["name"] for r in hit.json()["results"]] == ["ООО «Уралпромснаб»"]
+
+    miss = await auth_client.get(
+        "/api/v1/crm/customers", params={"archived": "false", "search": "Уралпром"}
+    )
+    assert miss.json()["results"] == []
+
+
 async def test_customers_endpoint_requires_auth(client: AsyncClient) -> None:
     response = await client.get("/api/v1/crm/customers")
     assert response.status_code == 401

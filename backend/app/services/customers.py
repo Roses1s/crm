@@ -55,8 +55,13 @@ async def list_customers(
     params: PageParams,
     *,
     search: str | None = None,
+    archived: bool | None = None,
 ) -> dict[str, Any]:
-    """Все лиды компании, активные и проигранные вперемешку.
+    """Все лиды компании, по умолчанию активные и проигранные вперемешку.
+
+    `archived` сужает выдачу до одного состояния: True — только проигранные,
+    False — только активные, None — без фильтра. Видимость при этом прежняя:
+    вся компания, чужой активный маскируется, проигранный открыт полностью.
 
     Поиск — только по названию и ИНН: это единственные поля, видимые на
     чужом активном лиде, остальные фильтры по скрытым полям превратили бы
@@ -80,6 +85,8 @@ async def list_customers(
                 Lead.inn.ilike(pattern, escape=LIKE_ESCAPE),
             )
         )
+    if archived is not None:
+        stmt = stmt.where(Lead.is_archived.is_(archived))
 
     items, total = await paginate(session, stmt, params)
     customers = [_to_customer(lead, user) for lead in items]
