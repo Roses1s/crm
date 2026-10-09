@@ -108,15 +108,17 @@ export function useInfiniteLeads(
  * «Клиенты» показывает все лиды компании. Поиск ограничен названием и ИНН,
  * чтобы не раскрывать данные чужой карточки.
  */
-export function useCustomers(search: string) {
+export function useCustomers(search: string, archived: boolean | null = null) {
   return useInfiniteQuery({
-    queryKey: keys.customers(search),
+    queryKey: keys.customers(search, archived),
     queryFn: ({ pageParam }) => {
       const params = new URLSearchParams({
         page: String(pageParam),
         page_size: String(CUSTOMER_PAGE_SIZE),
       });
       if (search) params.set("search", search);
+      // null — без фильтра (все вперемешку), как отвечает бэкенд по умолчанию.
+      if (archived !== null) params.set("archived", String(archived));
       return api<Page<Customer>>(`/crm/customers?${params.toString()}`, {
         schema: pageSchema(customerSchema),
       });

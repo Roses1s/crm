@@ -75,7 +75,9 @@ export const keys = {
   stages: ["stages"] as const,
   tags: ["tags"] as const,
   lossReasons: ["loss-reasons"] as const,
-  customers: (search: string) => ["customers", search] as const,
+  // archived входит в ключ: списки «все / активные / проигранные» кешируются
+  // раздельно, а инвалидация по префиксу ["customers"] по-прежнему бьёт во все.
+  customers: (search: string, archived: boolean | null) => ["customers", search, archived] as const,
   leads: (filters: LeadFilters) => ["leads", filters] as const,
   leadPages: (filters: LeadFilters, pageSize: number) =>
     ["leads", "pages", filters, pageSize] as const,

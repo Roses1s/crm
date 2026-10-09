@@ -13,10 +13,32 @@ import { CustomerTile } from "@/features/customers/CustomerTile";
  * создаются в модуле CRM. Свой лид и любой проигранный открываются полностью,
  * чужой активный показан усечённо и не кликается — см. CustomerTile.
  */
+/** Что показывать на странице: всё вперемешку, только активных или только
+ * проигранных. Значение живёт в адресе (?view=…), чтобы ссылкой можно было
+ * поделиться; посторонние значения считаем «все». */
+type CustomersView = "all" | "active" | "lost";
+
 export function CustomersPage() {
   const [params, setParams] = useSearchParams();
   const search = params.get("search") ?? "";
   const [searchInput, setSearchInput] = useState(search);
+
+  const rawView = params.get("view");
+  const view: CustomersView = rawView === "active" || rawView === "lost" ? rawView : "all";
+  // «все» намеренно не посылаем: без параметра бэкенд отдаёт всё вперемешку.
+  const archived = view === "all" ? null : view === "lost";
+
+  function setView(next: CustomersView) {
+    setParams(
+      (prev) => {
+        const nextParams = new URLSearchParams(prev);
+        if (next === "all") nextParams.delete("view");
+        else nextParams.set("view", next);
+        return nextParams;
+      },
+      { replace: true },
+    );
+  }
 
   useEffect(() => {
     const timer = setTimeout(() => {
@@ -39,13 +61,29 @@ export function CustomersPage() {
     hasNextPage,
     isFetchingNextPage,
     fetchNextPage,
-  } = useCustomers(search);
+  } = useCustomers(search, archived);
   const customers = customersPage?.items ?? [];
+
+  // Переключатель состояния — тот же слот и стиль, что фильтр статусов на
+  // «Заявках», чтобы не заводить новый способ делать фильтр.
+  const viewFilter = (
+    <select
+      className="h-8 rounded-[3px] border border-odoo-border bg-odoo-surface-sunken px-2 text-[13px] text-odoo-text-muted outline-none transition-colors hover:border-odoo-border focus:border-odoo-focus/40"
+      value={view}
+      onChange={(e) => setView(e.target.value as CustomersView)}
+      aria-label="Показывать клиентов"
+    >
+      <option value="all">Все клиенты</option>
+      <option value="active">Активные</option>
+      <option value="lost">Проигранные</option>
+    </select>
+  );
 
   return (
     <AppShell>
       <ControlPanel
         title="Клиенты"
+        status={viewFilter}
         search={searchInput}
         onSearch={setSearchInput}
         count={customersPage?.total || undefined}

@@ -58,7 +58,7 @@ describe("Страница клиентов", () => {
 
     expect(screen.getByText("Клиенты")).toBeInTheDocument();
     expect(screen.getByRole("textbox", { name: "Поиск" })).toHaveValue("Север");
-    expect(useCustomersMock).toHaveBeenCalledWith("Север");
+    expect(useCustomersMock).toHaveBeenCalledWith("Север", null);
     expect(screen.getByRole("link", { name: /ООО Север/ })).toHaveAttribute("href", "/crm/leads/1");
     expect(screen.getByText("ООО Юг")).toBeInTheDocument();
     expect(screen.queryByRole("link", { name: /ООО Юг/ })).not.toBeInTheDocument();
@@ -114,6 +114,42 @@ describe("Страница клиентов", () => {
       target: { value: "Транспорт" },
     });
 
-    await waitFor(() => expect(useCustomersMock).toHaveBeenCalledWith("Транспорт"));
+    await waitFor(() => expect(useCustomersMock).toHaveBeenCalledWith("Транспорт", null));
+  });
+
+  it("переключатель состояния передаёт фильтр проигранных в запрос", async () => {
+    useCustomersMock.mockReturnValue({
+      data: { items: [], total: 0, limit: 60 },
+      isLoading: false,
+      hasNextPage: false,
+    });
+    const user = userEvent.setup();
+    renderWithProviders(<CustomersPage />, { route: "/customers" });
+
+    expect(useCustomersMock).toHaveBeenLastCalledWith("", null);
+
+    await user.selectOptions(screen.getByRole("combobox", { name: "Показывать клиентов" }), "lost");
+    await waitFor(() => expect(useCustomersMock).toHaveBeenLastCalledWith("", true));
+
+    await user.selectOptions(
+      screen.getByRole("combobox", { name: "Показывать клиентов" }),
+      "active",
+    );
+    await waitFor(() => expect(useCustomersMock).toHaveBeenLastCalledWith("", false));
+  });
+
+  it("читает выбранный фильтр из адреса и игнорирует посторонние значения", () => {
+    useCustomersMock.mockReturnValue({
+      data: { items: [], total: 0, limit: 60 },
+      isLoading: false,
+      hasNextPage: false,
+    });
+
+    renderWithProviders(<CustomersPage />, { route: "/customers?view=lost" });
+    expect(useCustomersMock).toHaveBeenLastCalledWith("", true);
+    expect(screen.getByRole("combobox", { name: "Показывать клиентов" })).toHaveValue("lost");
+
+    renderWithProviders(<CustomersPage />, { route: "/customers?view=постороннее" });
+    expect(useCustomersMock).toHaveBeenLastCalledWith("", null);
   });
 });
