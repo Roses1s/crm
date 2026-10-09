@@ -162,7 +162,11 @@ export async function api<T>(path: string, options: Options<T>): Promise<T> {
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
-    throw new ApiError(response.status, errorDetail(payload, response.status), errorCode(payload));
+    throw new ApiError(
+      response.status,
+      errorDetail(payload, response.status),
+      errorCode(payload),
+    );
   }
 
   return validateResponse(path, method, schema, payload);
