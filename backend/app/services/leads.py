@@ -260,7 +260,15 @@ async def lose_lead(session: AsyncSession, user: User, lead_id: int, payload: Le
     всегда показывал Odoo: «Активный: Да → Нет» и «Причина проигрыша: — → …».
     """
     lead = await get_editable_lead(session, lead_id, user)
-    reason = await session.get(LossReason, payload.reason_id)
+    # Удаление справочника блокирует ту же строку; назначение и удаление
+    # причины тем самым сериализуются на PostgreSQL.
+    reason = (
+        await session.execute(
+            select(LossReason)
+            .where(LossReason.id == payload.reason_id)
+            .with_for_update()
+        )
+    ).scalar_one_or_none()
     if reason is None:
         raise NotFoundError(f"Причина {payload.reason_id} не найдена")
 
