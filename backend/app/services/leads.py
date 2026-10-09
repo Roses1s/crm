@@ -415,7 +415,21 @@ async def transfer_lead(
     сотрудником» здесь не ошибка, если лид как раз нужно восстановить тому же
     человеку, у которого он был до проигрыша.
     """
-    lead = await get_lead_or_404(session, lead_id, user)
+    # Передача может одновременно восстановить проигранный лид; используем
+    # ту же блокировку, что и restore_lead, чтобы операции не перезаписывали друг друга.
+    stmt = (
+        select(Lead)
+        .where(Lead.id == lead_id)
+        .options(selectinload(Lead.tags))
+        .execution_options(populate_existing=True)
+        .with_for_update(of=Lead)
+    )
+    lead = (await session.execute(stmt)).unique().scalar_one_or_none()
+    if lead is None:
+        raise NotFoundError(f"Лид {lead_id} не найден")
+    forbidden = user.role != Role.admin and lead.assigned_to_id != user.id
+    if forbidden and not lead.is_archived:
+        raise NotFoundError(f"Лид {lead_id} не найден")
     was_lost = lead.is_archived
 
     target = await session.get(User, payload.user_id)
