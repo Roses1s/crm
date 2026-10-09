@@ -29,6 +29,17 @@ async def manager_token(client: AsyncClient) -> str:
     return str(login.json()["access_token"])
 
 
+async def test_stage_color_respects_database_length(
+    auth_client: AsyncClient, seeded: dict
+) -> None:
+    response = await auth_client.post(
+        "/api/v1/crm/stages",
+        json={"name": "Цвет слишком длинный", "color": "x" * 21},
+    )
+    assert response.status_code == 422
+    assert response.json()["code"] == "validation_error"
+
+
 async def test_first_visit_creates_default_board(
     client: AsyncClient, seeded: dict[str, object]
 ) -> None:
