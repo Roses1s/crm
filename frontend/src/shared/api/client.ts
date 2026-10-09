@@ -71,11 +71,7 @@ async function request(
   // Защищаем не только от запоздавшего 401: успешный ответ старой сессии
   // тоже нельзя отдавать вызывающему коду после смены пользователя.
   if (auth && generationAtStart !== getSessionGeneration()) {
-    throw new ApiError(
-      401,
-      "Запрос относится к предыдущей сессии",
-      "session_changed",
-    );
+    throw new ApiError(401, "Запрос относится к предыдущей сессии", "session_changed");
   }
 
   if (response.status === 401 && auth) {
@@ -169,11 +165,7 @@ export async function api<T>(path: string, options: Options<T>): Promise<T> {
   const payload = await response.json().catch(() => null);
 
   if (!response.ok) {
-    throw new ApiError(
-      response.status,
-      errorDetail(payload, response.status),
-      errorCode(payload),
-    );
+    throw new ApiError(response.status, errorDetail(payload, response.status), errorCode(payload));
   }
 
   return validateResponse(path, method, schema, payload);
