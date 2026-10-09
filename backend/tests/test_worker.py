@@ -178,6 +178,31 @@ def test_cleanup_orphan_files_removes_only_unknown_and_old(tmp_path: Path) -> No
     assert not orphan_thumbnail.exists(), "миниатюру удалённого вложения нужно убрать"
 
 
+def test_database_backups_use_unique_names_and_publish_after_success(
+    tmp_path: Path, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Два бэкапа в одну минуту не должны конфликтовать или перезаписывать друг друга."""
+    backup_dir = tmp_path / "backups"
+    monkeypatch.setattr(worker_tasks, "BACKUP_DIR", backup_dir)
+    monkeypatch.setattr(worker_tasks.shutil, "which", lambda _: "/usr/bin/pg_dump")
+
+    def fake_pg_dump(command: list[str], **_: object) -> object:
+        target = Path(command[command.index("--file") + 1])
+        target.write_bytes(b"valid dump")
+        return type("Result", (), {"returncode": 0, "stderr": ""})()
+
+    monkeypatch.setattr(worker_tasks.subprocess, "run", fake_pg_dump)
+    first = worker_tasks.backup_database()
+    second = worker_tasks.backup_database()
+
+    assert first["ok"] is True
+    assert second["ok"] is True
+    assert first["file"] != second["file"]
+    assert (backup_dir / first["file"]).read_bytes() == b"valid dump"
+    assert (backup_dir / second["file"]).read_bytes() == b"valid dump"
+    assert not list(backup_dir.glob("*.tmp"))
+
+
 def test_backup_attachments_includes_original_and_thumbnail(
     tmp_path: Path, monkeypatch: pytest.MonkeyPatch
 ) -> None:
