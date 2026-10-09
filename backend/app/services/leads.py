@@ -73,20 +73,18 @@ async def get_lead_or_404(
     return lead
 
 
-async def get_editable_lead(session: AsyncSession, lead_id: int, user: User) -> Lead:
-    """Доступный для изменения лид; блокирует строку до конца операции записи.
-
-    Блокировка сериализует запись заметок, вложений и заявок с операцией
-    проигрыша: нельзя пройти проверку на активном лиде и завершить запись уже
-    после того, как другой запрос отметил его проигранным.
-    """
+async def get_editable_lead(
+    session: AsyncSession, lead_id: int, user: User, *, for_update: bool = False
+) -> Lead:
+    """Проверяет право записи; при необходимости блокирует лид до конца транзакции."""
     stmt = (
         select(Lead)
         .where(Lead.id == lead_id)
         .options(selectinload(Lead.tags))
         .execution_options(populate_existing=True)
-        .with_for_update(of=Lead)
     )
+    if for_update:
+        stmt = stmt.with_for_update(of=Lead)
     lead = (await session.execute(stmt)).unique().scalar_one_or_none()
     if lead is None:
         raise NotFoundError(f"Лид {lead_id} не найден")
@@ -193,7 +191,7 @@ async def create_lead(session: AsyncSession, user: User, payload: LeadCreate) ->
 
 
 async def update_lead(session: AsyncSession, user: User, lead_id: int, payload: LeadUpdate) -> Lead:
-    lead = await get_editable_lead(session, lead_id, user)
+    lead = await get_editable_lead(session, lead_id, user, for_update=True)
     expected_updated_at = payload.expected_updated_at
     data = payload.model_dump(exclude_unset=True, exclude={"expected_updated_at"})
     tag_ids = data.pop("tag_ids", None)
@@ -276,7 +274,7 @@ async def lose_lead(session: AsyncSession, user: User, lead_id: int, payload: Le
     строгая проверка доступа. Запись в ленту повторяет вид, в котором это
     всегда показывал Odoo: «Активный: Да → Нет» и «Причина проигрыша: — → …».
     """
-    lead = await get_editable_lead(session, lead_id, user)
+    lead = await get_editable_lead(session, lead_id, user, for_update=True)
     # Удаление справочника блокирует ту же строку; назначение и удаление
     # причины тем самым сериализуются на PostgreSQL.
     reason = (
@@ -518,7 +516,7 @@ async def _get_entry_or_404(session: AsyncSession, lead_id: int, entry_id: int) 
 async def add_note(
     session: AsyncSession, user: User, lead_id: int, payload: NoteCreate
 ) -> TimelineEntry:
-    await get_editable_lead(session, lead_id, user)
+    await get_editable_lead(session, lead_id, user, for_update=True)
     entry = TimelineEntry(
         lead_id=lead_id, author_id=user.id, type=EntryType.note, body=payload.body
     )
@@ -531,7 +529,7 @@ async def add_note(
 async def update_timeline_entry(
     session: AsyncSession, user: User, lead_id: int, entry_id: int, payload: NoteUpdate
 ) -> TimelineEntry:
-    await get_editable_lead(session, lead_id, user)
+    await get_editable_lead(session, lead_id, user, for_update=True)
     entry = await _get_entry_or_404(session, lead_id, entry_id)
     if entry.type is not EntryType.note:
         raise AppError("Изменять можно только примечания", code="not_editable")
