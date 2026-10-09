@@ -378,9 +378,7 @@ function ShipmentForm({ id }: { id?: string }) {
     created_at: toDatetimeLocal(new Date().toISOString()),
   }));
   const [pristine, setPristine] = useState<FormState>(form);
-  const { data: selectedLeadDetails } = useLead(
-    isNew && form.lead_id ? String(form.lead_id) : undefined,
-  );
+  const { data: selectedLeadDetails } = useLead(isNew && form.lead_id ? String(form.lead_id) : undefined);
   const [error, setError] = useState("");
   const [preview, setPreview] = useState<Attachment | null>(null);
   const [tab, setTab] = useState("lines");
@@ -626,9 +624,7 @@ function ShipmentForm({ id }: { id?: string }) {
 
   const currentStageId = STAGES.find((s) => s.value === shipment?.status)?.id ?? 0;
 
-  const selectedLead =
-    leads.find((l) => l.id === form.lead_id) ??
-    selectedLeadDetails;
+  const selectedLead = leads.find((l) => l.id === form.lead_id) ?? selectedLeadDetails;
   const title = shipment?.lead_name || selectedLead?.name || "Новая заявка";
 
   const composerInitial = (currentUser?.first_name || currentUser?.email || "Я")
