@@ -156,17 +156,10 @@ async def test_refresh_rotates_and_old_token_stops_working(
     first = await client.post("/api/v1/auth/refresh")
     assert first.status_code == 200
 
-    # Сразу после ротации прежний токен ещё принимается — это защита от гонки
-    # параллельных вкладок (REFRESH_GRACE_SECONDS).
-    from app.api.v1 import auth as auth_module
-
-    original_grace = auth_module.REFRESH_GRACE_SECONDS
-    auth_module.REFRESH_GRACE_SECONDS = -1
-    try:
-        client.cookies.set("crm_refresh", old_cookie)
-        replay = await client.post("/api/v1/auth/refresh")
-    finally:
-        auth_module.REFRESH_GRACE_SECONDS = original_grace
+    # Повторное использование отозванной куки нельзя допускать даже короткое
+    # время: перехваченная cookie иначе выпустит независимую новую сессию.
+    client.cookies.set("crm_refresh", old_cookie)
+    replay = await client.post("/api/v1/auth/refresh")
 
     assert replay.status_code == 401, replay.text
 
@@ -177,7 +170,7 @@ async def test_refresh_rotates_and_old_token_stops_working(
 async def test_concurrent_refresh_requests_do_not_conflict(
     engine, seeded: dict[str, object]
 ) -> None:
-    """Два запроса с одной кукой завершаются успешно, а не спорят за уникальный jti."""
+    """Из двух параллельных запросов с одной кукой успешен только первый."""
     maker = async_sessionmaker(bind=engine, expire_on_commit=False)
 
     async def independent_session():
@@ -205,9 +198,12 @@ async def test_concurrent_refresh_requests_do_not_conflict(
                 second_client.post("/api/v1/auth/refresh"),
             )
 
-            assert first.status_code == second.status_code == 200, (first.text, second.text)
-            assert first.cookies.get("crm_refresh")
-            assert second.cookies.get("crm_refresh")
+            assert sorted((first.status_code, second.status_code)) == [200, 401], (
+                first.text,
+                second.text,
+            )
+            successful = first if first.status_code == 200 else second
+            assert successful.cookies.get("crm_refresh")
     finally:
         if previous_override is None:
             app.dependency_overrides.pop(get_session, None)
