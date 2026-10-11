@@ -99,6 +99,10 @@ export function useSessionRestored(): boolean {
  * Тихое восстановление сессии при запуске приложения и после истечения
  * короткого токена. Кука уходит автоматически, тело запроса не нужно.
  */
+// Сколько ждать перед повторной попыткой продления: ответ соседней вкладки
+// с новой кукой должен успеть долететь до браузера раньше нашего повтора.
+const REFRESH_RETRY_DELAY_MS = 400;
+
 export async function refreshSession(): Promise<boolean> {
   // Один общий «полёт» на всю вкладку. Когда токен истёк, 401 прилетает сразу
   // нескольким запросам, и раньше каждый из них слал своё продление. Сервер
@@ -109,22 +113,37 @@ export async function refreshSession(): Promise<boolean> {
 
   const generationAtStart = sessionGeneration;
   refreshInFlight = (async () => {
-    try {
-      const response = await fetch("/api/v1/auth/refresh", { method: "POST" });
-      if (!response.ok || generationAtStart !== sessionGeneration) return false;
-      const parsed = accessTokenResponseSchema.safeParse(await response.json());
-      if (!parsed.success) return false;
-      // Это продление той же сессии, поэтому кеш сбрасывать не нужно. Если пока
-      // ждали ответ случился logout/login, проверка поколения выше его отбросит.
-      setAccessToken(parsed.data.access_token);
-      return true;
-    } catch {
-      return false;
-    } finally {
-      // Старый refresh не должен очистить ссылку на новый запрос другой сессии.
-      if (generationAtStart === sessionGeneration) refreshInFlight = null;
+    // Сервер отклоняет уже отозванную куку сразу, без окна снисхождения.
+    // Но 401 с первой попытки ещё не означает конец сессии: кука общая на все
+    // вкладки, и соседняя вкладка могла продлить сессию мгновением раньше —
+    // тогда её ответ с новой кукой приходит чуть позже нашего отказа. Ждём и
+    // пробуем ещё раз уже с новой кукой. Чужак, replay-нувший старую куку,
+    // получит 401 и на повторе: новую куку взять ему неоткуда.
+    for (let attempt = 1; attempt <= 2; attempt += 1) {
+      if (attempt === 2) {
+        await new Promise((resolve) => setTimeout(resolve, REFRESH_RETRY_DELAY_MS));
+        if (generationAtStart !== sessionGeneration) return false;
+      }
+      try {
+        const response = await fetch("/api/v1/auth/refresh", { method: "POST" });
+        if (generationAtStart !== sessionGeneration) return false;
+        if (response.status === 401 && attempt === 1) continue;
+        if (!response.ok) return false;
+        const parsed = accessTokenResponseSchema.safeParse(await response.json());
+        if (!parsed.success) return false;
+        // Это продление той же сессии, поэтому кеш сбрасывать не нужно. Если
+        // пока ждали ответ случился logout/login, проверка поколения отбросит.
+        setAccessToken(parsed.data.access_token);
+        return true;
+      } catch {
+        return false;
+      }
     }
-  })();
+    return false;
+  })().finally(() => {
+    // Старый refresh не должен очистить ссылку на новый запрос другой сессии.
+    if (generationAtStart === sessionGeneration) refreshInFlight = null;
+  });
 
   return refreshInFlight;
 }

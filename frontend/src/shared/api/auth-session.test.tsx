@@ -193,4 +193,41 @@ describe("изоляция Query cache между учётными сессия�
     await expect(pending).resolves.toBe(false);
     expect(getAccessToken()).toBeNull();
   });
+
+  it("после 401 ждёт и повторяет: соседняя вкладка уже могла продлить сессию", async () => {
+    clearTokens();
+    let calls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        calls += 1;
+        if (calls === 1) return new Response(null, { status: 401 });
+        return Response.json({
+          access_token: "rotated-by-sibling-tab",
+          token_type: "bearer",
+          expires_in: 1800,
+        });
+      }),
+    );
+
+    await expect(refreshSession()).resolves.toBe(true);
+    expect(getAccessToken()).toBe("rotated-by-sibling-tab");
+    expect(calls).toBe(2);
+  });
+
+  it("правда отозванная сессия не продлевается и повтором", async () => {
+    clearTokens();
+    let calls = 0;
+    vi.stubGlobal(
+      "fetch",
+      vi.fn(async () => {
+        calls += 1;
+        return new Response(null, { status: 401 });
+      }),
+    );
+
+    await expect(refreshSession()).resolves.toBe(false);
+    expect(getAccessToken()).toBeNull();
+    expect(calls).toBe(2);
+  });
 });
