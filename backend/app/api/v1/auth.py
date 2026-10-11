@@ -174,24 +174,14 @@ async def _revoked_entry(session: SessionDep, jti: str | None) -> RevokedToken |
     return found.scalar_one_or_none()
 
 
-async def _is_revoked_beyond_grace(session: SessionDep, jti: str | None) -> bool:
-    """Отозван ли токен настолько давно, что продлевать по нему уже нельзя.
+async def _is_revoked(session: SessionDep, jti: str | None) -> bool:
+    """Проверяет, что refresh-токен ещё не был отозван.
 
-    Свежий отзыв (меньше `REFRESH_GRACE_SECONDS` назад) — это почти наверняка
-    собственная параллельная вкладка, а не перехват: такой запрос пропускаем.
+    Ротация действует немедленно: иначе перехваченная старая cookie могла бы
+    успеть выпустить собственный новый токен и пережить выход пользователя.
+    Параллельные запросы одной вкладки объединяет frontend.
     """
-    entry = await _revoked_entry(session, jti)
-    if entry is None:
-        return False
-    # Выход из системы действует сразу: окно снисхождения — только для замены
-    # токена при продлении сессии.
-    if entry.reason != "rotation":
-        return True
-    revoked_at = entry.created_at
-    if revoked_at.tzinfo is None:  # SQLite хранит время без часового пояса
-        revoked_at = revoked_at.replace(tzinfo=UTC)
-    return (datetime.now(tz=UTC) - revoked_at).total_seconds() > REFRESH_GRACE_SECONDS
-
+    return await _revoked_entry(session, jti) is not None
 
 async def _revoke(session: SessionDep, payload: dict[str, Any], reason: str) -> None:
     """Заносит обновляющий токен в чёрный список (до его собственного срока)."""
