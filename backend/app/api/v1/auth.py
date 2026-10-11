@@ -183,6 +183,7 @@ async def _is_revoked(session: SessionDep, jti: str | None) -> bool:
     """
     return await _revoked_entry(session, jti) is not None
 
+
 async def _revoke(session: SessionDep, payload: dict[str, Any], reason: str) -> None:
     """Заносит обновляющий токен в чёрный список (до его собственного срока)."""
     jti = str(payload.get("jti") or "")
