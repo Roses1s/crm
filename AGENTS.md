@@ -62,7 +62,7 @@ cd backend && .venv/bin/ruff check . && .venv/bin/ruff format --check . \
   && .venv/bin/python -m pytest --cov=app --cov-branch --cov-report=term-missing --cov-fail-under=70
 # `alembic check` без DATABASE_URL берёт адрес PostgreSQL из настроек и в
 # песочнице падает на DNS. CI подставляет SQLite — повторяем то же самое:
-cd backend && rm -f /tmp/checks.db \
+rm -f /tmp/checks.db \
   && DATABASE_URL=sqlite+aiosqlite:////tmp/checks.db .venv/bin/alembic upgrade head \
   && DATABASE_URL=sqlite+aiosqlite:////tmp/checks.db .venv/bin/alembic check
 cd ../frontend && npm run lint && npm run format:check && npx tsc -b \

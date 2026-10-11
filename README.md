@@ -106,8 +106,12 @@ cd ../frontend && npm install && npm run dev           # http://localhost:5173
 ```bash
 cd backend && .venv/bin/ruff check . && .venv/bin/ruff format --check . \
   && .venv/bin/mypy app \
-  && .venv/bin/python -m pytest --cov=app --cov-branch --cov-report=term-missing --cov-fail-under=70 \
-  && .venv/bin/alembic check
+  && .venv/bin/python -m pytest --cov=app --cov-branch --cov-report=term-missing --cov-fail-under=70
+# `alembic check` без DATABASE_URL идёт в PostgreSQL из настроек; локально,
+# как и в CI, проверяем на временной SQLite:
+rm -f /tmp/checks.db \
+  && DATABASE_URL=sqlite+aiosqlite:////tmp/checks.db .venv/bin/alembic upgrade head \
+  && DATABASE_URL=sqlite+aiosqlite:////tmp/checks.db .venv/bin/alembic check
 cd ../frontend && npm run lint && npm run format:check && npx tsc -b \
   && npm test -- --coverage \
   && npm run build
@@ -126,21 +130,22 @@ HTTP-клиент открывает отдельную сессию БД на �
 Временные значения по умолчанию удалены отдельной миграцией, а `alembic check`
 теперь сравнивает значения по умолчанию в базе и моделях.
 
-В коде рабочей ветки закрыты **Ф-05**, **Ф-08**, **Ф-09** и **Ф-10**. Чаттер
+Закрыты и выкачены в production (релиз `a55d7b2`, 08.10.2026) **Ф-05**,
+**Ф-08**, **Ф-09** и **Ф-10**. Чаттер
 получает уменьшенную WebP-миниатюру через защищённую ручку; свёрнутые колонки
 хранят настройки отдельно для сотрудника и доски; JSON-ответы API проверяются
 Zod-схемами. У страницы клиентов появился отдельный тест, большой файл хуков
 разделён по областям, а прежний путь `shared/api/hooks.ts` оставлен как общий
 вход.
 
-**Production на 09.10.2026:** версия `2cd0382`, схема БД — `c5e93b9d1995`.
-После выкладки все 7 контейнеров запущены, сайт отвечает. Предмиграционный дамп
-`/var/backups/crm/crm-pre-deploy-20261009-131646-2cd0382.dump` проверен через
-`pg_restore --list`. В томе `crm_backups`, смонтированном в контейнерах как
-`/var/backups/crm`, присутствуют ежедневные дампы по 09.10.2026 включительно;
-последний проверенный предрелизный дамп читается. Celery Beat запущен,
-worker зарегистрировал 6 задач и перешёл в состояние ready; фактическое
-исполнение всех периодических задач отдельно не подтверждалось.
+**Production на 09.10.2026:** версия `9a11e73` (фильтр «Все / Активные /
+Проигранные» на «Клиентах»), схема БД — `c5e93b9d1995`. После выкладки все 7
+контейнеров запущены, сайт отвечает. Предрелизный дамп —
+`/var/backups/crm/crm-pre-deploy-20261009-150037-9a11e73.dump`. В томе
+`crm_backups`, смонтированном в контейнерах как `/var/backups/crm`, есть
+ежедневные дампы по 09.10.2026 включительно. Celery Beat и worker работают;
+исполнение расписания подтверждено файлами в томе (ежедневные дампы с 30.09 и
+воскресный бэкап вложений). Свежие сведения — в [`docs/STATUS.md`](docs/STATUS.md).
 
 Т-07 закрыта: заменены устаревшие коды статусов, усилен тестовый ключ JWT,
 cookie задаются на клиенте, а списочная загрузка заявок явно выбирает нужные
