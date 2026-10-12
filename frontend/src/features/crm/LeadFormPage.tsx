@@ -39,6 +39,7 @@ import { ownerInitials, ownerLabel } from "@/shared/lib/owner";
 import type { Attachment } from "@/shared/types";
 import { ClientGroup } from "@/features/crm/lead-form/ClientGroup";
 import { CompanyGroup } from "@/features/crm/lead-form/CompanyGroup";
+import { describe } from "@/features/crm/lead-form/describe-error";
 import { DeleteLeadDialog } from "@/features/crm/lead-form/DeleteLeadDialog";
 import { LeadHeaderBar } from "@/features/crm/lead-form/LeadHeaderBar";
 import { LeadStageBar } from "@/features/crm/lead-form/LeadStageBar";
@@ -235,18 +236,6 @@ function LeadForm({ id }: { id?: string }) {
     // упасть именно из-за того, что сейчас исправляют.
     autoSaveBlocked.current = false;
     setForm((f) => ({ ...f, [key]: value }));
-  }
-
-  function describe(err: unknown, fallback: string): string {
-    if (err instanceof ApiError) {
-      if (err.code === "lead_conflict")
-        return "Другой пользователь уже изменил карточку. Ваши правки не сохранены — загрузите актуальную карточку перед продолжением.";
-      if (err.status === 422)
-        return "Проверьте поля: ИНН должен быть из 10 или 12 цифр с верной контрольной суммой";
-      if (err.status === 403) return "Недостаточно прав для этого действия";
-      return err.message;
-    }
-    return fallback;
   }
 
   async function reloadLatestLead() {
