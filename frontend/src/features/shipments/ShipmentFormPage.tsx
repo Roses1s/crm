@@ -1,12 +1,5 @@
 import { FileText } from "lucide-react";
-import {
-  useCallback,
-  useEffect,
-  useRef,
-  useState,
-  type InputHTMLAttributes,
-  type TextareaHTMLAttributes,
-} from "react";
+import { useCallback, useEffect, useRef, useState, type TextareaHTMLAttributes } from "react";
 import { Link, useBlocker, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { AppShell, ControlPanel } from "@/app/layout/AppShell";
@@ -49,23 +42,18 @@ import {
 } from "@/shared/ui/odoo-form";
 import { FormSkeleton } from "@/shared/ui/skeleton";
 import { useToast } from "@/shared/ui/toast-context";
-import { formatMoney } from "./money";
 import {
   fieldStateCls,
   fromDatetimeLocal,
-  netAmount,
   selectStateCls,
   toDatetimeLocal,
 } from "./shipment-form/helpers";
+import { OrderLinesTab } from "./shipment-form/OrderLinesTab";
+import { SInput } from "./shipment-form/fields";
 import { TokenField } from "./TokenField";
 
 // Наша компания — статичная шапка бланка.
 const OWN_COMPANY = 'ООО "Детроид"';
-
-function SInput({ className = "", ...props }: InputHTMLAttributes<HTMLInputElement>) {
-  const filled = Boolean(props.value);
-  return <input {...props} className={`${fieldStateCls(filled)} ${className}`} />;
-}
 
 function STextarea({ className = "", ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
   const filled = Boolean(props.value);
@@ -89,149 +77,6 @@ const TRANSPORT_OPTIONS: { value: string; label: string }[] = [
   { value: "gazel", label: "Газель" },
   { value: "other", label: "Другое" },
 ];
-
-// Позиция заказа: одна фиксированная услуга, цена заказчика и перевозчика —
-// каждая со своей ставкой НДС.
-const SERVICE_NAME = "Транспортно-экспедиционное обслуживание";
-
-const TAX_OPTIONS: { value: string; label: string }[] = [
-  { value: "vat_22", label: "НДС 22%" },
-  { value: "no_vat", label: "Без НДС" },
-  { value: "vat_0", label: "НДС 0%" },
-];
-
-/** Вкладка «Позиции заказа»: одна фиксированная строка услуги с ценой
- * заказчика и перевозчика, у каждой свой НДС, плюс итоговая маржа. */
-function OrderLinesTab({
-  customerPrice,
-  customerTax,
-  carrierPrice,
-  carrierTax,
-  deductionRate,
-  onCustomerPriceChange,
-  onCustomerTaxChange,
-  onCarrierPriceChange,
-  onCarrierTaxChange,
-}: {
-  customerPrice: string;
-  customerTax: string;
-  carrierPrice: string;
-  carrierTax: string;
-  /** Ставку вычета знает только сервер (GET /meta) — локальной копии нет (Т-08). */
-  deductionRate: number | null;
-  onCustomerPriceChange: (value: string) => void;
-  onCustomerTaxChange: (value: string) => void;
-  onCarrierPriceChange: (value: string) => void;
-  onCarrierTaxChange: (value: string) => void;
-}) {
-  const customerNet = netAmount(customerPrice, customerTax);
-  const carrierNet = netAmount(carrierPrice, carrierTax);
-  // Из получившейся разницы дополнительно вычитаем долю доп. расходов —
-  // по требованию владельца бизнеса (не связанные с НДС). Пока константа
-  // не приехала с сервера, живой пересчёт не показываем.
-  const margin =
-    deductionRate != null && customerNet != null && carrierNet != null
-      ? (customerNet - carrierNet) * (1 - deductionRate)
-      : null;
-
-  const th = "whitespace-nowrap px-3 py-2 text-left font-semibold";
-  const td = "px-3 py-2 align-middle";
-
-  return (
-    <div>
-      <div className="overflow-x-auto">
-        <table className="w-full min-w-[720px] border-collapse text-[13px]">
-          <thead className="bg-odoo-surface-sunken text-odoo-text-muted">
-            <tr className="border-b border-odoo-border">
-              <th rowSpan={2} className={th}>
-                Продукт
-              </th>
-              <th colSpan={3} className={`${th} border-l border-odoo-border text-center`}>
-                Заказчик
-              </th>
-              <th colSpan={3} className={`${th} border-l border-odoo-border text-center`}>
-                Перевозчик
-              </th>
-            </tr>
-            <tr className="border-b border-odoo-border">
-              <th className={`${th} border-l border-odoo-border`}>Цена</th>
-              <th className={th}>Налог</th>
-              <th className={th}>Налог исключен.</th>
-              <th className={`${th} border-l border-odoo-border`}>Цена</th>
-              <th className={th}>Налог</th>
-              <th className={th}>Налог исключен.</th>
-            </tr>
-          </thead>
-          <tbody>
-            <tr className="border-b border-odoo-border-light bg-odoo-surface">
-              <td className={td}>{SERVICE_NAME}</td>
-              <td className={`${td} border-l border-odoo-border`}>
-                <SInput
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  aria-label="Цена для заказчика"
-                  value={customerPrice}
-                  onChange={(e) => onCustomerPriceChange(e.target.value)}
-                />
-              </td>
-              <td className={td}>
-                <select
-                  className={`${selectStateCls(true)} min-w-[92px]`}
-                  value={customerTax}
-                  onChange={(e) => onCustomerTaxChange(e.target.value)}
-                >
-                  {TAX_OPTIONS.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
-              </td>
-              <td className={`${td} text-odoo-text-muted`}>
-                {customerNet != null ? formatMoney(customerNet) : ""}
-              </td>
-              <td className={`${td} border-l border-odoo-border`}>
-                <SInput
-                  type="number"
-                  step="0.01"
-                  placeholder="0.00"
-                  aria-label="Цена для перевозчика"
-                  value={carrierPrice}
-                  onChange={(e) => onCarrierPriceChange(e.target.value)}
-                />
-              </td>
-              <td className={td}>
-                <select
-                  className={`${selectStateCls(true)} min-w-[92px]`}
-                  value={carrierTax}
-                  onChange={(e) => onCarrierTaxChange(e.target.value)}
-                >
-                  {TAX_OPTIONS.map((t) => (
-                    <option key={t.value} value={t.value}>
-                      {t.label}
-                    </option>
-                  ))}
-                </select>
-              </td>
-              <td className={`${td} text-odoo-text-muted`}>
-                {carrierNet != null ? formatMoney(carrierNet) : ""}
-              </td>
-            </tr>
-          </tbody>
-        </table>
-      </div>
-      <div className="mt-3 flex justify-end">
-        <div className="flex items-center gap-3 px-3 py-2 text-[13px]">
-          <span className="font-medium text-odoo-text-muted">Маржа</span>
-          <span className="font-semibold text-odoo-text">
-            {margin != null ? formatMoney(margin) : "—"}
-          </span>
-        </div>
-      </div>
-    </div>
-  );
-}
 
 const emptyForm = {
   number: "",
