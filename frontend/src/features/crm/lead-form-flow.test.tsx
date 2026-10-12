@@ -38,7 +38,7 @@
  *   только предупреждение о дубле при ИНН от 10 цифр;
  * — после неудачного сохранения автосохранение замолкает до следующей правки.
  */
-import { act, screen, waitFor, within } from "@testing-library/react";
+import { act, fireEvent, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Route, Routes, useParams } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
@@ -1182,6 +1182,100 @@ it("«Действия → Отметить проигрышем» открыв�
   expect(screen.queryByLabelText("Лид проигран")).not.toBeInTheDocument();
 });
 
+/**
+ * Пункты меню «Действия» делают три вещи по порядку: закрывают меню,
+ * стирают прошлую ошибку и открывают своё окно. Проверяем это на странице
+ * целиком: ошибка специально доводится до показа, окно закрывается, а затем
+ * открывается снова из меню — старой ошибки быть не должно, а меню должно
+ * быть закрыто (внутри меню нет пункта удаления, пока окно открыто).
+ */
+it("пункт «Отметить проигрышем»: меню закрывается, старая ошибка стирается, окно открывается", async () => {
+  setAccessToken("токен");
+  server = startFakeApi([
+    ...leadRoutes(),
+    { path: "/crm/loss-reasons", response: LOSS_REASONS },
+    {
+      method: "POST",
+      path: "/crm/leads/10/lose",
+      response: { detail: "Причина не найдена" },
+      status: 404,
+    },
+  ]);
+
+  const user = userEvent.setup();
+  renderLead("10");
+  await screen.findAllByDisplayValue("ООО Ромашка");
+
+  // Первая попытка: открываем из меню и получаем ошибку от сервера.
+  await user.click(screen.getByRole("button", { name: "Действия" }));
+  await user.click(screen.getByRole("button", { name: "Отметить проигрышем" }));
+
+  const dialog = await screen.findByRole("dialog", { name: "Отметка проигрыша" });
+  // Меню закрылось вместе с открытием окна: пункта удаления рядом уже нет.
+  expect(screen.queryByRole("button", { name: "Удалить лид" })).not.toBeInTheDocument();
+
+  await user.click(await screen.findByRole("radio", { name: "Перестал возить" }));
+  await user.click(within(dialog).getByRole("button", { name: "Отметить проигрышем" }));
+  expect(await within(dialog).findByText("Причина не найдена")).toBeVisible();
+
+  // Закрываем окно, не подтверждая: ошибка осталась в состоянии страницы —
+  // значит, её можно стереть только при следующем открытии.
+  await user.keyboard("{Escape}");
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog", { name: "Отметка проигрыша" })).not.toBeInTheDocument(),
+  );
+
+  // Открываем снова из меню: меню закрыто, окно открыто, прежней ошибки нет.
+  await user.click(screen.getByRole("button", { name: "Действия" }));
+  await user.click(screen.getByRole("button", { name: "Отметить проигрышем" }));
+
+  const again = await screen.findByRole("dialog", { name: "Отметка проигрыша" });
+  expect(screen.queryByRole("button", { name: "Удалить лид" })).not.toBeInTheDocument();
+  expect(within(again).queryByText("Причина не найдена")).not.toBeInTheDocument();
+  // Ничего не переотправлялось: второй раз мы окно только открыли.
+  expect(countCalls("POST", "/crm/leads/10/lose")).toBe(1);
+});
+
+it("пункт «Удалить лид»: меню закрывается, старая ошибка стирается, окно открывается", async () => {
+  setAccessToken("токен");
+  server = startFakeApi([
+    ...leadRoutes(),
+    {
+      method: "DELETE",
+      path: "/crm/leads/10/permanent",
+      response: { detail: "Лид уже удалён" },
+      status: 404,
+    },
+  ]);
+
+  const user = userEvent.setup();
+  renderLead("10");
+  await screen.findAllByDisplayValue("ООО Ромашка");
+
+  await user.click(screen.getByRole("button", { name: "Действия" }));
+  await user.click(screen.getByRole("button", { name: "Удалить лид" }));
+
+  const dialog = await screen.findByRole("dialog", { name: "Удаление лида" });
+  // Меню закрыто: пункта проигрыша рядом уже нет.
+  expect(screen.queryByRole("button", { name: "Отметить проигрышем" })).not.toBeInTheDocument();
+
+  await user.click(within(dialog).getByRole("button", { name: "Удалить навсегда" }));
+  expect(await within(dialog).findByText("Лид уже удалён")).toBeVisible();
+
+  await user.keyboard("{Escape}");
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog", { name: "Удаление лида" })).not.toBeInTheDocument(),
+  );
+
+  await user.click(screen.getByRole("button", { name: "Действия" }));
+  await user.click(screen.getByRole("button", { name: "Удалить лид" }));
+
+  const again = await screen.findByRole("dialog", { name: "Удаление лида" });
+  expect(screen.queryByRole("button", { name: "Отметить проигрышем" })).not.toBeInTheDocument();
+  expect(within(again).queryByText("Лид уже удалён")).not.toBeInTheDocument();
+  expect(countCalls("DELETE", "/crm/leads/10/permanent")).toBe(1);
+});
+
 it("у проигранного лида пункта «Отметить проигрышем» в меню нет", async () => {
   const lostLead = {
     ...LEAD,
@@ -1203,6 +1297,72 @@ it("у проигранного лида пункта «Отметить про�
   // уже проигранный нельзя: этого пункта в меню нет.
   expect(screen.getByRole("button", { name: "Удалить лид" })).toBeVisible();
   expect(screen.queryByRole("button", { name: "Отметить проигрышем" })).not.toBeInTheDocument();
+});
+
+/**
+ * Настоящий сервер отвечает не мгновенно: пока запрос в пути, видны состояния
+ * ожидания. Так же сделано в тестах автосохранения заявки — иначе состояние
+ * «идёт запрос» не поймать: ответ приходит до следующей отрисовки.
+ */
+function slowResponses(ms = 400) {
+  const fakeFetch = globalThis.fetch;
+  vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+    return fakeFetch(input, init);
+  });
+}
+
+it("шапка показывает число заявок лида, а не что-то другое", async () => {
+  setAccessToken("токен");
+  server = startFakeApi(leadRoutes(ME, LEAD, SHIPMENTS));
+
+  renderLead("10");
+  await screen.findAllByDisplayValue("ООО Ромашка");
+
+  // В шапке — «Все заявки» со числом самого лида (в фикстуре их две).
+  const stats = screen.getByText("Все заявки").parentElement!;
+  await waitFor(() => expect(within(stats).getByText("2")).toBeVisible());
+});
+
+it("у лида без заявок счётчик в шапке показывает ноль", async () => {
+  setAccessToken("токен");
+  server = startFakeApi(leadRoutes());
+
+  renderLead("10");
+  await screen.findAllByDisplayValue("ООО Ромашка");
+
+  const stats = screen.getByText("Все заявки").parentElement!;
+  await waitFor(() => expect(within(stats).getByText("0")).toBeVisible());
+});
+
+it("во время удаления пункт «Удалить лид» в меню заблокирован", async () => {
+  setAccessToken("токен");
+  server = startFakeApi([
+    ...leadRoutes(),
+    { method: "DELETE", path: "/crm/leads/10/permanent", response: null },
+  ]);
+  slowResponses();
+
+  const user = userEvent.setup();
+  const { router } = renderLead("10");
+  await screen.findAllByDisplayValue("ООО Ромашка");
+
+  await user.click(screen.getByRole("button", { name: "Действия" }));
+  await user.click(screen.getByRole("button", { name: "Удалить лид" }));
+
+  const dialog = await screen.findByRole("dialog", { name: "Удаление лида" });
+  await user.click(within(dialog).getByRole("button", { name: "Удалить навсегда" }));
+
+  // Пока запрос в пути, окно показывает ожидание.
+  expect(await within(dialog).findByRole("button", { name: "Удаляем…" })).toBeDisabled();
+
+  // Открываем меню прямо поверх окна — обычным нажатием не выйдет: под окном
+  // лежит подложка, поэтому клик отправляем прямо в шестерёнку. Пункт удаления
+  // в этот момент должен быть недоступен, как было и до переноса шапки.
+  fireEvent.click(screen.getByRole("button", { name: "Действия" }));
+  expect(screen.getByRole("button", { name: "Удалить лид" })).toBeDisabled();
+
+  await waitFor(() => expect(router.state.location.pathname).toBe("/crm"));
 });
 
 it("«Создать заявку» в полосе этапов открывает окно новой заявки", async () => {

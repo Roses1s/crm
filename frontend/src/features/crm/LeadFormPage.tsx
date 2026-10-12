@@ -1,8 +1,7 @@
-import { ChevronLeft, ChevronRight, FileText, Settings } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { useBlocker, useNavigate, useParams } from "react-router-dom";
 
-import { AppShell, ControlPanel } from "@/app/layout/AppShell";
+import { AppShell } from "@/app/layout/AppShell";
 import { StarRating } from "@/features/crm/board/StarRating";
 import { ACCOUNTANT_NAMES } from "@/features/crm/lead-form/accountant-options";
 import { TagsField } from "@/features/crm/lead-form/TagsField";
@@ -41,6 +40,7 @@ import type { Attachment } from "@/shared/types";
 import { ClientGroup } from "@/features/crm/lead-form/ClientGroup";
 import { CompanyGroup } from "@/features/crm/lead-form/CompanyGroup";
 import { DeleteLeadDialog } from "@/features/crm/lead-form/DeleteLeadDialog";
+import { LeadHeaderBar } from "@/features/crm/lead-form/LeadHeaderBar";
 import { LoseLeadDialog } from "@/features/crm/lead-form/LoseLeadDialog";
 import { QuickCreateLeadDialog } from "@/features/crm/lead-form/QuickCreateLeadDialog";
 import { QuickCreateShipmentDialog } from "@/features/shipments/QuickCreateShipmentDialog";
@@ -57,7 +57,6 @@ import {
   FormSheet,
   FormWorkspace,
   FormSheetBg,
-  FormStatusIndicator,
   FormStatusbar,
   FormTitle,
   InnerGroup,
@@ -449,111 +448,34 @@ function LeadForm({ id }: { id?: string }) {
 
   return (
     <AppShell>
-      <ControlPanel
+      <LeadHeaderBar
+        leadName={form.name}
+        isNew={isNew}
+        isArchived={!!lead?.is_archived}
+        isAdmin={currentUser?.role === "admin"}
+        dirty={dirty}
+        readOnly={readOnly}
+        saving={saving}
+        actionsOpen={actionsOpen}
+        deletePending={deleteLead.isPending}
+        shipmentsCount={shipments.length}
+        pager={pager ?? null}
         onNew={() => setQuickCreateOpen(true)}
-        crumbs={[{ label: "Лиды", to: "/crm" }, { label: form.name || "Новый лид" }]}
-        status={
-          <FormStatusIndicator
-            dirty={dirty && !readOnly}
-            saving={saving}
-            onSave={() => save({ manual: true })}
-            onDiscard={discard}
-          />
-        }
-        cog={
-          !isNew ? (
-            <span className="relative inline-flex">
-              <button
-                type="button"
-                aria-label="Действия"
-                title="Действия"
-                className="inline-flex h-6 w-6 items-center justify-center rounded-sm text-odoo-text-muted transition-colors hover:bg-odoo-bg hover:text-odoo-text"
-                onClick={() => setActionsOpen((v) => !v)}
-              >
-                <Settings className="h-4 w-4" />
-              </button>
-              {actionsOpen && (
-                <>
-                  <button
-                    type="button"
-                    className="fixed inset-0 z-10"
-                    aria-label="Закрыть"
-                    onClick={() => setActionsOpen(false)}
-                  />
-                  <div className="absolute left-0 top-6 z-50 min-w-[180px] rounded-[3px] border border-odoo-border bg-odoo-surface py-1 shadow-lg">
-                    {!lead?.is_archived && (
-                      <button
-                        type="button"
-                        className="block w-full px-3 py-1.5 text-left text-[13px] text-odoo-text hover:bg-odoo-bg disabled:opacity-60"
-                        onClick={() => {
-                          setActionsOpen(false);
-                          setLoseError("");
-                          setLoseOpen(true);
-                        }}
-                      >
-                        Отметить проигрышем
-                      </button>
-                    )}
-                    {currentUser?.role === "admin" && (
-                      <button
-                        type="button"
-                        disabled={deleteLead.isPending}
-                        className="block w-full px-3 py-1.5 text-left text-[13px] text-odoo-danger hover:bg-odoo-bg disabled:opacity-60"
-                        onClick={() => {
-                          setActionsOpen(false);
-                          setDeleteError("");
-                          setDeleteOpen(true);
-                        }}
-                      >
-                        Удалить лид
-                      </button>
-                    )}
-                  </div>
-                </>
-              )}
-            </span>
-          ) : null
-        }
-        stats={
-          !isNew ? (
-            <span className="inline-flex h-[34px] items-center gap-2 rounded-[4px] border border-odoo-border bg-odoo-surface px-2.5">
-              <FileText className="h-4 w-4 text-odoo-text-muted" />
-              <span className="flex flex-col items-start leading-[13px]">
-                <span className="text-[12px] text-odoo-text">Все заявки</span>
-                <span className="text-[11px] text-odoo-text-muted">{shipments.length}</span>
-              </span>
-            </span>
-          ) : null
-        }
-        pager={
-          !isNew && pager ? (
-            <span className="flex items-center gap-1">
-              <span className="whitespace-nowrap text-[13px] text-odoo-text-muted [font-variant-numeric:tabular-nums]">
-                {pager.position} / {pager.total}
-              </span>
-              <span className="inline-flex h-7 overflow-hidden rounded-[4px] border border-odoo-border bg-odoo-surface">
-                <button
-                  type="button"
-                  aria-label="Предыдущий лид"
-                  disabled={!pager.prev_id}
-                  onClick={() => pager.prev_id && navigate(`/crm/leads/${pager.prev_id}`)}
-                  className="inline-flex w-7 items-center justify-center text-odoo-text-muted transition-colors hover:bg-odoo-bg disabled:opacity-40"
-                >
-                  <ChevronLeft className="h-4 w-4" />
-                </button>
-                <button
-                  type="button"
-                  aria-label="Следующий лид"
-                  disabled={!pager.next_id}
-                  onClick={() => pager.next_id && navigate(`/crm/leads/${pager.next_id}`)}
-                  className="inline-flex w-7 items-center justify-center border-l border-odoo-border text-odoo-text-muted transition-colors hover:bg-odoo-bg disabled:opacity-40"
-                >
-                  <ChevronRight className="h-4 w-4" />
-                </button>
-              </span>
-            </span>
-          ) : null
-        }
+        onSave={() => save({ manual: true })}
+        onDiscard={discard}
+        onActionsOpenChange={setActionsOpen}
+        onOpenLose={() => {
+          setActionsOpen(false);
+          setLoseError("");
+          setLoseOpen(true);
+        }}
+        onOpenDelete={() => {
+          setActionsOpen(false);
+          setDeleteError("");
+          setDeleteOpen(true);
+        }}
+        onPrevLead={() => pager?.prev_id && navigate(`/crm/leads/${pager.prev_id}`)}
+        onNextLead={() => pager?.next_id && navigate(`/crm/leads/${pager.next_id}`)}
       />
 
       {/*
