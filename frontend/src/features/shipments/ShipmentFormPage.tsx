@@ -44,10 +44,10 @@ import { FormSkeleton } from "@/shared/ui/skeleton";
 import { useToast } from "@/shared/ui/toast-context";
 import { fromDatetimeLocal, selectStateCls, toDatetimeLocal } from "./shipment-form/helpers";
 import { CargoGroup } from "./shipment-form/CargoGroup";
+import { LoadingGroup } from "./shipment-form/LoadingGroup";
 import { OrderLinesTab } from "./shipment-form/OrderLinesTab";
 import { UnloadingGroup } from "./shipment-form/UnloadingGroup";
 import { SInput, STextarea } from "./shipment-form/fields";
-import { TokenField } from "./TokenField";
 
 // Наша компания — статичная шапка бланка.
 const OWN_COMPANY = 'ООО "Детроид"';
@@ -569,60 +569,20 @@ function ShipmentForm({ id }: { id?: string }) {
 
                   {/* --- Погрузка / Выгрузка --- */}
                   <FormGroup>
-                    <div>
-                      <InnerGroup title="Информация о погрузке">
-                        <Field label="Города погрузки" htmlFor="ship-load-cities">
-                          <TokenField
-                            id="ship-load-cities"
-                            placeholder="Город + Enter"
-                            value={form.loading_cities}
-                            onChange={(v) => set("loading_cities", v)}
-                          />
-                        </Field>
-                        <Field label="Адрес погрузки" htmlFor="ship-addr-load">
-                          <SInput
-                            id="ship-addr-load"
-                            value={form.address_loading}
-                            onChange={(e) => set("address_loading", e.target.value)}
-                          />
-                        </Field>
-                        <Field
-                          label="Контактное лицо на погрузке и телефон"
-                          htmlFor="ship-load-name"
-                        >
-                          <SInput
-                            id="ship-load-name"
-                            placeholder="Иванов Иван, +7 900 000-00-00"
-                            value={form.contact_loading_name}
-                            onChange={(e) => set("contact_loading_name", e.target.value)}
-                          />
-                        </Field>
-                        <Field label="Дата погрузки с" htmlFor="ship-load-date-from">
-                          <SInput
-                            id="ship-load-date-from"
-                            type="date"
-                            value={form.loading_date_from}
-                            onChange={(e) => set("loading_date_from", e.target.value)}
-                          />
-                        </Field>
-                        <Field label="Дата погрузки по" htmlFor="ship-load-date-to">
-                          <SInput
-                            id="ship-load-date-to"
-                            type="date"
-                            value={form.loading_date_to}
-                            onChange={(e) => set("loading_date_to", e.target.value)}
-                          />
-                        </Field>
-                        <Field label="Время" htmlFor="ship-load-time-from">
-                          <SInput
-                            id="ship-load-time-from"
-                            placeholder="09:00"
-                            value={form.loading_time_from}
-                            onChange={(e) => set("loading_time_from", e.target.value)}
-                          />
-                        </Field>
-                      </InnerGroup>
-                    </div>
+                    <LoadingGroup
+                      loadingCities={form.loading_cities}
+                      addressLoading={form.address_loading}
+                      contactLoadingName={form.contact_loading_name}
+                      loadingDateFrom={form.loading_date_from}
+                      loadingDateTo={form.loading_date_to}
+                      loadingTimeFrom={form.loading_time_from}
+                      onLoadingCitiesChange={(v) => set("loading_cities", v)}
+                      onAddressLoadingChange={(v) => set("address_loading", v)}
+                      onContactLoadingNameChange={(v) => set("contact_loading_name", v)}
+                      onLoadingDateFromChange={(v) => set("loading_date_from", v)}
+                      onLoadingDateToChange={(v) => set("loading_date_to", v)}
+                      onLoadingTimeFromChange={(v) => set("loading_time_from", v)}
+                    />
 
                     <UnloadingGroup
                       unloadingCities={form.unloading_cities}

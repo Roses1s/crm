@@ -2,8 +2,8 @@
  * Форма заявки на уровне страницы: дата создания (заявку часто заводят
  * в CRM позже, чем она реально возникла, и нужно уметь исправить её задним
  * числом), маржа по серверной ставке, защита несохранённых правок
- * и проводка полей блоков «Информация о грузе» и «Информация о выгрузке»
- * до сохранения.
+ * и проводка полей блоков «Информация о грузе», «Информация о выгрузке»
+ * и «Информация о погрузке» до сохранения.
  */
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -311,5 +311,50 @@ it("правки блока «Информация о выгрузке» ухо�
     unloading_date_from: "2026-02-10",
     unloading_date_to: "2026-02-11",
     unloading_time_from: "14:00",
+  });
+});
+
+it("правки блока «Информация о погрузке» уходят на сервер теми же полями", async () => {
+  setAccessToken("токен");
+  server = startFakeApi([
+    ...commonRoutes(),
+    {
+      method: "PATCH",
+      path: "/shipments/101",
+      response: (body: unknown) => ({ ...SHIPMENT, ...(body as object) }),
+    },
+  ]);
+
+  const user = userEvent.setup();
+  renderShipment();
+
+  // Шесть полей блока: значения нарочно разные, чтобы перепутанные местами
+  // обработчики было видно сразу.
+  await user.type(await screen.findByLabelText("Города погрузки"), "Тверь{Enter}");
+  await user.type(screen.getByLabelText("Адрес погрузки"), "Склад №7");
+  await user.type(
+    screen.getByLabelText("Контактное лицо на погрузке и телефон"),
+    "Сидоров Сидор, +7 900 222-33-44",
+  );
+  // Даты и время берём по id: подпись «Время» есть и у погрузки, и у выгрузки.
+  fireEvent.change(document.getElementById("ship-load-date-from")!, {
+    target: { value: "2026-03-01" },
+  });
+  fireEvent.change(document.getElementById("ship-load-date-to")!, {
+    target: { value: "2026-03-02" },
+  });
+  await user.type(document.getElementById("ship-load-time-from")!, "07:45");
+
+  await user.click(screen.getByRole("button", { name: "Сохранить" }));
+
+  await waitFor(() => expect(server?.called("PATCH", "/shipments/101")).toBe(true));
+  const patch = server.calls.find((c) => c.method === "PATCH" && c.url.includes("/shipments/101"));
+  expect(patch?.body).toMatchObject({
+    loading_cities: ["Тверь"],
+    address_loading: "Склад №7",
+    contact_loading_name: "Сидоров Сидор, +7 900 222-33-44",
+    loading_date_from: "2026-03-01",
+    loading_date_to: "2026-03-02",
+    loading_time_from: "07:45",
   });
 });
