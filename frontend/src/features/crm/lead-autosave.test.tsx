@@ -89,6 +89,14 @@ function savesCount(): number {
   return (server?.calls ?? []).filter((c) => c.method === "PATCH").length;
 }
 
+/** Тело последнего сохранения — что именно отправили на сервер. */
+function lastSaveBody(): Record<string, unknown> {
+  const call = [...(server?.calls ?? [])]
+    .reverse()
+    .find((c) => c.method === "PATCH" && c.url.includes("/crm/leads/10"));
+  return (call?.body ?? {}) as Record<string, unknown>;
+}
+
 /**
  * Настоящий сервер отвечает не мгновенно, и здесь это принципиально: пока
  * запрос в пути, форма успевает отрисоваться в состоянии «идёт сохранение»,
@@ -103,6 +111,34 @@ function slowResponses(ms = 400) {
   vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
     await new Promise((resolve) => setTimeout(resolve, ms));
     return fakeFetch(input, init);
+  });
+}
+
+/**
+ * Первое сохранение отвечает ошибкой — ответ всё равно приходит с задержкой
+ * (её делает slowResponses), чтобы форма успела побывать в состоянии «идёт
+ * сохранение» и эффект после ответа перезапустился, упёршись в запрет повторов.
+ * Без настоящей неудачи проверять восстановление нечего: запрет взводится
+ * только обработчиком ошибки.
+ *
+ * Запрос сначала пропускаем до поддельного сервера (иначе попытка не попала бы
+ * в журнал `server.calls`), а успешный ответ подменяем отказом.
+ */
+function failFirstSave() {
+  const fakeFetch = globalThis.fetch;
+  let failed = false;
+  vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+    const response = await fakeFetch(input, init);
+    const url = typeof input === "string" ? input : input.toString();
+    const method = (init?.method ?? "GET").toUpperCase();
+    if (!failed && method === "PATCH" && url.includes("/crm/leads/10")) {
+      failed = true;
+      return new Response(JSON.stringify({ detail: "Конфликт", code: "conflict" }), {
+        status: 409,
+        headers: { "Content-Type": "application/json" },
+      });
+    }
+    return response;
   });
 }
 
@@ -146,6 +182,69 @@ it("после неудачного автосохранения запрос н
     await vi.advanceTimersByTimeAsync(20000);
   });
   expect(savesCount()).toBe(1);
+});
+
+it("правка руками после неудачного автосохранения снова запускает сохранение", async () => {
+  setAccessToken("токен");
+  let current = { ...LEAD };
+  server = startFakeApi([
+    ...routes(() => current),
+    {
+      method: "PATCH",
+      path: "/crm/leads/10",
+      response: (body: unknown) => {
+        current = { ...current, ...(body as Partial<typeof LEAD>) };
+        return current;
+      },
+    },
+  ]);
+  slowResponses();
+  failFirstSave();
+
+  const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
+  renderWithDataRouter(
+    <ToastProvider>
+      <Routes>
+        <Route path="/crm/leads/:id" element={<LeadFormPage />} />
+      </Routes>
+    </ToastProvider>,
+    { route: "/crm/leads/10" },
+  );
+
+  // Название лида показано и в шапке, и в поле формы — берём первое поле.
+  const [name] = await screen.findAllByDisplayValue("ООО Ромашка");
+  await user.type(name, "!");
+
+  // Первая попытка падает: причина видна, форма ждёт правки руками.
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(3500);
+  });
+  await waitFor(() => expect(savesCount()).toBe(1));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Конфликт");
+
+  // Пока правок нет — повторов быть не должно: иначе следующая проверка
+  // («после правки снова работает») ничего бы не доказывала — запросы шли бы
+  // и сами по себе.
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(10000);
+  });
+  expect(savesCount()).toBe(1);
+
+  // Правка руками снимает запрет: через три секунды простоя уходит второй
+  // запрос — уже с новым значением, и на этот раз успешный.
+  await user.type(name, "?");
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(3500);
+  });
+  await waitFor(() => expect(savesCount()).toBe(2));
+  expect(lastSaveBody().name).toBe("ООО Ромашка!?");
+
+  // Причина ошибки сменяется подтверждением, и после успеха повторов нет.
+  expect(await screen.findByText("Сохранено")).toBeVisible();
+  await act(async () => {
+    await vi.advanceTimersByTimeAsync(10000);
+  });
+  expect(savesCount()).toBe(2);
 });
 
 it("правка руками снова включает автосохранение", async () => {
