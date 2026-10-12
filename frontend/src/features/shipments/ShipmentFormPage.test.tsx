@@ -571,3 +571,49 @@ it("новая заявка без лида не уходит на сервер 
   expect(await screen.findByText("Выберите лид, по которому создаётся заявка")).toBeVisible();
   expect(writeCalls()).toEqual([]);
 });
+
+it("номер заявки уходит на сервер без лишних пробелов", async () => {
+  setAccessToken("токен");
+  server = startFakeApi([
+    ...commonRoutes(),
+    {
+      method: "PATCH",
+      path: "/shipments/101",
+      response: (body: unknown) => ({ ...SHIPMENT, ...(body as object) }),
+    },
+  ]);
+
+  const user = userEvent.setup();
+  renderShipment();
+
+  const number = (await screen.findByLabelText("Номер заявки")) as HTMLInputElement;
+  await waitFor(() => expect(number.value).toBe("101"));
+
+  await user.clear(number);
+  await user.click(number);
+  await user.paste("  777  ");
+  await user.click(screen.getByRole("button", { name: "Сохранить" }));
+
+  await waitFor(() => expect(server?.called("PATCH", "/shipments/101")).toBe(true));
+  // Берём последний запрос: до кнопки могло успеть сработать автосохранение.
+  const patches = server.calls.filter((call) => call.method === "PATCH");
+  expect((patches[patches.length - 1]?.body as { number?: string })?.number).toBe("777");
+});
+
+it("пустой номер у существующей заявки не уходит на сервер", async () => {
+  setAccessToken("токен");
+  // Маршрута сохранения нет вовсе: любой ушедший запрос сразу виден в журнале.
+  server = startFakeApi(commonRoutes());
+
+  const user = userEvent.setup();
+  renderShipment();
+
+  const number = (await screen.findByLabelText("Номер заявки")) as HTMLInputElement;
+  await waitFor(() => expect(number.value).toBe("101"));
+
+  await user.clear(number);
+  await user.click(screen.getByRole("button", { name: "Сохранить" }));
+
+  expect(await screen.findByText("Номер заявки не может быть пустым")).toBeVisible();
+  expect(writeCalls()).toEqual([]);
+});
