@@ -12,6 +12,13 @@
  * не сломал сценарии незаметно. Продакшн-код здесь не трогаем — если тест
  * находит странность, она описывается в комментарии, а не исправляется.
  *
+ * Вкладка «Заявки» вынесена в конец файла: до этих проверок таблица заявок
+ * в карточке лида не исполнялась ни одним тестом — тесты видели только пустой
+ * список. Теперь зафиксированы состав колонок, попадание значений в свою
+ * колонку, формат даты, прочерк вместо пустого перевозчика, ссылка на заявку,
+ * счётчик в названии вкладки, пустое состояние, ожидание ответа и ошибка
+ * загрузки, а также кнопка «Добавить заявку».
+ *
  * Отдельно зафиксировано поведение, которое легко сломать случайно:
  * — имя и ИНН при отправке обрезаются по краям, контакт и телефон уходят как
  *   введены, а пустые e-mail и бухгалтер — как null (см. toPayload);
@@ -21,7 +28,7 @@
  */
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { Route, Routes } from "react-router-dom";
+import { Route, Routes, useParams } from "react-router-dom";
 import { afterEach, expect, it, vi } from "vitest";
 
 import { LeadFormPage } from "./LeadFormPage";
@@ -86,6 +93,44 @@ const COLLEAGUES = [
   { id: 2, first_name: "Денис", last_name: "Кузнецов", full_name: "Денис Кузнецов" },
 ];
 
+/**
+ * Заявки по лиду — полный набор полей, который требует схема ответа
+ * (shipmentListItemSchema). Вторая заявка без перевозчика: в таблице он
+ * показывается прочерком.
+ */
+const SHIPMENTS = [
+  {
+    id: 501,
+    number: "З-501",
+    lead_id: 10,
+    lead_name: "ООО Ромашка",
+    tags: [],
+    seller_name: "Админов Админ",
+    status: "checked",
+    route: "Москва — Казань",
+    carrier_name: "ООО «Перевозчик»",
+    // Полдень по Гринвичу: дата «12.08.2026» остаётся той же в любом поясе,
+    // поэтому проверка не зависит от часового пояса машины.
+    created_at: "2026-08-12T12:00:00+00:00",
+    margin: "15000.00",
+    customer_total: "120000.00",
+  },
+  {
+    id: 502,
+    number: "З-502",
+    lead_id: 10,
+    lead_name: "ООО Ромашка",
+    tags: [],
+    seller_name: null,
+    status: "loaded",
+    route: "Санкт-Петербург — Тверь",
+    carrier_name: "",
+    created_at: "2026-09-01T12:00:00+00:00",
+    margin: null,
+    customer_total: null,
+  },
+];
+
 let server: FakeServer | undefined;
 
 afterEach(() => {
@@ -101,10 +146,17 @@ function renderLead(id: string) {
       <Routes>
         <Route path="/crm/leads/:id" element={<LeadFormPage />} />
         <Route path="/crm" element={<p>Доска CRM</p>} />
+        {/* Заглушка карточки заявки: нужна, чтобы проверить ссылку из таблицы. */}
+        <Route path="/shipments/:id" element={<ShipmentStub />} />
       </Routes>
     </ToastProvider>,
     { route: `/crm/leads/${id}` },
   );
+}
+
+function ShipmentStub() {
+  const { id } = useParams();
+  return <p>Карточка заявки {id}</p>;
 }
 
 /**
@@ -115,7 +167,7 @@ function renderLead(id: string) {
  * `leadResponse` принимает и функцию: тогда ответ читается «в момент запроса»
  * и карточка, обновлённая на сервере, приезжает обратно как настоящая.
  */
-function leadRoutes(me: unknown = ME, leadResponse: unknown = LEAD) {
+function leadRoutes(me: unknown = ME, leadResponse: unknown = LEAD, shipments: unknown = []) {
   return [
     { path: "/auth/me", response: me },
     { path: "/crm/leads/10/timeline", response: [] },
@@ -128,7 +180,7 @@ function leadRoutes(me: unknown = ME, leadResponse: unknown = LEAD) {
     { path: "/crm/stages", response: STAGES },
     { path: "/crm/tags", response: [] },
     { path: "/crm/customers/by-inn", response: [] },
-    { path: "/leads/10/shipments", response: [] },
+    { path: "/leads/10/shipments", response: shipments },
   ];
 }
 
@@ -697,4 +749,174 @@ it("передача лида: два шага, POST с выбранным со�
   expect(callBody("POST", "/crm/leads/10/transfer")).toEqual({ user_id: 2 });
   expect(await screen.findByText("Доска CRM")).toBeVisible();
   expect(router.state.location.pathname).toBe("/crm");
+});
+
+// --- вкладка «Заявки» в карточке лида ---------------------------------------
+// Таблица заявок рисуется целиком в LeadFormPage.tsx и раньше не проверялась
+// ни одной строкой: тесты видели только пустой список. Здесь фиксируется
+// состав колонок, попадание данных в нужную колонку, формат даты, прочерк
+// вместо пустого перевозчика, ссылка на заявку и действие кнопки.
+
+/** Заголовки колонок в порядке, как в разметке. */
+const SHIPMENT_HEADERS = ["№", "Дата создания", "Маршрут", "Перевозчик", "Статус"];
+
+it("вкладка «Заявки»: строки, колонки и значения полей", async () => {
+  setAccessToken("токен");
+  server = startFakeApi(leadRoutes(ME, LEAD, SHIPMENTS));
+
+  renderLead("10");
+  await screen.findAllByDisplayValue("ООО Ромашка");
+
+  // Счётчик в названии вкладки берётся из загруженного списка.
+  expect(await screen.findByRole("button", { name: "Заявки (2)" })).toBeVisible();
+  // Пустая строка уступает место данным.
+  expect(screen.queryByText("Пока нет заявок по этому лиду.")).not.toBeInTheDocument();
+
+  const rows = screen.getAllByRole("row");
+  expect(rows).toHaveLength(3); // шапка и две заявки — ничего лишнего
+  expect(
+    within(rows[0]!)
+      .getAllByRole("columnheader")
+      .map((cell) => cell.textContent),
+  ).toEqual(SHIPMENT_HEADERS);
+
+  const first = rows[1]!;
+  // Номер заявки — ссылка на её карточку, в колонке «№».
+  expect(within(first).getByRole("link", { name: "З-501" })).toHaveAttribute(
+    "href",
+    "/shipments/501",
+  );
+  // Дата — в формате «дд.мм.гггг чч:мм:сс» (проверяется вся клетка целиком).
+  expect(within(first).getByText(/^12\.08\.2026 \d{2}:\d{2}:\d{2}$/)).toBeVisible();
+  // Маршрут попадает в свою колонку и дублируется подсказкой (полный текст
+  // виден при наведении, если колонка узкая).
+  expect(within(first).getByTitle("Москва — Казань")).toBeVisible();
+  expect(within(first).getByText("ООО «Перевозчик»")).toBeVisible();
+  expect(within(first).getByText("Проверена и подписана заявка")).toBeVisible();
+
+  const second = rows[2]!;
+  expect(within(second).getByRole("link", { name: "З-502" })).toHaveAttribute(
+    "href",
+    "/shipments/502",
+  );
+  expect(within(second).getByText(/^01\.09\.2026 \d{2}:\d{2}:\d{2}$/)).toBeVisible();
+  expect(within(second).getByText("Санкт-Петербург — Тверь")).toBeVisible();
+  // Перевозчика нет — в колонке прочерк, а не пустое место.
+  expect(within(second).getByText("—")).toBeVisible();
+  expect(within(second).getByText("Машина загрузилась")).toBeVisible();
+
+  // Список заявок запрошен один раз и у нужного лида.
+  expect(countCalls("GET", "/leads/10/shipments")).toBe(1);
+});
+
+it("каждая строка ведёт на свою заявку", async () => {
+  setAccessToken("токен");
+  server = startFakeApi(leadRoutes(ME, LEAD, SHIPMENTS));
+
+  const user = userEvent.setup();
+  const { router } = renderLead("10");
+  await screen.findByRole("button", { name: "Заявки (2)" });
+
+  // Вторая строка: ссылка обязана вести на 502, а не на первую заявку.
+  await user.click(screen.getByRole("link", { name: "З-502" }));
+
+  expect(await screen.findByText("Карточка заявки 502")).toBeVisible();
+  expect(router.state.location.pathname).toBe("/shipments/502");
+});
+
+it("пустой список: пояснение вместо строк и кнопка «Добавить заявку»", async () => {
+  setAccessToken("токен");
+  // Пустой ответ — настройка по умолчанию в leadRoutes.
+  server = startFakeApi(leadRoutes());
+
+  renderLead("10");
+  await screen.findAllByDisplayValue("ООО Ромашка");
+
+  expect(await screen.findByRole("button", { name: "Заявки (0)" })).toBeVisible();
+  expect(screen.getByText("Пока нет заявок по этому лиду.")).toBeVisible();
+
+  // Шапка и одна строка с пояснением — данных нет.
+  const rows = screen.getAllByRole("row");
+  expect(rows).toHaveLength(2);
+  expect(within(rows[1]!).queryByRole("link")).not.toBeInTheDocument();
+  expect(screen.getByRole("button", { name: "Добавить заявку" })).toBeVisible();
+  expect(countCalls("GET", "/leads/10/shipments")).toBe(1);
+});
+
+it("пока заявки не пришли — пустой список, после ответа строки и счётчик", async () => {
+  setAccessToken("токен");
+  server = startFakeApi(leadRoutes(ME, LEAD, SHIPMENTS));
+
+  // Своего состояния ожидания у блока нет: пока ответ в пути, видно ту же
+  // пустую строку. Чтобы это поймать, придерживаем ответ до сигнала.
+  const fakeFetch = globalThis.fetch;
+  let release = () => {};
+  const gate = new Promise<void>((resolve) => {
+    release = resolve;
+  });
+  vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+    const url = typeof input === "string" ? input : input.toString();
+    if (url.includes("/leads/10/shipments")) await gate;
+    return fakeFetch(input, init);
+  });
+
+  renderLead("10");
+  await screen.findAllByDisplayValue("ООО Ромашка");
+
+  expect(screen.getByRole("button", { name: "Заявки (0)" })).toBeVisible();
+  expect(screen.getByText("Пока нет заявок по этому лиду.")).toBeVisible();
+
+  await act(async () => {
+    release();
+  });
+
+  expect(await screen.findByRole("button", { name: "Заявки (2)" })).toBeVisible();
+  expect(screen.queryByText("Пока нет заявок по этому лиду.")).not.toBeInTheDocument();
+  expect(screen.getAllByRole("row")).toHaveLength(3);
+});
+
+it("ошибка загрузки заявок не роняет карточку и не повторяется", async () => {
+  setAccessToken("токен");
+  server = startFakeApi([
+    ...leadRoutes().filter((route) => route.path !== "/leads/10/shipments"),
+    { path: "/leads/10/shipments", response: { detail: "Сервер прилёг" }, status: 500 },
+  ]);
+
+  renderLead("10");
+  await screen.findAllByDisplayValue("ООО Ромашка");
+
+  // Своего сообщения об ошибке у вкладки нет — она показывает пустой список,
+  // а карточка продолжает работать. Текст ошибки уходит в консоль React Query.
+  expect(await screen.findByRole("button", { name: "Заявки (0)" })).toBeVisible();
+  expect(screen.getByText("Пока нет заявок по этому лиду.")).toBeVisible();
+  expect(screen.getByRole("textbox", { name: "Название лида" })).toHaveValue("ООО Ромашка");
+  expect(countCalls("GET", "/leads/10/shipments")).toBe(1);
+});
+
+it("«Добавить заявку» открывает быстрое создание заявки и ничего не отправляет", async () => {
+  setAccessToken("токен");
+  server = startFakeApi(leadRoutes());
+
+  const user = userEvent.setup();
+  renderLead("10");
+  await screen.findAllByDisplayValue("ООО Ромашка");
+
+  await user.click(screen.getByRole("button", { name: "Добавить заявку" }));
+
+  expect(await screen.findByRole("dialog", { name: "Новая заявка" })).toBeVisible();
+  // Пока форму не заполнили и не отправили, на сервер ничего не уходит.
+  expect(writeCalls()).toHaveLength(0);
+});
+
+it("у новой карточки вкладки заявок нет и запрос за заявками не уходит", async () => {
+  setAccessToken("токен");
+  server = startFakeApi(newLeadRoutes());
+
+  renderLead("new");
+  await screen.findByRole("textbox", { name: "Название лида" });
+
+  expect(screen.queryByRole("button", { name: /^Заявки \(/ })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Добавить заявку" })).not.toBeInTheDocument();
+  // У новой карточки нет id — заявки за ней запрашивать нечего.
+  expect((server?.calls ?? []).filter((call) => call.url.includes("/shipments"))).toHaveLength(0);
 });
