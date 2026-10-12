@@ -3,7 +3,10 @@
  * в CRM позже, чем она реально возникла, и нужно уметь исправить её задним
  * числом), маржа по серверной ставке, защита несохранённых правок
  * и проводка полей блоков «Информация о грузе», «Информация о выгрузке»,
- * «Информация о погрузке» и «Сведения о перевозчике» до сохранения.
+ * «Информация о погрузке», «Сведения о перевозчике» и шапки «Заявка»
+ * до сохранения. Шапка проверяется «сквозным» путём: выбор лида, поиск лида
+ * и подстановка лида по ссылке `?lead=` — с настоящими запросами и проверкой,
+ * что лишнего на сервер не уходит.
  */
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -421,4 +424,150 @@ it("правки блока «Сведения о перевозчике» ух�
     driver_passport: "4509 123456",
     carrier_signer: "Директор Петров",
   });
+});
+
+const LEAD_LUTIK = {
+  id: 42,
+  name: "ООО «Лютик»",
+  inn: "7712345678",
+  logist_contact: "Иван",
+  logist_phone: "+7 900 000-00-00",
+  logist_email: null,
+  accountant_name: null,
+  priority: 0,
+  is_archived: false,
+  loss_reason_id: null,
+  loss_reason_name: null,
+  stage_id: 1,
+  stage_name: "Новый",
+  assigned_to_id: null,
+  assigned_to_email: null,
+  assigned_to_name: null,
+  tags: [],
+  created_at: "2026-01-01T00:00:00+00:00",
+  updated_at: "2026-01-01T00:00:00+00:00",
+};
+
+const LEAD_PETROV = { ...LEAD_LUTIK, id: 43, name: "ИП Петров", inn: "500100732259" };
+
+/** Запросы не-GET: сохранение, смена этапа и прочие изменения. */
+function writeCalls() {
+  return server?.calls.filter((call) => call.method !== "GET") ?? [];
+}
+
+it("выбор лида уходит в новую заявку тем же полем", async () => {
+  setAccessToken("токен");
+  // Адреса для конкретных лидов — раньше общего списка: поддельный сервер
+  // подбирает маршрут по началу адреса.
+  server = startFakeApi([
+    { path: "/crm/leads/43", response: LEAD_PETROV },
+    { path: "/crm/leads/42", response: LEAD_LUTIK },
+    { path: "/crm/leads", response: page([LEAD_LUTIK, LEAD_PETROV]) },
+    {
+      method: "POST",
+      path: "/shipments",
+      response: (body: unknown) => ({ ...SHIPMENT, ...(body as object) }),
+    },
+    ...commonRoutes(),
+  ]);
+
+  const user = userEvent.setup();
+  renderShipment("/shipments/new");
+
+  const select = (await screen.findByLabelText("Лид")) as HTMLSelectElement;
+  // Список лидов приходит запросом: ждём, пока в списке появятся оба.
+  await waitFor(() => expect(select.options.length).toBe(3));
+  await user.selectOptions(select, "42");
+  expect(select.value).toBe("42");
+
+  // Новую заявку создаёт человек: до нажатия «Сохранить» ничего не уходит.
+  expect(writeCalls()).toEqual([]);
+
+  await user.click(screen.getByRole("button", { name: "Сохранить" }));
+
+  await waitFor(() => expect(server?.called("POST", "/shipments")).toBe(true));
+  const post = writeCalls()[0];
+  expect(post?.body).toMatchObject({ lead_id: 42 });
+});
+
+it("поиск лида идёт на сервер и не делает новую заявку несохранённой", async () => {
+  setAccessToken("токен");
+  server = startFakeApi([
+    { path: "/crm/leads", query: { search: "лютик" }, response: page([LEAD_LUTIK]) },
+    { path: "/crm/leads", response: page([LEAD_LUTIK, LEAD_PETROV]) },
+    ...commonRoutes(),
+  ]);
+
+  const user = userEvent.setup();
+  renderShipment("/shipments/new");
+
+  const search = await screen.findByLabelText("Поиск лида");
+  await user.click(search);
+  await user.paste("лютик");
+
+  // Список запрашивается заново с текстом поиска, и на экране остаётся один лид.
+  await waitFor(() =>
+    expect(
+      server?.calls.some((call) => decodeURIComponent(call.url).includes("search=лютик")),
+    ).toBe(true),
+  );
+  const select = (await screen.findByLabelText("Лид")) as HTMLSelectElement;
+  await waitFor(() =>
+    expect([...select.options].map((option) => option.textContent)).toEqual([
+      "Выберите лид",
+      "ООО «Лютик» · 7712345678",
+    ]),
+  );
+
+  // Заявку поиск не меняет: ни запросов на сохранение, ни «несохранённых правок».
+  expect(writeCalls()).toEqual([]);
+  expect(screen.queryByLabelText("Несохранённые изменения")).toBeNull();
+  expect(screen.queryByRole("button", { name: "Сохранить" })).toBeNull();
+
+  // И уход со страницы не спрашивает про несохранённые изменения.
+  await user.click(screen.getByRole("link", { name: "Заявки" }));
+  expect(await screen.findByText("Список заявок")).toBeVisible();
+  expect(screen.queryByRole("dialog", { name: "Несохранённые изменения" })).toBeNull();
+});
+
+it("ссылка ?lead=42 подставляет лида и не делает форму несохранённой", async () => {
+  setAccessToken("токен");
+  server = startFakeApi([{ path: "/crm/leads/42", response: LEAD_LUTIK }, ...commonRoutes()]);
+
+  const user = userEvent.setup();
+  renderShipment("/shipments/new?lead=42");
+
+  // Лид подставлен выбранным — отдельным пунктом, потому что в списке его нет.
+  const select = (await screen.findByLabelText("Лид")) as HTMLSelectElement;
+  await waitFor(() => expect(select.value).toBe("42"));
+  await waitFor(() =>
+    expect([...select.options].map((option) => option.textContent)).toEqual([
+      "Выберите лид",
+      "ООО «Лютик» · 7712345678",
+    ]),
+  );
+
+  // Форма не «грязная»: уход без вопросов и без запросов сохранения.
+  await user.click(screen.getByRole("link", { name: "Заявки" }));
+  expect(await screen.findByText("Список заявок")).toBeVisible();
+  expect(screen.queryByRole("dialog", { name: "Несохранённые изменения" })).toBeNull();
+  expect(writeCalls()).toEqual([]);
+});
+
+it("новая заявка без лида не уходит на сервер и объясняет, чего не хватает", async () => {
+  setAccessToken("токен");
+  server = startFakeApi(commonRoutes());
+
+  const user = userEvent.setup();
+  renderShipment("/shipments/new");
+
+  // Правка поля шапки делает форму несохранённой — в хедере появляется «Сохранить».
+  const contact = await screen.findByLabelText("Контакт заказчика");
+  await user.click(contact);
+  await user.paste("Мария");
+
+  await user.click(screen.getByRole("button", { name: "Сохранить" }));
+
+  expect(await screen.findByText("Выберите лид, по которому создаётся заявка")).toBeVisible();
+  expect(writeCalls()).toEqual([]);
 });

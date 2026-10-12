@@ -26,7 +26,6 @@ import { Chatter } from "@/shared/ui/chatter";
 import { FilePreview } from "@/shared/ui/file-preview";
 import { UnsavedChangesDialog } from "@/shared/ui/unsaved-changes-dialog";
 import {
-  Field,
   FormAlert,
   FormGroup,
   FormSheet,
@@ -35,22 +34,19 @@ import {
   FormStatusbar,
   FormTitle,
   FormWorkspace,
-  InnerGroup,
   Notebook,
   OdooInput,
 } from "@/shared/ui/odoo-form";
 import { FormSkeleton } from "@/shared/ui/skeleton";
 import { useToast } from "@/shared/ui/toast-context";
-import { fromDatetimeLocal, selectStateCls, toDatetimeLocal } from "./shipment-form/helpers";
+import { fromDatetimeLocal, toDatetimeLocal } from "./shipment-form/helpers";
 import { CarrierGroup } from "./shipment-form/CarrierGroup";
 import { CargoGroup } from "./shipment-form/CargoGroup";
 import { LoadingGroup } from "./shipment-form/LoadingGroup";
 import { OrderLinesTab } from "./shipment-form/OrderLinesTab";
+import { ShipmentHeaderGroup } from "./shipment-form/ShipmentHeaderGroup";
 import { UnloadingGroup } from "./shipment-form/UnloadingGroup";
-import { SInput, STextarea } from "./shipment-form/fields";
-
-// Наша компания — статичная шапка бланка.
-const OWN_COMPANY = 'ООО "Детроид"';
+import { STextarea } from "./shipment-form/fields";
 
 // Этапы заявки — единая воронка (Новая → … → Машина выгрузилась). Статусбар
 // работает по числовым id, поэтому держим и id (позиция), и значение статуса.
@@ -501,70 +497,21 @@ function ShipmentForm({ id }: { id?: string }) {
 
                   {/* --- Шапка: своя компания и заказчик (заказчик привязан к лиду) --- */}
                   <FormGroup>
-                    <div>
-                      <InnerGroup title="Заявка">
-                        <Field label="Компания">
-                          <span className="px-1.5 py-[3px] text-odoo-text">{OWN_COMPANY}</span>
-                        </Field>
-                        <Field label="Дата создания" htmlFor="ship-created-at">
-                          <SInput
-                            id="ship-created-at"
-                            type="datetime-local"
-                            value={form.created_at}
-                            onChange={(e) => set("created_at", e.target.value)}
-                          />
-                        </Field>
-                        {isNew ? (
-                          <Field label="Лид" htmlFor="ship-lead-select">
-                            <div className="space-y-1">
-                              <SInput
-                                aria-label="Поиск лида"
-                                placeholder="Поиск по названию или ИНН"
-                                value={leadSearch}
-                                onChange={(e) => setLeadSearch(e.target.value)}
-                              />
-                              <select
-                                id="ship-lead-select"
-                                className={selectStateCls(Boolean(form.lead_id))}
-                                value={form.lead_id || ""}
-                                onChange={(e) => set("lead_id", Number(e.target.value) || 0)}
-                              >
-                                <option value="">Выберите лид</option>
-                                {selectedLeadDetails &&
-                                  !leads.some((lead) => lead.id === selectedLeadDetails.id) && (
-                                    <option value={selectedLeadDetails.id}>
-                                      {selectedLeadDetails.name} · {selectedLeadDetails.inn}
-                                    </option>
-                                  )}
-                                {leads.map((lead) => (
-                                  <option key={lead.id} value={lead.id}>
-                                    {lead.name} · {lead.inn}
-                                  </option>
-                                ))}
-                              </select>
-                            </div>
-                          </Field>
-                        ) : (
-                          <Field label="Заказчик">
-                            <span className="px-1.5 py-[3px] text-odoo-text">
-                              {selectedLead?.name || title}
-                            </span>
-                          </Field>
-                        )}
-                        <Field label="ИНН заказчика">
-                          <span className="px-1.5 py-[3px] text-odoo-text-muted">
-                            {selectedLead?.inn}
-                          </span>
-                        </Field>
-                        <Field label="Контакт заказчика" htmlFor="ship-cust-contact">
-                          <SInput
-                            id="ship-cust-contact"
-                            value={form.customer_contact}
-                            onChange={(e) => set("customer_contact", e.target.value)}
-                          />
-                        </Field>
-                      </InnerGroup>
-                    </div>
+                    <ShipmentHeaderGroup
+                      isNew={isNew}
+                      createdAt={form.created_at}
+                      onCreatedAtChange={(v) => set("created_at", v)}
+                      leadSearch={leadSearch}
+                      onLeadSearchChange={setLeadSearch}
+                      leadId={form.lead_id}
+                      onLeadIdChange={(v) => set("lead_id", v)}
+                      leads={leads}
+                      selectedLeadDetails={selectedLeadDetails}
+                      customerName={selectedLead?.name || title}
+                      customerInn={selectedLead?.inn}
+                      customerContact={form.customer_contact}
+                      onCustomerContactChange={(v) => set("customer_contact", v)}
+                    />
                   </FormGroup>
 
                   {/* --- Погрузка / Выгрузка --- */}

@@ -680,6 +680,11 @@ frontend-прогон — 118 тестов в 35 файлах, 66,55% строк
   прохождение Vitest заменой браузерного прогона.
 - Полезный приём: подставные бинарники в `PATH` (например, фальшивый `docker`)
   позволяют прогнать логику скриптов вроде `deploy.sh` целиком, включая ветку отката.
+- **В компонентных тестах не описывать тип обработчиков руками.** Если написать
+  `const handlers: { onX: ReturnType<typeof vi.fn> }`, `tsc -b` падает:
+  `Mock<Procedure | Constructable>` не подходит под `(value: string) => void`
+  у props. Работает штатный приём соседних тестов: `const handlers = { onX: vi.fn() }`
+  внутри функции `renderGroup`, а тип — `ReturnType<typeof renderGroup>["handlers"]`.
 
 ---
 
