@@ -45,6 +45,7 @@ import { useToast } from "@/shared/ui/toast-context";
 import { fromDatetimeLocal, selectStateCls, toDatetimeLocal } from "./shipment-form/helpers";
 import { CargoGroup } from "./shipment-form/CargoGroup";
 import { OrderLinesTab } from "./shipment-form/OrderLinesTab";
+import { UnloadingGroup } from "./shipment-form/UnloadingGroup";
 import { SInput, STextarea } from "./shipment-form/fields";
 import { TokenField } from "./TokenField";
 
@@ -623,60 +624,20 @@ function ShipmentForm({ id }: { id?: string }) {
                       </InnerGroup>
                     </div>
 
-                    <div>
-                      <InnerGroup title="Информация о выгрузке">
-                        <Field label="Города выгрузки" htmlFor="ship-unload-cities">
-                          <TokenField
-                            id="ship-unload-cities"
-                            placeholder="Город + Enter"
-                            value={form.unloading_cities}
-                            onChange={(v) => set("unloading_cities", v)}
-                          />
-                        </Field>
-                        <Field label="Адрес выгрузки" htmlFor="ship-addr-unload">
-                          <SInput
-                            id="ship-addr-unload"
-                            value={form.address_unloading}
-                            onChange={(e) => set("address_unloading", e.target.value)}
-                          />
-                        </Field>
-                        <Field
-                          label="Контактное лицо на выгрузке и телефон"
-                          htmlFor="ship-unload-name"
-                        >
-                          <SInput
-                            id="ship-unload-name"
-                            placeholder="Иванов Иван, +7 900 000-00-00"
-                            value={form.contact_unloading_name}
-                            onChange={(e) => set("contact_unloading_name", e.target.value)}
-                          />
-                        </Field>
-                        <Field label="Дата выгрузки с" htmlFor="ship-unload-date-from">
-                          <SInput
-                            id="ship-unload-date-from"
-                            type="date"
-                            value={form.unloading_date_from}
-                            onChange={(e) => set("unloading_date_from", e.target.value)}
-                          />
-                        </Field>
-                        <Field label="Дата выгрузки по" htmlFor="ship-unload-date-to">
-                          <SInput
-                            id="ship-unload-date-to"
-                            type="date"
-                            value={form.unloading_date_to}
-                            onChange={(e) => set("unloading_date_to", e.target.value)}
-                          />
-                        </Field>
-                        <Field label="Время" htmlFor="ship-unload-time-from">
-                          <SInput
-                            id="ship-unload-time-from"
-                            placeholder="09:00"
-                            value={form.unloading_time_from}
-                            onChange={(e) => set("unloading_time_from", e.target.value)}
-                          />
-                        </Field>
-                      </InnerGroup>
-                    </div>
+                    <UnloadingGroup
+                      unloadingCities={form.unloading_cities}
+                      addressUnloading={form.address_unloading}
+                      contactUnloadingName={form.contact_unloading_name}
+                      unloadingDateFrom={form.unloading_date_from}
+                      unloadingDateTo={form.unloading_date_to}
+                      unloadingTimeFrom={form.unloading_time_from}
+                      onUnloadingCitiesChange={(v) => set("unloading_cities", v)}
+                      onAddressUnloadingChange={(v) => set("address_unloading", v)}
+                      onContactUnloadingNameChange={(v) => set("contact_unloading_name", v)}
+                      onUnloadingDateFromChange={(v) => set("unloading_date_from", v)}
+                      onUnloadingDateToChange={(v) => set("unloading_date_to", v)}
+                      onUnloadingTimeFromChange={(v) => set("unloading_time_from", v)}
+                    />
                   </FormGroup>
 
                   {/* --- Перевозчик / Груз --- */}

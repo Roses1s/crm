@@ -2,9 +2,10 @@
  * Форма заявки на уровне страницы: дата создания (заявку часто заводят
  * в CRM позже, чем она реально возникла, и нужно уметь исправить её задним
  * числом), маржа по серверной ставке, защита несохранённых правок
- * и проводка полей блока «Информация о грузе» до сохранения.
+ * и проводка полей блоков «Информация о грузе» и «Информация о выгрузке»
+ * до сохранения.
  */
-import { screen, waitFor } from "@testing-library/react";
+import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
 import { Route, Routes } from "react-router-dom";
 import { afterEach, expect, it } from "vitest";
@@ -265,5 +266,50 @@ it("правки блока «Информация о грузе» уходят 
     body_type: ["изотерм"],
     loading_method: ["боковая"],
     transport_type: "ref",
+  });
+});
+
+it("правки блока «Информация о выгрузке» уходят на сервер теми же полями", async () => {
+  setAccessToken("токен");
+  server = startFakeApi([
+    ...commonRoutes(),
+    {
+      method: "PATCH",
+      path: "/shipments/101",
+      response: (body: unknown) => ({ ...SHIPMENT, ...(body as object) }),
+    },
+  ]);
+
+  const user = userEvent.setup();
+  renderShipment();
+
+  // Шесть полей блока: значения нарочно разные, чтобы перепутанные местами
+  // обработчики было видно сразу.
+  await user.type(await screen.findByLabelText("Города выгрузки"), "Казань{Enter}");
+  await user.type(screen.getByLabelText("Адрес выгрузки"), "Склад №2");
+  await user.type(
+    screen.getByLabelText("Контактное лицо на выгрузке и телефон"),
+    "Петров Пётр, +7 900 111-22-33",
+  );
+  // Даты и время берём по id: подпись «Время» есть и у погрузки, и у выгрузки.
+  fireEvent.change(document.getElementById("ship-unload-date-from")!, {
+    target: { value: "2026-02-10" },
+  });
+  fireEvent.change(document.getElementById("ship-unload-date-to")!, {
+    target: { value: "2026-02-11" },
+  });
+  await user.type(document.getElementById("ship-unload-time-from")!, "14:00");
+
+  await user.click(screen.getByRole("button", { name: "Сохранить" }));
+
+  await waitFor(() => expect(server?.called("PATCH", "/shipments/101")).toBe(true));
+  const patch = server.calls.find((c) => c.method === "PATCH" && c.url.includes("/shipments/101"));
+  expect(patch?.body).toMatchObject({
+    unloading_cities: ["Казань"],
+    address_unloading: "Склад №2",
+    contact_unloading_name: "Петров Пётр, +7 900 111-22-33",
+    unloading_date_from: "2026-02-10",
+    unloading_date_to: "2026-02-11",
+    unloading_time_from: "14:00",
   });
 });
