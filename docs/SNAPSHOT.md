@@ -93,10 +93,11 @@
 ## Тесты
 
 - бэкенд (pytest): **214** тест-функций
-- фронтенд (vitest): **227** тестов
+- фронтенд (vitest): **243** тестов
 - сценарные (подменяется только сеть, остальное настоящее):
   - `frontend/src/features/auth/login-flow.test.tsx`
   - `frontend/src/features/crm/kanban-flow.test.tsx`
+  - `frontend/src/features/crm/lead-form-flow.test.tsx`
   - `frontend/src/features/shipments/shipments-flow.test.tsx`
 
 Считаются объявления в коде; при параметризации фактических прогонов больше.
