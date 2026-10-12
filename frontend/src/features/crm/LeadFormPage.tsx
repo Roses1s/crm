@@ -1,6 +1,6 @@
 import { ChevronLeft, ChevronRight, FileText, Settings } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
-import { Link, useBlocker, useNavigate, useParams } from "react-router-dom";
+import { useBlocker, useNavigate, useParams } from "react-router-dom";
 
 import { AppShell, ControlPanel } from "@/app/layout/AppShell";
 import { StarRating } from "@/features/crm/board/StarRating";
@@ -43,8 +43,8 @@ import { DeleteLeadDialog } from "@/features/crm/lead-form/DeleteLeadDialog";
 import { LoseLeadDialog } from "@/features/crm/lead-form/LoseLeadDialog";
 import { QuickCreateLeadDialog } from "@/features/crm/lead-form/QuickCreateLeadDialog";
 import { QuickCreateShipmentDialog } from "@/features/shipments/QuickCreateShipmentDialog";
-import { formatShipmentDate, SHIPMENT_STATUS } from "@/features/shipments/shipment-status";
 import { LostRibbon } from "@/features/crm/lead-form/LostRibbon";
+import { ShipmentsTab } from "@/features/crm/lead-form/ShipmentsTab";
 import { TransferDialog } from "@/features/crm/lead-form/TransferDialog";
 import { Chatter } from "@/shared/ui/chatter";
 import { FilePreview } from "@/shared/ui/file-preview";
@@ -409,78 +409,7 @@ function LeadForm({ id }: { id?: string }) {
       id: "shipments",
       label: `Заявки (${shipments.length})`,
       content: (
-        <div className="-mx-4 lg:-mx-6">
-          <table className="w-full border-collapse text-[13px] [font-variant-numeric:tabular-nums]">
-            <thead>
-              <tr>
-                <th className="w-[100px] bg-odoo-bg px-2 py-1.5 pl-4 text-left font-medium text-odoo-text shadow-[inset_0_-1px_0_rgb(var(--odoo-border))] lg:pl-6">
-                  №
-                </th>
-                <th className="w-[170px] bg-odoo-bg px-2 py-1.5 text-left font-medium text-odoo-text shadow-[inset_0_-1px_0_rgb(var(--odoo-border))]">
-                  Дата создания
-                </th>
-                <th className="bg-odoo-bg px-2 py-1.5 text-left font-medium text-odoo-text shadow-[inset_0_-1px_0_rgb(var(--odoo-border))]">
-                  Маршрут
-                </th>
-                <th className="w-[160px] bg-odoo-bg px-2 py-1.5 text-left font-medium text-odoo-text shadow-[inset_0_-1px_0_rgb(var(--odoo-border))]">
-                  Перевозчик
-                </th>
-                <th className="w-[180px] bg-odoo-bg px-2 py-1.5 pr-4 text-left font-medium text-odoo-text shadow-[inset_0_-1px_0_rgb(var(--odoo-border))] lg:pr-6">
-                  Статус
-                </th>
-              </tr>
-            </thead>
-            <tbody>
-              {shipments.length === 0 && (
-                <tr>
-                  <td colSpan={5} className="px-4 py-6 text-center text-odoo-text-muted lg:px-6">
-                    Пока нет заявок по этому лиду.
-                  </td>
-                </tr>
-              )}
-              {shipments.map((s) => {
-                const st = SHIPMENT_STATUS[s.status] ?? SHIPMENT_STATUS.new;
-                return (
-                  <tr
-                    key={s.id}
-                    className="border-b border-odoo-border-light hover:bg-odoo-surface-hover"
-                  >
-                    <td className="px-2 py-1 pl-4 lg:pl-6">
-                      <Link className="text-odoo-action hover:underline" to={`/shipments/${s.id}`}>
-                        {s.number}
-                      </Link>
-                    </td>
-                    <td className="whitespace-nowrap px-2 py-1 text-odoo-text-muted">
-                      {formatShipmentDate(s.created_at)}
-                    </td>
-                    <td className="truncate px-2 py-1" title={s.route}>
-                      {s.route}
-                    </td>
-                    <td className="truncate px-2 py-1 text-odoo-text-muted">
-                      {s.carrier_name || "—"}
-                    </td>
-                    <td className="truncate px-2 py-1 pr-4 lg:pr-6">
-                      <span
-                        className={`inline-flex rounded-[10px] px-2 py-0.5 text-[11px] font-medium ${st.cls}`}
-                      >
-                        {st.label}
-                      </span>
-                    </td>
-                  </tr>
-                );
-              })}
-            </tbody>
-          </table>
-          <div className="px-4 pt-2 lg:px-6">
-            <button
-              type="button"
-              onClick={() => setShipmentCreateOpen(true)}
-              className="text-[13px] text-odoo-action hover:underline"
-            >
-              Добавить заявку
-            </button>
-          </div>
-        </div>
+        <ShipmentsTab shipments={shipments} onAddShipment={() => setShipmentCreateOpen(true)} />
       ),
     },
   ];
