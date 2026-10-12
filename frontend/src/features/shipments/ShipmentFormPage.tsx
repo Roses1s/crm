@@ -1,5 +1,5 @@
 import { FileText } from "lucide-react";
-import { useCallback, useEffect, useRef, useState, type TextareaHTMLAttributes } from "react";
+import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useBlocker, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
 import { AppShell, ControlPanel } from "@/app/layout/AppShell";
@@ -42,23 +42,13 @@ import {
 } from "@/shared/ui/odoo-form";
 import { FormSkeleton } from "@/shared/ui/skeleton";
 import { useToast } from "@/shared/ui/toast-context";
-import {
-  fieldStateCls,
-  fromDatetimeLocal,
-  selectStateCls,
-  toDatetimeLocal,
-} from "./shipment-form/helpers";
+import { fromDatetimeLocal, selectStateCls, toDatetimeLocal } from "./shipment-form/helpers";
 import { OrderLinesTab } from "./shipment-form/OrderLinesTab";
-import { SInput } from "./shipment-form/fields";
+import { SInput, STextarea } from "./shipment-form/fields";
 import { TokenField } from "./TokenField";
 
 // Наша компания — статичная шапка бланка.
 const OWN_COMPANY = 'ООО "Детроид"';
-
-function STextarea({ className = "", ...props }: TextareaHTMLAttributes<HTMLTextAreaElement>) {
-  const filled = Boolean(props.value);
-  return <textarea {...props} className={`${fieldStateCls(filled)} resize-y ${className}`} />;
-}
 
 // Этапы заявки — единая воронка (Новая → … → Машина выгрузилась). Статусбар
 // работает по числовым id, поэтому держим и id (позиция), и значение статуса.
