@@ -38,6 +38,7 @@ import {
 } from "@/shared/api/hooks";
 import { ownerInitials, ownerLabel } from "@/shared/lib/owner";
 import type { Attachment } from "@/shared/types";
+import { ClientGroup } from "@/features/crm/lead-form/ClientGroup";
 import { DeleteLeadDialog } from "@/features/crm/lead-form/DeleteLeadDialog";
 import { LoseLeadDialog } from "@/features/crm/lead-form/LoseLeadDialog";
 import { QuickCreateLeadDialog } from "@/features/crm/lead-form/QuickCreateLeadDialog";
@@ -866,38 +867,15 @@ function LeadForm({ id }: { id?: string }) {
                         </InnerGroup>
                       </div>
 
-                      <div>
-                        <InnerGroup title="Информация о клиенте">
-                          <Field label="Контакт логиста/ЛПР" htmlFor="lead-contact">
-                            <OdooInput
-                              id="lead-contact"
-                              placeholder="Фамилия Имя"
-                              value={form.logist_contact}
-                              disabled={readOnly}
-                              onChange={(e) => set("logist_contact", e.target.value)}
-                            />
-                          </Field>
-                          <Field label="Телефон логиста" htmlFor="lead-logist-phone">
-                            <OdooInput
-                              id="lead-logist-phone"
-                              placeholder="+7 900 000-00-00"
-                              value={form.logist_phone}
-                              disabled={readOnly}
-                              onChange={(e) => set("logist_phone", e.target.value)}
-                            />
-                          </Field>
-                          <Field label="Email логиста" htmlFor="lead-email">
-                            <OdooInput
-                              id="lead-email"
-                              type="email"
-                              placeholder="name@example.ru"
-                              value={form.logist_email}
-                              disabled={readOnly}
-                              onChange={(e) => set("logist_email", e.target.value)}
-                            />
-                          </Field>
-                        </InnerGroup>
-                      </div>
+                      <ClientGroup
+                        logistContact={form.logist_contact}
+                        logistPhone={form.logist_phone}
+                        logistEmail={form.logist_email}
+                        readOnly={readOnly}
+                        onLogistContactChange={(v) => set("logist_contact", v)}
+                        onLogistPhoneChange={(v) => set("logist_phone", v)}
+                        onLogistEmailChange={(v) => set("logist_email", v)}
+                      />
                     </FormGroup>
 
                     {!isNew && <Notebook tabs={notebookTabs} active={tab} onSelect={setTab} />}

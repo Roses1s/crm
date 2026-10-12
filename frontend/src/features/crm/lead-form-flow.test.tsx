@@ -322,6 +322,52 @@ it("неверный ИНН: сервер отвечает 422, человек �
   expect(countCalls("PATCH", "/crm/leads/10")).toBe(1);
 });
 
+it("телефон и e-mail уходят на сервер своими полями, лишних сохранений нет", async () => {
+  setAccessToken("токен");
+  let current: typeof LEAD = { ...LEAD };
+  server = startFakeApi([
+    ...leadRoutes(ME, () => current),
+    {
+      method: "PATCH",
+      path: "/crm/leads/10",
+      response: (body: unknown) => {
+        current = { ...current, ...(body as Partial<typeof LEAD>) };
+        return current;
+      },
+    },
+  ]);
+
+  const user = userEvent.setup();
+  renderLead("10");
+  await screen.findAllByDisplayValue("ООО Ромашка");
+
+  const phone = screen.getByRole("textbox", { name: "Телефон логиста" });
+  await user.clear(phone);
+  await user.type(phone, "+7 900 111-22-33");
+  const email = screen.getByRole("textbox", { name: "Email логиста" });
+  await user.clear(email);
+  await user.type(email, "logist@example.ru");
+
+  await user.click(screen.getByRole("button", { name: "Сохранить" }));
+
+  // Один запрос на две правки: телефон и почта уходят в свои поля, остальное
+  // из формы не задето.
+  await waitFor(() => expect(countCalls("PATCH", "/crm/leads/10")).toBe(1));
+  expect(callBody("PATCH", "/crm/leads/10")).toEqual({
+    name: "ООО Ромашка",
+    inn: "7701234567",
+    logist_contact: "Иван",
+    logist_phone: "+7 900 111-22-33",
+    logist_email: "logist@example.ru",
+    accountant_name: null,
+    priority: 0,
+    stage_id: 1,
+    tag_ids: [],
+    expected_updated_at: "2026-10-01T10:00:00+03:00",
+  });
+  expect(countCalls("PATCH", "/crm/leads/10")).toBe(1);
+});
+
 it("нет прав на правку: отказ 403 и автосохранение молчит до следующей правки", async () => {
   setAccessToken("токен");
   server = startFakeApi([
@@ -556,6 +602,11 @@ it("проигранная карточка только для чтения: «
   const names = await screen.findAllByDisplayValue("ООО Ромашка");
   expect(screen.getByLabelText("Лид проигран")).toBeVisible();
   names.forEach((input) => expect(input).toBeDisabled());
+  // Поля блока «Информация о клиенте» тоже заблокированы: страница передаёт
+  // в компонент признак «только для чтения», а не собственное правило.
+  for (const label of ["Контакт логиста/ЛПР", "Телефон логиста", "Email логиста"]) {
+    expect(screen.getByLabelText(label)).toBeDisabled();
+  }
   expect(screen.getByRole("button", { name: "В работе" })).toBeDisabled();
   expect(screen.getByText(/сначала восстановите карточку/i)).toBeVisible();
   expect(screen.queryByRole("button", { name: "Создать заявку" })).not.toBeInTheDocument();
@@ -572,6 +623,9 @@ it("проигранная карточка только для чтения: «
   // Карточка вернулась с сервера уже не проигранной — запрет снят.
   await waitFor(() => expect(screen.queryByLabelText("Лид проигран")).not.toBeInTheDocument());
   await waitFor(() => expect(screen.getByRole("textbox", { name: "Название лида" })).toBeEnabled());
+  for (const label of ["Контакт логиста/ЛПР", "Телефон логиста", "Email логиста"]) {
+    await waitFor(() => expect(screen.getByLabelText(label)).toBeEnabled());
+  }
 });
 
 it("«Удалить лид» не показывается тому, кто не администратор", async () => {
