@@ -98,6 +98,12 @@ git status — десятки изменений, которые ты не де�
 merge --ff-only в этой ситуации не сработает (рабочее дерево грязное),
 reset --hard не применять никогда. Проверяй это ПЕРЕД КАЖДЫМ коммитом.
 
+Осторожно: reset FETCH_HEAD верен только после fetch С ИМЕНЕМ ВЕТКИ.
+После простого `git fetch origin` в FETCH_HEAD попадают все ветки и первой
+может оказаться main — тогда reset уведёт на главную ветку (так едва не
+случилось 11.10.2026). Если сомневаешься — пиши явно:
+   git reset origin/<ВЕТКА>
+
 Каталоги .venv и node_modules тоже не переживают перезапуск песочницы:
    cd backend && python -m venv .venv && .venv/bin/pip install -e ".[dev]"
    cd frontend && npm install

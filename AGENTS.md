@@ -84,6 +84,12 @@ cd ../frontend && npm install
 git fetch origin "$(git rev-parse --abbrev-ref HEAD)" && git reset FETCH_HEAD && git status --short
 ```
 
+Важно: `git reset FETCH_HEAD` хорош только после `fetch` **с именем ветки**.
+После простого `git fetch origin` в `FETCH_HEAD` попадают все ветки, и первой
+может оказаться `main` — тогда `reset` уведёт на главную ветку. Безопасная
+замена, если команда выше уже выполнена без имени ветки:
+`git reset origin/"$(git rev-parse --abbrev-ref HEAD)"`.
+
 ## Пять самых частых граблей
 
 | Грабли | Как правильно |
