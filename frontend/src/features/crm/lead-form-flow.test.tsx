@@ -17,6 +17,13 @@
  * крупный заголовок, у новой карточки передача лида запрещена, а ошибка
  * передачи не «прилипает» к окну при повторном открытии.
  *
+ * В самом конце — раздел про шапку карточки и полосу этапов: какая кнопка
+ * какое окно открывает, что открытие окна ничего не отправляет на сервер,
+ * куда ведёт листалка карточек и что «Лиды» возвращает на доску. Раньше эти
+ * действия не исполнялись ни одним тестом — подмена «кнопка открывает чужое
+ * окно» проходила незамеченной (такая поломка нашлась шагом 14 у кнопки
+ * «Новый» и была записана отдельной задачей).
+ *
  * Вкладка «Заявки» вынесена в конец файла: до этих проверок таблица заявок
  * в карточке лида не исполнялась ни одним тестом — тесты видели только пустой
  * список. Теперь зафиксированы состав колонок, попадание значений в свою
@@ -1062,4 +1069,218 @@ it("у новой карточки вкладки заявок нет и зап�
   expect(screen.queryByRole("button", { name: "Добавить заявку" })).not.toBeInTheDocument();
   // У новой карточки нет id — заявки за ней запрашивать нечего.
   expect((server?.calls ?? []).filter((call) => call.url.includes("/shipments"))).toHaveLength(0);
+});
+
+// --- шапка карточки и полоса этапов ----------------------------------------
+// Кнопки шапки и полосы этапов открывают окна и уводят на другие экраны.
+// До этого раздела их действия не исполнялись ни одним тестом: подмена
+// «кнопка открывает чужое окно» проходила незамеченной — такая поломка
+// нашлась на шаге 14 у кнопки «Новый» и была записана отдельной задачей.
+// Здесь зафиксировано: какая кнопка какое окно открывает, что открытие окна
+// ничего не отправляет на сервер, куда ведёт листалка карточек и как ведут
+// себя её крайние кнопки, а также что «Лиды» возвращает на доску.
+
+/**
+ * Адреса одной карточки лида с заданной листалкой. Порядок тот же, что
+ * в `leadRoutes`: частные пути (.../timeline, .../pager) идут раньше голого
+ * адреса карточки, иначе поддельный сервер ответил бы карточкой на запрос
+ * листалки.
+ */
+function leadRoutesWithPager(id: number, lead: unknown, pager: unknown) {
+  return [
+    { path: `/crm/leads/${id}/timeline`, response: [] },
+    { path: `/crm/leads/${id}/pager`, response: pager },
+    { path: `/crm/leads/${id}/attachments`, response: [] },
+    { path: `/crm/leads/${id}`, response: lead },
+    { path: `/leads/${id}/shipments`, response: [] },
+  ];
+}
+
+/** Соседи карточки 10: слева лид 9, справа — 11; по ним проверяется листалка. */
+const LEAD_LEFT = { ...LEAD, id: 9, name: "ООО Лютик", inn: "7700000001" };
+const LEAD_RIGHT = { ...LEAD, id: 11, name: "ООО Вектор", inn: "7700000002" };
+
+function pagerRoutes() {
+  return [
+    { path: "/auth/me", response: ME },
+    { path: "/crm/stages", response: STAGES },
+    { path: "/crm/tags", response: [] },
+    { path: "/crm/customers/by-inn", response: [] },
+    ...leadRoutesWithPager(9, LEAD_LEFT, { position: 1, total: 3, prev_id: null, next_id: 10 }),
+    ...leadRoutesWithPager(10, LEAD, { position: 2, total: 3, prev_id: 9, next_id: 11 }),
+    ...leadRoutesWithPager(11, LEAD_RIGHT, { position: 3, total: 3, prev_id: 10, next_id: null }),
+  ];
+}
+
+/**
+ * Кнопка «Новый» в шапке карточки. В полосе этапов есть этап с тем же
+ * названием — его кнопка помечена `aria-current="step"` как активный этап,
+ * поэтому у кнопки шапки такой пометки нет.
+ */
+function headerNewButton(): HTMLElement {
+  const found = screen
+    .getAllByRole("button", { name: "Новый" })
+    .find((button) => !button.hasAttribute("aria-current"));
+  if (!found) throw new Error("Кнопка «Новый» в шапке карточки не найдена");
+  return found;
+}
+
+it("«Новый» в шапке открывает окно нового лида и ничего не отправляет", async () => {
+  setAccessToken("токен");
+  server = startFakeApi([
+    ...leadRoutes(),
+    // Маршрут создания описан заранее: если запрос всё-таки уйдёт, его будет
+    // видно в журнале, а не спишут на «неизвестный маршрут».
+    { method: "POST", path: "/crm/leads", response: LEAD },
+  ]);
+
+  const user = userEvent.setup();
+  renderLead("10");
+  await screen.findAllByDisplayValue("ООО Ромашка");
+
+  await user.click(headerNewButton());
+
+  expect(await screen.findByRole("dialog", { name: "Новый лид" })).toBeVisible();
+  // Окно заявки — другое действие другой кнопки: здесь его быть не должно.
+  expect(screen.queryByRole("dialog", { name: "Новая заявка" })).not.toBeInTheDocument();
+  // Открытие окна ничего не создаёт на сервере.
+  expect(writeCalls()).toHaveLength(0);
+
+  // Закрыли и открыли снова: окно открывается так же, состояние не «залипает».
+  await user.keyboard("{Escape}");
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog", { name: "Новый лид" })).not.toBeInTheDocument(),
+  );
+  await user.click(headerNewButton());
+  expect(await screen.findByRole("dialog", { name: "Новый лид" })).toBeVisible();
+  expect(countCalls("POST", "/crm/leads")).toBe(0);
+});
+
+it("«Действия → Отметить проигрышем» открывает окно проигрыша и не меняет лид", async () => {
+  setAccessToken("токен");
+  server = startFakeApi([
+    ...leadRoutes(),
+    { path: "/crm/loss-reasons", response: LOSS_REASONS },
+    // Подтверждение проигрыша здесь не нажимается — маршрут нужен, чтобы
+    // случайный запрос был виден в журнале, а не считался «неизвестным».
+    { method: "POST", path: "/crm/leads/10/lose", response: null },
+  ]);
+
+  const user = userEvent.setup();
+  const { router } = renderLead("10");
+  await screen.findAllByDisplayValue("ООО Ромашка");
+
+  await user.click(screen.getByRole("button", { name: "Действия" }));
+  await user.click(screen.getByRole("button", { name: "Отметить проигрышем" }));
+
+  expect(await screen.findByRole("dialog", { name: "Отметка проигрыша" })).toBeVisible();
+  // Открытие окна ничего не решает: лид остаётся активным, запись не уходит.
+  expect(countCalls("POST", "/crm/leads/10/lose")).toBe(0);
+  expect(writeCalls()).toHaveLength(0);
+  expect(router.state.location.pathname).toBe("/crm/leads/10");
+  expect(activeStage()).toBe("Новый");
+  expect(screen.queryByLabelText("Лид проигран")).not.toBeInTheDocument();
+});
+
+it("у проигранного лида пункта «Отметить проигрышем» в меню нет", async () => {
+  const lostLead = {
+    ...LEAD,
+    is_archived: true,
+    assigned_to_id: MANAGER.id,
+    assigned_to_name: "Денис Кузнецов",
+    loss_reason_name: "Перестал возить",
+  };
+  setAccessToken("токен");
+  server = startFakeApi(leadRoutes(ME, lostLead));
+
+  const user = userEvent.setup();
+  renderLead("10");
+  await screen.findAllByDisplayValue("ООО Ромашка");
+
+  await user.click(screen.getByRole("button", { name: "Действия" }));
+
+  // Администратор по-прежнему может удалить лид, а отметить проигрышем
+  // уже проигранный нельзя: этого пункта в меню нет.
+  expect(screen.getByRole("button", { name: "Удалить лид" })).toBeVisible();
+  expect(screen.queryByRole("button", { name: "Отметить проигрышем" })).not.toBeInTheDocument();
+});
+
+it("«Создать заявку» в полосе этапов открывает окно новой заявки", async () => {
+  setAccessToken("токен");
+  server = startFakeApi([
+    ...leadRoutes(),
+    // Маршрут создания заявки описан заранее: если запрос уйдёт до
+    // подтверждения, он будет виден в журнале.
+    { method: "POST", path: "/shipments", response: LEAD },
+  ]);
+
+  const user = userEvent.setup();
+  renderLead("10");
+  await screen.findAllByDisplayValue("ООО Ромашка");
+
+  await user.click(screen.getByRole("button", { name: "Создать заявку" }));
+
+  expect(await screen.findByRole("dialog", { name: "Новая заявка" })).toBeVisible();
+  // Окно нового лида — другое действие: кнопки не должны путать окна.
+  expect(screen.queryByRole("dialog", { name: "Новый лид" })).not.toBeInTheDocument();
+  // До подтверждения заявка не создаётся.
+  expect(countCalls("POST", "/shipments")).toBe(0);
+  expect(writeCalls()).toHaveLength(0);
+});
+
+it("листалка ведёт на предыдущий и следующий лид по своим адресам", async () => {
+  setAccessToken("токен");
+  server = startFakeApi(pagerRoutes());
+
+  const user = userEvent.setup();
+  const { router } = renderLead("10");
+  await screen.findAllByDisplayValue("ООО Ромашка");
+  expect(screen.getByText("2 / 3")).toBeVisible();
+
+  await user.click(screen.getByRole("button", { name: "Предыдущий лид" }));
+
+  await waitFor(() => expect(router.state.location.pathname).toBe("/crm/leads/9"));
+  // Открылась именно соседняя карточка — со своим названием и своим счётчиком.
+  await screen.findAllByDisplayValue("ООО Лютик");
+  expect(screen.getByText("1 / 3")).toBeVisible();
+
+  await user.click(screen.getByRole("button", { name: "Следующий лид" }));
+
+  await waitFor(() => expect(router.state.location.pathname).toBe("/crm/leads/10"));
+  await screen.findAllByDisplayValue("ООО Ромашка");
+  expect(screen.getByText("2 / 3")).toBeVisible();
+});
+
+it("на краях списка кнопки листалки заблокированы, у соседа — доступны", async () => {
+  setAccessToken("токен");
+  server = startFakeApi(pagerRoutes());
+
+  // Первая карточка списка: назад идти некуда, вперёд — можно.
+  const first = renderLead("9");
+  await screen.findAllByDisplayValue("ООО Лютик");
+  expect(screen.getByText("1 / 3")).toBeVisible();
+  expect(screen.getByRole("button", { name: "Предыдущий лид" })).toBeDisabled();
+  expect(screen.getByRole("button", { name: "Следующий лид" })).toBeEnabled();
+  first.unmount();
+
+  // Последняя карточка списка: наоборот.
+  renderLead("11");
+  await screen.findAllByDisplayValue("ООО Вектор");
+  expect(screen.getByText("3 / 3")).toBeVisible();
+  expect(screen.getByRole("button", { name: "Предыдущий лид" })).toBeEnabled();
+  expect(screen.getByRole("button", { name: "Следующий лид" })).toBeDisabled();
+});
+
+it("«Лиды» в шапке возвращает на доску", async () => {
+  setAccessToken("токен");
+  server = startFakeApi(leadRoutes());
+
+  const user = userEvent.setup();
+  const { router } = renderLead("10");
+  await screen.findAllByDisplayValue("ООО Ромашка");
+
+  await user.click(screen.getByRole("link", { name: "Лиды" }));
+
+  await waitFor(() => expect(router.state.location.pathname).toBe("/crm"));
+  expect(await screen.findByText("Доска CRM")).toBeVisible();
 });
