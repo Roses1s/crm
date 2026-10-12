@@ -19,7 +19,7 @@ Production остаётся `2d6684d`, выкатка для этапа не н�
   этой работы полностью непокрытыми были шесть именованных функций —
   `navigateWithoutPrompt`, `discard`, `confirmLose`, `restore`, `deleteForever`,
   `selectStage` — и около 53 безымянных обработчиков разметки.
-- **Новый файл** `frontend/src/features/crm/lead-form-flow.test.tsx` (507 строк):
+- **Новый файл** `frontend/src/features/crm/lead-form-flow.test.tsx` (646 строк):
   16 сквозных проверок — подменяется только сеть (`src/test/fake-api.ts`),
   страница, хуки и HTTP-клиент настоящие. Проверяется и то, что видно человеку,
   и то, что уходит на сервер: метод, адрес, тело, число повторов, а после

@@ -89,7 +89,7 @@
   непокрытыми были шесть именованных функций — `navigateWithoutPrompt`,
   `discard`, `confirmLose`, `restore`, `deleteForever`, `selectStage` —
   и около 53 безымянных обработчиков разметки.
-- **Новый файл** `frontend/src/features/crm/lead-form-flow.test.tsx` (507 строк) —
+- **Новый файл** `frontend/src/features/crm/lead-form-flow.test.tsx` (646 строк) —
   16 сквозных проверок: подменяется только сеть, страница, хуки и HTTP-клиент
   настоящие. Поэтому проверяется и экран, и то, что уходит на сервер — метод,
   адрес, тело, число повторов.
