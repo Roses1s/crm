@@ -6,6 +6,9 @@
  * повторял один и тот же неудачный запрос каждые три секунды, пока открыта
  * вкладка. Проверяем, что после ошибки повторов нет, а после правки руками
  * автосохранение снова работает.
+ *
+ * Важно: проверка «после ошибки повторов нет» имеет смысл только с ответом
+ * сервера, приходящим с задержкой (см. slowResponses ниже).
  */
 import { act, screen, waitFor, within } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -86,6 +89,23 @@ function savesCount(): number {
   return (server?.calls ?? []).filter((c) => c.method === "PATCH").length;
 }
 
+/**
+ * Настоящий сервер отвечает не мгновенно, и здесь это принципиально: пока
+ * запрос в пути, форма успевает отрисоваться в состоянии «идёт сохранение»,
+ * а после ответа эффект автосохранения перезапускается. Именно на этом
+ * перезапуске и держится запрет повторов после ошибки. С мгновенным ответом
+ * React склеивает «идёт сохранение» и «ошибка» в одну отрисовку, эффект не
+ * перезапускается вовсе — и проверка проходила даже с удалённым запретом
+ * (воспроизведено подстановкой поломки в LeadFormPage.tsx).
+ */
+function slowResponses(ms = 400) {
+  const fakeFetch = globalThis.fetch;
+  vi.stubGlobal("fetch", async (input: RequestInfo | URL, init?: RequestInit) => {
+    await new Promise((resolve) => setTimeout(resolve, ms));
+    return fakeFetch(input, init);
+  });
+}
+
 it("после неудачного автосохранения запрос не повторяется бесконечно", async () => {
   setAccessToken("токен");
   server = startFakeApi([
@@ -97,6 +117,7 @@ it("после неудачного автосохранения запрос н
       response: { detail: "Конфликт", code: "conflict" },
     },
   ]);
+  slowResponses();
 
   const user = userEvent.setup({ advanceTimers: vi.advanceTimersByTime });
   renderWithDataRouter(
@@ -112,13 +133,15 @@ it("после неудачного автосохранения запрос н
   const [name] = await screen.findAllByDisplayValue("ООО Ромашка");
   await user.type(name, "!");
 
-  // Первая попытка — через 3 секунды простоя.
+  // Первая попытка — через 3 секунды простоя — должна упасть и показать причину.
   await act(async () => {
     await vi.advanceTimersByTimeAsync(3500);
   });
   await waitFor(() => expect(savesCount()).toBe(1));
+  expect(await screen.findByRole("alert")).toHaveTextContent("Конфликт");
 
-  // Ещё двадцать секунд: повторов быть не должно.
+  // Ещё двадцать секунд: без запрета повторов эффект перезапускался бы каждые
+  // три секунды — за это окно набралось бы шесть повторов.
   await act(async () => {
     await vi.advanceTimersByTimeAsync(20000);
   });
