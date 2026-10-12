@@ -37,12 +37,12 @@ import {
   FormWorkspace,
   InnerGroup,
   Notebook,
-  OdooCheckbox,
   OdooInput,
 } from "@/shared/ui/odoo-form";
 import { FormSkeleton } from "@/shared/ui/skeleton";
 import { useToast } from "@/shared/ui/toast-context";
 import { fromDatetimeLocal, selectStateCls, toDatetimeLocal } from "./shipment-form/helpers";
+import { CarrierGroup } from "./shipment-form/CarrierGroup";
 import { CargoGroup } from "./shipment-form/CargoGroup";
 import { LoadingGroup } from "./shipment-form/LoadingGroup";
 import { OrderLinesTab } from "./shipment-form/OrderLinesTab";
@@ -602,96 +602,30 @@ function ShipmentForm({ id }: { id?: string }) {
 
                   {/* --- Перевозчик / Груз --- */}
                   <FormGroup>
-                    <div>
-                      <InnerGroup title="Сведения о перевозчике">
-                        <Field label="Перевозчик" htmlFor="ship-carrier-name">
-                          {/* Перевозчика просто вписывают текстом — любого,
-                          без выбора из справочника (справочника больше нет). */}
-                          <SInput
-                            id="ship-carrier-name"
-                            placeholder="Название компании"
-                            value={form.carrier_name}
-                            onChange={(e) => set("carrier_name", e.target.value)}
-                          />
-                        </Field>
-                        <Field label="ИНН перевозчика" htmlFor="ship-carrier-inn">
-                          <SInput
-                            id="ship-carrier-inn"
-                            inputMode="numeric"
-                            placeholder="10 или 12 цифр"
-                            value={form.carrier_inn}
-                            onChange={(e) => set("carrier_inn", e.target.value)}
-                          />
-                        </Field>
-                        <Field label="Контакт перевозчика" htmlFor="ship-carr-contact">
-                          <SInput
-                            id="ship-carr-contact"
-                            value={form.carrier_contact}
-                            onChange={(e) => set("carrier_contact", e.target.value)}
-                          />
-                        </Field>
-                        <Field label="ТС (марка)" htmlFor="ship-vehicle">
-                          <SInput
-                            id="ship-vehicle"
-                            value={form.vehicle}
-                            onChange={(e) => set("vehicle", e.target.value)}
-                          />
-                        </Field>
-                        <Field label="Номер ТС" htmlFor="ship-vehicle-num">
-                          <SInput
-                            id="ship-vehicle-num"
-                            value={form.vehicle_number}
-                            onChange={(e) => set("vehicle_number", e.target.value)}
-                          />
-                        </Field>
-                        <Field label="Прицеп" htmlFor="ship-has-trailer">
-                          <OdooCheckbox
-                            id="ship-has-trailer"
-                            label="Есть прицеп"
-                            checked={form.has_trailer}
-                            onChange={(v) => set("has_trailer", v)}
-                          />
-                        </Field>
-                        {form.has_trailer && (
-                          <Field label="Номер прицепа" htmlFor="ship-trailer-num">
-                            <SInput
-                              id="ship-trailer-num"
-                              value={form.trailer_number}
-                              onChange={(e) => set("trailer_number", e.target.value)}
-                            />
-                          </Field>
-                        )}
-                        <Field label="ФИО водителя" htmlFor="ship-driver-name">
-                          <SInput
-                            id="ship-driver-name"
-                            value={form.driver_name}
-                            onChange={(e) => set("driver_name", e.target.value)}
-                          />
-                        </Field>
-                        <Field label="Телефон водителя" htmlFor="ship-driver-phone">
-                          <SInput
-                            id="ship-driver-phone"
-                            placeholder="+7 900 000-00-00"
-                            value={form.driver_phone}
-                            onChange={(e) => set("driver_phone", e.target.value)}
-                          />
-                        </Field>
-                        <Field label="Паспорт водителя" htmlFor="ship-driver-pass">
-                          <SInput
-                            id="ship-driver-pass"
-                            value={form.driver_passport}
-                            onChange={(e) => set("driver_passport", e.target.value)}
-                          />
-                        </Field>
-                        <Field label="Кто подписывает" htmlFor="ship-carr-signer">
-                          <SInput
-                            id="ship-carr-signer"
-                            value={form.carrier_signer}
-                            onChange={(e) => set("carrier_signer", e.target.value)}
-                          />
-                        </Field>
-                      </InnerGroup>
-                    </div>
+                    <CarrierGroup
+                      carrierName={form.carrier_name}
+                      carrierInn={form.carrier_inn}
+                      carrierContact={form.carrier_contact}
+                      vehicle={form.vehicle}
+                      vehicleNumber={form.vehicle_number}
+                      hasTrailer={form.has_trailer}
+                      trailerNumber={form.trailer_number}
+                      driverName={form.driver_name}
+                      driverPhone={form.driver_phone}
+                      driverPassport={form.driver_passport}
+                      carrierSigner={form.carrier_signer}
+                      onCarrierNameChange={(v) => set("carrier_name", v)}
+                      onCarrierInnChange={(v) => set("carrier_inn", v)}
+                      onCarrierContactChange={(v) => set("carrier_contact", v)}
+                      onVehicleChange={(v) => set("vehicle", v)}
+                      onVehicleNumberChange={(v) => set("vehicle_number", v)}
+                      onHasTrailerChange={(v) => set("has_trailer", v)}
+                      onTrailerNumberChange={(v) => set("trailer_number", v)}
+                      onDriverNameChange={(v) => set("driver_name", v)}
+                      onDriverPhoneChange={(v) => set("driver_phone", v)}
+                      onDriverPassportChange={(v) => set("driver_passport", v)}
+                      onCarrierSignerChange={(v) => set("carrier_signer", v)}
+                    />
 
                     <CargoGroup
                       cargoType={form.cargo_type}

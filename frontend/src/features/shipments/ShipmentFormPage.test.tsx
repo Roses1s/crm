@@ -2,8 +2,8 @@
  * Форма заявки на уровне страницы: дата создания (заявку часто заводят
  * в CRM позже, чем она реально возникла, и нужно уметь исправить её задним
  * числом), маржа по серверной ставке, защита несохранённых правок
- * и проводка полей блоков «Информация о грузе», «Информация о выгрузке»
- * и «Информация о погрузке» до сохранения.
+ * и проводка полей блоков «Информация о грузе», «Информация о выгрузке»,
+ * «Информация о погрузке» и «Сведения о перевозчике» до сохранения.
  */
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -356,5 +356,69 @@ it("правки блока «Информация о погрузке» ухо�
     loading_date_from: "2026-03-01",
     loading_date_to: "2026-03-02",
     loading_time_from: "07:45",
+  });
+});
+
+it("правки блока «Сведения о перевозчике» уходят на сервер теми же полями", async () => {
+  setAccessToken("токен");
+  server = startFakeApi([
+    ...commonRoutes(),
+    {
+      method: "PATCH",
+      path: "/shipments/101",
+      response: (body: unknown) => ({ ...SHIPMENT, ...(body as object) }),
+    },
+  ]);
+
+  const user = userEvent.setup();
+  renderShipment();
+
+  // Значения вписываем целиком (клик и вставка): по буквам контролируемое поле
+  // зовёт обработчик на каждый символ, а нам важны итоговые поля запроса.
+  const fill = async (label: string, value: string) => {
+    const input = screen.getByLabelText(label);
+    await user.click(input);
+    await user.paste(value);
+  };
+
+  // «Номер прицепа» — единственное условное поле блока: без галочки его нет.
+  // Сначала дожидаемся самой формы (иначе проверка на отсутствие поля была бы
+  // пустой: пока данные грузятся, на экране ничего нет).
+  const trailerCheckbox = await screen.findByRole("checkbox", { name: "Есть прицеп" });
+  expect(screen.queryByLabelText("Номер прицепа")).toBeNull();
+  await user.click(trailerCheckbox);
+  expect(screen.getByLabelText("Номер прицепа")).toBeVisible();
+
+  await fill("Перевозчик", "ООО Транс");
+  await fill("ИНН перевозчика", "7701234567");
+  await fill("Контакт перевозчика", "Иванов, +7 900 000-00-00");
+  await fill("ТС (марка)", "Volvo FH");
+  await fill("Номер ТС", "А123ВС77");
+  await fill("Номер прицепа", "ЕК4567");
+  await fill("ФИО водителя", "Сидоров Сидор");
+  await fill("Телефон водителя", "+7 900 111-22-33");
+  await fill("Паспорт водителя", "4509 123456");
+  await fill("Кто подписывает", "Директор Петров");
+
+  await user.click(screen.getByRole("button", { name: "Сохранить" }));
+
+  await waitFor(() => expect(server?.called("PATCH", "/shipments/101")).toBe(true));
+  // Берём последний запрос: до нажатия «Сохранить» могло сработать
+  // автосохранение с частью полей.
+  const patches = server.calls.filter(
+    (c) => c.method === "PATCH" && c.url.includes("/shipments/101"),
+  );
+  expect(patches[patches.length - 1]?.body).toMatchObject({
+    carrier_name: "ООО Транс",
+    carrier_inn: "7701234567",
+    carrier_contact: "Иванов, +7 900 000-00-00",
+    vehicle: "Volvo FH",
+    vehicle_number: "А123ВС77",
+    has_trailer: true,
+    trailer_number: "ЕК4567",
+    driver_name: "Сидоров Сидор",
+    driver_phone: "+7 900 111-22-33",
+    driver_passport: "4509 123456",
+    carrier_signer: "Директор Петров",
   });
 });
