@@ -692,6 +692,78 @@ it("проигранная карточка только для чтения: «
   }
 });
 
+it("владелец восстанавливает свой проигранный лид и снова может его править", async () => {
+  setAccessToken("токен");
+  let current: typeof LEAD = {
+    ...LEAD,
+    is_archived: true,
+    loss_reason_name: "Перестал возить",
+  };
+  server = startFakeApi([
+    ...leadRoutes(ME, () => current),
+    {
+      method: "POST",
+      path: "/crm/leads/10/restore",
+      response: () => {
+        current = { ...current, is_archived: false, loss_reason_name: null };
+        return null;
+      },
+    },
+  ]);
+
+  const user = userEvent.setup();
+  renderLead("10");
+
+  const names = await screen.findAllByDisplayValue("ООО Ромашка");
+  names.forEach((input) => expect(input).toBeDisabled());
+
+  // Лид закреплён за текущим пользователем: кнопка возвращает его на доску,
+  // а не забирает себе.
+  const restore = screen.getByRole("button", { name: "Восстановить" });
+  expect(restore).toHaveAttribute("title", "Вернуть лид на доску");
+  expect(screen.queryByRole("button", { name: "Взять себе" })).not.toBeInTheDocument();
+
+  await user.click(restore);
+
+  await waitFor(() => expect(countCalls("POST", "/crm/leads/10/restore")).toBe(1));
+  // Карточка вернулась с сервера уже не проигранной — запрет на правку снят.
+  await waitFor(() => expect(screen.queryByLabelText("Лид проигран")).not.toBeInTheDocument());
+  await waitFor(() => expect(screen.getByRole("textbox", { name: "Название лида" })).toBeEnabled());
+  // Кроме восстановления ничего не отправлялось.
+  expect(writeCalls()).toHaveLength(1);
+});
+
+it("ошибка восстановления показывается плашкой, лид остаётся проигранным", async () => {
+  setAccessToken("токен");
+  const lost = { ...LEAD, is_archived: true, loss_reason_name: "Перестал возить" };
+  server = startFakeApi([
+    ...leadRoutes(ME, lost),
+    {
+      method: "POST",
+      path: "/crm/leads/10/restore",
+      response: { detail: "Лид уже восстановлен" },
+      status: 409,
+    },
+  ]);
+
+  const user = userEvent.setup();
+  renderLead("10");
+  await screen.findAllByDisplayValue("ООО Ромашка");
+
+  await user.click(screen.getByRole("button", { name: "Восстановить" }));
+
+  // У проигранной карточки уже есть предупреждение с ролью «alert» — плашку
+  // ошибки ищем по тексту, чтобы не путать их между собой.
+  const alerts = await screen.findAllByRole("alert");
+  expect(alerts.some((node) => node.textContent?.includes("Лид уже восстановлен"))).toBe(true);
+  // Запрет на правку не снялся: карточка по-прежнему проиграна.
+  expect(screen.getByLabelText("Лид проигран")).toBeVisible();
+
+  // Попытку можно повторить: кнопка не «залипла» и уходит второй запрос.
+  await user.click(screen.getByRole("button", { name: "Восстановить" }));
+  await waitFor(() => expect(countCalls("POST", "/crm/leads/10/restore")).toBe(2));
+});
+
 it("«Удалить лид» не показывается тому, кто не администратор", async () => {
   setAccessToken("токен");
   server = startFakeApi(leadRoutes(MANAGER));
@@ -1386,6 +1458,124 @@ it("«Создать заявку» в полосе этапов открыва�
   // До подтверждения заявка не создаётся.
   expect(countCalls("POST", "/shipments")).toBe(0);
   expect(writeCalls()).toHaveLength(0);
+});
+
+it("во время восстановления кнопка показывает ожидание и заблокирована", async () => {
+  setAccessToken("токен");
+  let current: typeof LEAD = {
+    ...LEAD,
+    is_archived: true,
+    loss_reason_name: "Перестал возить",
+  };
+  server = startFakeApi([
+    ...leadRoutes(ME, () => current),
+    {
+      method: "POST",
+      path: "/crm/leads/10/restore",
+      response: () => {
+        current = { ...current, is_archived: false, loss_reason_name: null };
+        return null;
+      },
+    },
+  ]);
+  // Ответ сервера задержан: пока запрос в пути, видно состояние ожидания.
+  slowResponses();
+
+  const user = userEvent.setup();
+  renderLead("10");
+  await screen.findAllByDisplayValue("ООО Ромашка");
+
+  const restore = screen.getByRole("button", { name: "Восстановить" });
+  await user.click(restore);
+
+  // Пока запрос в пути, кнопка говорит «Восстанавливаем…» и не принимает
+  // повторных нажатий.
+  const pending = await screen.findByRole("button", { name: "Восстанавливаем…" });
+  expect(pending).toBeDisabled();
+
+  // После ответа сервера кнопка возвращается в обычное состояние, лид перестаёт
+  // быть проигранным, а запрос остаётся один — повторных нажатий не случилось.
+  await waitFor(() => expect(screen.queryByLabelText("Лид проигран")).not.toBeInTheDocument());
+  expect(countCalls("POST", "/crm/leads/10/restore")).toBe(1);
+});
+
+it("у новой карточки в полосе этапов нет кнопок действий", async () => {
+  setAccessToken("токен");
+  server = startFakeApi(newLeadRoutes());
+
+  renderLead("new");
+  await screen.findByRole("textbox", { name: "Название лида" });
+
+  // Заявку у ещё не созданного лида не создать, проигрыш тоже не отмечают.
+  expect(screen.queryByRole("button", { name: "Создать заявку" })).not.toBeInTheDocument();
+  expect(screen.queryByRole("button", { name: "Проигрыш" })).not.toBeInTheDocument();
+  // Полоса этапов при этом на месте: первый этап выбран по умолчанию.
+  expect(screen.getByRole("button", { name: "Новый" })).toBeVisible();
+});
+
+it("«Проигрыш» в полосе этапов стирает прошлую ошибку", async () => {
+  setAccessToken("токен");
+  server = startFakeApi([
+    ...leadRoutes(),
+    { path: "/crm/loss-reasons", response: LOSS_REASONS },
+    {
+      method: "POST",
+      path: "/crm/leads/10/lose",
+      response: { detail: "Причина не найдена" },
+      status: 404,
+    },
+  ]);
+
+  const user = userEvent.setup();
+  renderLead("10");
+  await screen.findAllByDisplayValue("ООО Ромашка");
+
+  // Первая попытка: сервер отказывает, ошибка остаётся в окне.
+  await user.click(screen.getByRole("button", { name: "Проигрыш" }));
+  let dialog = await screen.findByRole("dialog", { name: "Отметка проигрыша" });
+  await user.click(await screen.findByRole("radio", { name: "Перестал возить" }));
+  await user.click(within(dialog).getByRole("button", { name: "Отметить проигрышем" }));
+  expect(await within(dialog).findByText("Причина не найдена")).toBeVisible();
+
+  // Закрываем окно, не подтверждая: ошибка осталась в состоянии страницы.
+  await user.keyboard("{Escape}");
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog", { name: "Отметка проигрыша" })).not.toBeInTheDocument(),
+  );
+
+  // Кнопка в полосе открывает окно заново и стирает прежнюю ошибку.
+  await user.click(screen.getByRole("button", { name: "Проигрыш" }));
+  dialog = await screen.findByRole("dialog", { name: "Отметка проигрыша" });
+  expect(within(dialog).queryByText("Причина не найдена")).not.toBeInTheDocument();
+  expect(countCalls("POST", "/crm/leads/10/lose")).toBe(1);
+});
+
+it("пока карточка сохраняется, этапы заблокированы", async () => {
+  setAccessToken("токен");
+  server = startFakeApi([
+    ...leadRoutes(),
+    {
+      method: "PATCH",
+      path: "/crm/leads/10",
+      response: { ...LEAD, updated_at: "2026-10-02T10:00:00+03:00" },
+    },
+  ]);
+  // Ответ сервера задержан: пока правка в пути, видно состояние ожидания.
+  slowResponses();
+
+  const user = userEvent.setup();
+  renderLead("10");
+  const name = await screen.findByRole("textbox", { name: "Название лида" });
+
+  await user.clear(name);
+  await user.type(name, "ООО Ромашка плюс");
+  await user.click(screen.getByRole("button", { name: "Сохранить" }));
+
+  expect(screen.getByRole("button", { name: "В работе" })).toBeDisabled();
+
+  // После ответа сервера правка сохранена и этапы снова доступны.
+  await waitFor(() => expect(screen.getByRole("button", { name: "В работе" })).toBeEnabled());
+  expect(countCalls("PATCH", "/crm/leads/10")).toBe(1);
 });
 
 it("листалка ведёт на предыдущий и следующий лид по своим адресам", async () => {

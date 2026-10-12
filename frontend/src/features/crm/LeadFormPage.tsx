@@ -41,6 +41,7 @@ import { ClientGroup } from "@/features/crm/lead-form/ClientGroup";
 import { CompanyGroup } from "@/features/crm/lead-form/CompanyGroup";
 import { DeleteLeadDialog } from "@/features/crm/lead-form/DeleteLeadDialog";
 import { LeadHeaderBar } from "@/features/crm/lead-form/LeadHeaderBar";
+import { LeadStageBar } from "@/features/crm/lead-form/LeadStageBar";
 import { LoseLeadDialog } from "@/features/crm/lead-form/LoseLeadDialog";
 import { QuickCreateLeadDialog } from "@/features/crm/lead-form/QuickCreateLeadDialog";
 import { QuickCreateShipmentDialog } from "@/features/shipments/QuickCreateShipmentDialog";
@@ -57,7 +58,6 @@ import {
   FormSheet,
   FormWorkspace,
   FormSheetBg,
-  FormStatusbar,
   FormTitle,
   InnerGroup,
   Notebook,
@@ -491,65 +491,24 @@ function LeadForm({ id }: { id?: string }) {
             листом карточки — как в Odoo 17, где статусбар и кнопки живут в
             панели управления, а не на самом листе.
           */}
-          <FormStatusbar
-            items={stages}
-            current={form.stage_id}
-            disabled={saving || readOnly}
-            onSelect={selectStage}
-            left={
-              !isNew ? (
-                <>
-                  {!lead?.is_archived && (
-                    <button
-                      type="button"
-                      onClick={() => setShipmentCreateOpen(true)}
-                      className="inline-flex h-[30px] items-center rounded-[4px] bg-odoo-primary px-3 text-[13px] font-medium text-white transition-colors hover:bg-odoo-primary-hover"
-                    >
-                      Создать заявку
-                    </button>
-                  )}
-                  {lead?.is_archived ? (
-                    <button
-                      type="button"
-                      disabled={restoreLead.isPending}
-                      onClick={restore}
-                      title={
-                        isOwner
-                          ? "Вернуть лид на доску"
-                          : "Забрать лид себе: он перейдёт на вашу доску"
-                      }
-                      className="h-[30px] rounded-[4px] border border-odoo-border bg-odoo-surface px-3 text-[13px] text-odoo-text transition-colors hover:bg-odoo-bg disabled:opacity-60"
-                    >
-                      {restoreLead.isPending
-                        ? "Восстанавливаем…"
-                        : isOwner
-                          ? "Восстановить"
-                          : "Взять себе"}
-                    </button>
-                  ) : (
-                    <button
-                      type="button"
-                      onClick={() => {
-                        setLoseError("");
-                        setLoseOpen(true);
-                      }}
-                      className="h-[30px] rounded-[4px] border border-odoo-border bg-odoo-surface px-3 text-[13px] text-odoo-text transition-colors hover:bg-odoo-bg disabled:opacity-60"
-                    >
-                      Проигрыш
-                    </button>
-                  )}
-                </>
-              ) : null
-            }
+          <LeadStageBar
+            stages={stages}
+            currentStageId={form.stage_id}
+            isNew={isNew}
+            isArchived={!!lead?.is_archived}
+            isOwner={isOwner}
+            saving={saving}
+            readOnly={readOnly}
+            restorePending={restoreLead.isPending}
+            restoreError={restoreError}
+            onSelectStage={selectStage}
+            onCreateShipment={() => setShipmentCreateOpen(true)}
+            onRestore={restore}
+            onLose={() => {
+              setLoseError("");
+              setLoseOpen(true);
+            }}
           />
-          {restoreError && (
-            <div
-              role="alert"
-              className="mx-4 mt-2 rounded-[4px] border border-odoo-danger/30 bg-odoo-danger/10 px-3 py-2 text-sm text-odoo-danger lg:mx-6"
-            >
-              {restoreError}
-            </div>
-          )}
 
           <FormSheetBg>
             {error && (
