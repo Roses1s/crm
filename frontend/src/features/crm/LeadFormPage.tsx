@@ -26,7 +26,6 @@ import {
   useLeadPager,
   useLeadShipments,
   useLeadTimeline,
-  useLoseLead,
   useMe,
   useRestoreLead,
   useStages,
@@ -43,7 +42,7 @@ import { describe } from "@/features/crm/lead-form/describe-error";
 import { DeleteLeadDialog } from "@/features/crm/lead-form/DeleteLeadDialog";
 import { LeadHeaderBar } from "@/features/crm/lead-form/LeadHeaderBar";
 import { LeadStageBar } from "@/features/crm/lead-form/LeadStageBar";
-import { LoseLeadDialog } from "@/features/crm/lead-form/LoseLeadDialog";
+import { LoseLeadAction } from "@/features/crm/lead-form/LoseLeadAction";
 import { QuickCreateLeadDialog } from "@/features/crm/lead-form/QuickCreateLeadDialog";
 import { QuickCreateShipmentDialog } from "@/features/shipments/QuickCreateShipmentDialog";
 import { LostRibbon } from "@/features/crm/lead-form/LostRibbon";
@@ -92,7 +91,6 @@ function LeadForm({ id }: { id?: string }) {
 
   const createLead = useCreateLead();
   const updateLead = useUpdateLead(id);
-  const loseLead = useLoseLead();
   const restoreLead = useRestoreLead();
   const deleteLead = useDeleteLead();
   const addNote = useAddNote(id);
@@ -115,9 +113,8 @@ function LeadForm({ id }: { id?: string }) {
   const [transferError, setTransferError] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteError, setDeleteError] = useState("");
-  // Отметить проигрышем: диалог с выбором причины.
+  // Отметить проигрышем: окно с выбором причины; запрос и ошибка живут в действии.
   const [loseOpen, setLoseOpen] = useState(false);
-  const [loseError, setLoseError] = useState("");
   const [restoreError, setRestoreError] = useState("");
   // Кнопка «Новый» в шапке карточки — та же простая форма, что и на доске.
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
@@ -325,21 +322,6 @@ function LeadForm({ id }: { id?: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isNew, dirty, saving, form, lead?.is_archived]);
 
-  function confirmLose(reasonId: number) {
-    if (!lead) return;
-    setLoseError("");
-    loseLead.mutate(
-      { id: lead.id, reasonId },
-      {
-        onSuccess: () => {
-          setLoseOpen(false);
-          navigateWithoutPrompt("/crm");
-        },
-        onError: (err) => setLoseError(describe(err, "Не удалось отметить лид проигранным")),
-      },
-    );
-  }
-
   function restore() {
     if (!lead) return;
     setRestoreError("");
@@ -455,7 +437,6 @@ function LeadForm({ id }: { id?: string }) {
         onActionsOpenChange={setActionsOpen}
         onOpenLose={() => {
           setActionsOpen(false);
-          setLoseError("");
           setLoseOpen(true);
         }}
         onOpenDelete={() => {
@@ -493,10 +474,7 @@ function LeadForm({ id }: { id?: string }) {
             onSelectStage={selectStage}
             onCreateShipment={() => setShipmentCreateOpen(true)}
             onRestore={restore}
-            onLose={() => {
-              setLoseError("");
-              setLoseOpen(true);
-            }}
+            onLose={() => setLoseOpen(true)}
           />
 
           <FormSheetBg>
@@ -657,12 +635,14 @@ function LeadForm({ id }: { id?: string }) {
       )}
 
       {loseOpen && lead && (
-        <LoseLeadDialog
+        <LoseLeadAction
+          leadId={lead.id}
           leadName={lead.name}
-          pending={loseLead.isPending}
-          error={loseError}
           onCancel={() => setLoseOpen(false)}
-          onConfirm={confirmLose}
+          onLosed={() => {
+            setLoseOpen(false);
+            navigateWithoutPrompt("/crm");
+          }}
         />
       )}
 
