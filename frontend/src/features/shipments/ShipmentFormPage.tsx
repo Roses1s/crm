@@ -43,6 +43,7 @@ import {
 import { FormSkeleton } from "@/shared/ui/skeleton";
 import { useToast } from "@/shared/ui/toast-context";
 import { fromDatetimeLocal, selectStateCls, toDatetimeLocal } from "./shipment-form/helpers";
+import { CargoGroup } from "./shipment-form/CargoGroup";
 import { OrderLinesTab } from "./shipment-form/OrderLinesTab";
 import { SInput, STextarea } from "./shipment-form/fields";
 import { TokenField } from "./TokenField";
@@ -58,15 +59,6 @@ const STAGES = [
   { id: 2, value: "loaded", name: "Машина загрузилась" },
   { id: 3, value: "unloaded", name: "Машина выгрузилась" },
 ] as const;
-
-const TRANSPORT_OPTIONS: { value: string; label: string }[] = [
-  { value: "ft_20", label: "Фура 20т" },
-  { value: "ft_40", label: "Фура 40т" },
-  { value: "ref", label: "Рефрижератор" },
-  { value: "tent", label: "Тент" },
-  { value: "gazel", label: "Газель" },
-  { value: "other", label: "Другое" },
-];
 
 const emptyForm = {
   number: "",
@@ -780,78 +772,24 @@ function ShipmentForm({ id }: { id?: string }) {
                       </InnerGroup>
                     </div>
 
-                    <div>
-                      <InnerGroup title="Информация о грузе">
-                        <Field label="Тип груза" htmlFor="ship-cargo-type">
-                          <SInput
-                            id="ship-cargo-type"
-                            value={form.cargo_type}
-                            onChange={(e) => set("cargo_type", e.target.value)}
-                          />
-                        </Field>
-                        <Field label="Упаковка" htmlFor="ship-cargo-pack">
-                          <SInput
-                            id="ship-cargo-pack"
-                            value={form.cargo_packaging}
-                            onChange={(e) => set("cargo_packaging", e.target.value)}
-                          />
-                        </Field>
-                        <Field label="Объём кузова, м³" htmlFor="ship-volume">
-                          <SInput
-                            id="ship-volume"
-                            inputMode="decimal"
-                            value={form.cargo_volume}
-                            onChange={(e) => set("cargo_volume", e.target.value)}
-                          />
-                        </Field>
-                        <Field label="Вес груза, т" htmlFor="ship-weight">
-                          <SInput
-                            id="ship-weight"
-                            inputMode="decimal"
-                            value={form.cargo_weight}
-                            onChange={(e) => set("cargo_weight", e.target.value)}
-                          />
-                        </Field>
-                        <Field label="Грузоподъёмность, т" htmlFor="ship-capacity">
-                          <SInput
-                            id="ship-capacity"
-                            inputMode="decimal"
-                            value={form.capacity}
-                            onChange={(e) => set("capacity", e.target.value)}
-                          />
-                        </Field>
-                        <Field label="Тип кузова" htmlFor="ship-body-type">
-                          <TokenField
-                            id="ship-body-type"
-                            placeholder="Например: изотерм + Enter"
-                            value={form.body_type}
-                            onChange={(v) => set("body_type", v)}
-                          />
-                        </Field>
-                        <Field label="Способ погрузки" htmlFor="ship-load-method">
-                          <TokenField
-                            id="ship-load-method"
-                            placeholder="Например: задняя + Enter"
-                            value={form.loading_method}
-                            onChange={(v) => set("loading_method", v)}
-                          />
-                        </Field>
-                        <Field label="Тип транспорта" htmlFor="ship-transport">
-                          <select
-                            id="ship-transport"
-                            className={selectStateCls(Boolean(form.transport_type))}
-                            value={form.transport_type}
-                            onChange={(e) => set("transport_type", e.target.value)}
-                          >
-                            {TRANSPORT_OPTIONS.map((t) => (
-                              <option key={t.value} value={t.value}>
-                                {t.label}
-                              </option>
-                            ))}
-                          </select>
-                        </Field>
-                      </InnerGroup>
-                    </div>
+                    <CargoGroup
+                      cargoType={form.cargo_type}
+                      cargoPackaging={form.cargo_packaging}
+                      cargoVolume={form.cargo_volume}
+                      cargoWeight={form.cargo_weight}
+                      capacity={form.capacity}
+                      bodyType={form.body_type}
+                      loadingMethod={form.loading_method}
+                      transportType={form.transport_type}
+                      onCargoTypeChange={(v) => set("cargo_type", v)}
+                      onCargoPackagingChange={(v) => set("cargo_packaging", v)}
+                      onCargoVolumeChange={(v) => set("cargo_volume", v)}
+                      onCargoWeightChange={(v) => set("cargo_weight", v)}
+                      onCapacityChange={(v) => set("capacity", v)}
+                      onBodyTypeChange={(v) => set("body_type", v)}
+                      onLoadingMethodChange={(v) => set("loading_method", v)}
+                      onTransportTypeChange={(v) => set("transport_type", v)}
+                    />
                   </FormGroup>
 
                   {/* --- Вкладки: позиции заказа / прочая информация --- */}

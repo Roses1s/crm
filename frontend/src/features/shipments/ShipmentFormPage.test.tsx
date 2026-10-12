@@ -1,6 +1,8 @@
 /**
- * Дата создания заявки — редактируемое поле (заявку часто заводят в CRM
- * позже, чем она реально возникла, и нужно уметь её исправить задним числом).
+ * Форма заявки на уровне страницы: дата создания (заявку часто заводят
+ * в CRM позже, чем она реально возникла, и нужно уметь исправить её задним
+ * числом), маржа по серверной ставке, защита несохранённых правок
+ * и проводка полей блока «Информация о грузе» до сохранения.
  */
 import { screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
@@ -223,4 +225,45 @@ it("защищает даже новую заявку без выбранног�
 
   expect(await screen.findByRole("dialog", { name: "Несохранённые изменения" })).toBeVisible();
   expect(screen.getByRole("button", { name: "Сохранить и перейти" })).toBeDisabled();
+});
+
+it("правки блока «Информация о грузе» уходят на сервер теми же полями", async () => {
+  setAccessToken("токен");
+  server = startFakeApi([
+    ...commonRoutes(),
+    {
+      method: "PATCH",
+      path: "/shipments/101",
+      response: (body: unknown) => ({ ...SHIPMENT, ...(body as object) }),
+    },
+  ]);
+
+  const user = userEvent.setup();
+  renderShipment();
+
+  // Заполняем все восемь полей блока — значения нарочно разные, чтобы
+  // перепутанные местами обработчики было видно сразу.
+  await user.type(await screen.findByLabelText("Тип груза"), "Химгрузы");
+  await user.type(screen.getByLabelText("Упаковка"), "Биг-бэги");
+  await user.type(screen.getByLabelText("Объём кузова, м³"), "92,5");
+  await user.type(screen.getByLabelText("Вес груза, т"), "21");
+  await user.type(screen.getByLabelText("Грузоподъёмность, т"), "22");
+  await user.type(screen.getByLabelText("Тип кузова"), "изотерм{Enter}");
+  await user.type(screen.getByLabelText("Способ погрузки"), "боковая{Enter}");
+  await user.selectOptions(screen.getByLabelText("Тип транспорта"), "ref");
+
+  await user.click(screen.getByRole("button", { name: "Сохранить" }));
+
+  await waitFor(() => expect(server?.called("PATCH", "/shipments/101")).toBe(true));
+  const patch = server.calls.find((c) => c.method === "PATCH" && c.url.includes("/shipments/101"));
+  expect(patch?.body).toMatchObject({
+    cargo_type: "Химгрузы",
+    cargo_packaging: "Биг-бэги",
+    cargo_volume: "92,5",
+    cargo_weight: "21",
+    capacity: "22",
+    body_type: ["изотерм"],
+    loading_method: ["боковая"],
+    transport_type: "ref",
+  });
 });
