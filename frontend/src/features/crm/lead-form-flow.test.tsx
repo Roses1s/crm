@@ -12,6 +12,11 @@
  * не сломал сценарии незаметно. Продакшн-код здесь не трогаем — если тест
  * находит странность, она описывается в комментарии, а не исправляется.
  *
+ * Отдельный раздел в конце проверяет блок «Информация о компании» после его
+ * переноса в компонент (шаг 15): «Компания» — это то же название, что и
+ * крупный заголовок, у новой карточки передача лида запрещена, а ошибка
+ * передачи не «прилипает» к окну при повторном открытии.
+ *
  * Вкладка «Заявки» вынесена в конец файла: до этих проверок таблица заявок
  * в карточке лида не исполнялась ни одним тестом — тесты видели только пустой
  * список. Теперь зафиксированы состав колонок, попадание значений в свою
@@ -749,6 +754,144 @@ it("передача лида: два шага, POST с выбранным со�
   expect(callBody("POST", "/crm/leads/10/transfer")).toEqual({ user_id: 2 });
   expect(await screen.findByText("Доска CRM")).toBeVisible();
   expect(router.state.location.pathname).toBe("/crm");
+});
+
+it("проигранная карточка: передача лида доступна администратору и запрещена остальным", async () => {
+  const lostLead = {
+    ...LEAD,
+    is_archived: true,
+    assigned_to_id: MANAGER.id,
+    assigned_to_name: "Денис Кузнецов",
+    loss_reason_name: "Перестал возить",
+  };
+
+  // Не-администратор: у проигранной карточки передача запрещена, и подсказка
+  // объясняет, что сначала нужно вернуть лид. Это единственная проверка,
+  // которая ловит ошибку «страница всегда передаёт isAdmin = true»: сам блок
+  // роль не считает, он только получает готовый флаг со страницы.
+  setAccessToken("токен");
+  server = startFakeApi(leadRoutes(MANAGER, lostLead));
+  const managerView = renderLead("10");
+  await screen.findAllByDisplayValue("ООО Ромашка");
+
+  const blocked = screen.getByTitle("Сначала восстановите лид, чтобы передать его");
+  expect(blocked).toBeDisabled();
+  managerView.unmount();
+
+  // Администратор: проигранный лид передать можно — карточка вернётся на
+  // доску получателя, поэтому правило для админа мягче.
+  server = startFakeApi(leadRoutes(ME, lostLead));
+  renderLead("10");
+  await screen.findAllByDisplayValue("ООО Ромашка");
+
+  expect(screen.getByTitle("Передать лид другому сотруднику")).toBeEnabled();
+});
+
+// --- блок «Информация о компании» в карточке лида ---------------------------
+// Блок вынесен в отдельный компонент (шаг 15), но три вещи остаются заботой
+// страницы, и их обязательно проверять целиком: название из «Компании» — это
+// то же поле, что и крупный заголовок карточки; у новой карточки передача лида
+// запрещена, пока лид не сохранён; ошибка передачи не должна «прилипать» к
+// окну и показываться при следующем открытии. Проверки компонента этого не
+// видят — они смотрят только сам блок.
+
+it("«Компания» — то же название, что и крупный заголовок: правка уходит в payload.name", async () => {
+  setAccessToken("токен");
+  let current: typeof LEAD = { ...LEAD };
+  server = startFakeApi([
+    ...leadRoutes(ME, () => current),
+    {
+      method: "PATCH",
+      path: "/crm/leads/10",
+      response: (body: unknown) => {
+        current = { ...current, ...(body as Partial<typeof LEAD>) };
+        return current;
+      },
+    },
+  ]);
+
+  const user = userEvent.setup();
+  renderLead("10");
+  await screen.findAllByDisplayValue("ООО Ромашка");
+
+  const company = screen.getByRole("textbox", { name: "Компания" });
+  await user.clear(company);
+  await user.click(company);
+  await user.paste("ООО Лютик");
+
+  // Крупный заголовок и поле «Компания» — одно и то же название (form.name):
+  // правка сразу видна в заголовке, отдельного поля в базе нет.
+  expect(screen.getByRole("textbox", { name: "Название лида" })).toHaveValue("ООО Лютик");
+  // Лид активный — строки «Причина проигрыша» в блоке нет.
+  expect(screen.queryByText("Причина проигрыша")).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Сохранить" }));
+
+  await waitFor(() => expect(countCalls("PATCH", "/crm/leads/10")).toBe(1));
+  expect(callBody("PATCH", "/crm/leads/10").name).toBe("ООО Лютик");
+  expect(countCalls("PATCH", "/crm/leads/10")).toBe(1);
+});
+
+it("новая карточка: передача лида недоступна и объясняет почему", async () => {
+  setAccessToken("токен");
+  server = startFakeApi([
+    ...newLeadRoutes(),
+    // Маршрут коллег описан заранее: если окно передачи всё-таки откроется,
+    // запрос будет видно в журнале, а не спишут на «неизвестный маршрут».
+    { path: "/users/colleagues", response: COLLEAGUES },
+  ]);
+
+  const user = userEvent.setup();
+  renderLead("new");
+  await screen.findByRole("textbox", { name: "Компания" });
+
+  const seller = screen.getByTitle("Сначала сохраните лид");
+  expect(seller).toBeDisabled();
+
+  await user.click(seller);
+  expect(screen.queryByRole("dialog", { name: "Передача лида" })).not.toBeInTheDocument();
+  // Список коллег не запрашивается: передавать пока нечего — лида ещё нет.
+  expect(countCalls("GET", "/users/colleagues")).toBe(0);
+});
+
+it("ошибка передачи не показывается при повторном открытии окна", async () => {
+  setAccessToken("токен");
+  server = startFakeApi([
+    ...leadRoutes(),
+    { path: "/users/colleagues", response: COLLEAGUES },
+    {
+      method: "POST",
+      path: "/crm/leads/10/transfer",
+      response: { detail: "Нет прав на передачу" },
+      status: 403,
+    },
+  ]);
+
+  const user = userEvent.setup();
+  renderLead("10");
+  await screen.findAllByDisplayValue("ООО Ромашка");
+
+  await user.click(screen.getByTitle("Передать лид другому сотруднику"));
+  await user.click(await screen.findByRole("button", { name: "Денис Кузнецов" }));
+  await user.click(screen.getByRole("button", { name: "Передать" }));
+
+  const dialog = await screen.findByRole("dialog", { name: "Передача лида" });
+  expect(await within(dialog).findByText("Нет прав на передачу")).toBeVisible();
+  expect(countCalls("POST", "/crm/leads/10/transfer")).toBe(1);
+
+  // Закрываем окно и открываем снова: прежняя ошибка не должна встречать
+  // человека на втором шаге — она относилась к прошлой попытке.
+  await user.keyboard("{Escape}");
+  await waitFor(() =>
+    expect(screen.queryByRole("dialog", { name: "Передача лида" })).not.toBeInTheDocument(),
+  );
+
+  await user.click(screen.getByTitle("Передать лид другому сотруднику"));
+  await user.click(await screen.findByRole("button", { name: "Денис Кузнецов" }));
+
+  expect(screen.getByText(/перейдёт к сотруднику/)).toBeVisible();
+  expect(screen.queryByText("Нет прав на передачу")).not.toBeInTheDocument();
+  expect(countCalls("POST", "/crm/leads/10/transfer")).toBe(1);
 });
 
 // --- вкладка «Заявки» в карточке лида ---------------------------------------

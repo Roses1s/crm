@@ -39,6 +39,7 @@ import {
 import { ownerInitials, ownerLabel } from "@/shared/lib/owner";
 import type { Attachment } from "@/shared/types";
 import { ClientGroup } from "@/features/crm/lead-form/ClientGroup";
+import { CompanyGroup } from "@/features/crm/lead-form/CompanyGroup";
 import { DeleteLeadDialog } from "@/features/crm/lead-form/DeleteLeadDialog";
 import { LoseLeadDialog } from "@/features/crm/lead-form/LoseLeadDialog";
 import { QuickCreateLeadDialog } from "@/features/crm/lead-form/QuickCreateLeadDialog";
@@ -671,85 +672,24 @@ function LeadForm({ id }: { id?: string }) {
 
                     <FormGroup>
                       <div>
-                        <InnerGroup title="Информация о компании">
-                          <Field label="Компания" htmlFor="lead-company">
-                            {/*
-                            «Компания» показывает и редактирует то же название,
-                            что и крупный заголовок сверху (одно поле form.name),
-                            без отдельного поля в базе.
-                          */}
-                            <OdooInput
-                              id="lead-company"
-                              placeholder="например, ООО «Ромашка»"
-                              value={form.name}
-                              disabled={readOnly}
-                              onChange={(e) => set("name", e.target.value)}
-                            />
-                          </Field>
-                          <Field
-                            label="ИНН"
-                            htmlFor="lead-inn"
-                            help="10 или 12 цифр, проверяется контрольная сумма ФНС"
-                          >
-                            <OdooInput
-                              id="lead-inn"
-                              inputMode="numeric"
-                              placeholder="10 или 12 цифр"
-                              value={form.inn}
-                              disabled={readOnly}
-                              onChange={(e) => set("inn", e.target.value)}
-                            />
-                          </Field>
-                          {sameInn.length > 0 && (
-                            <p
-                              role="alert"
-                              className="rounded-[4px] bg-odoo-tag-yellow-bg px-2.5 py-2 text-[12px] leading-5 text-odoo-tag-yellow-text"
-                            >
-                              Лид с таким ИНН уже есть: «{sameInn[0].name}»
-                              {sameInn[0].assigned_to_name
-                                ? `, ответственный — ${sameInn[0].assigned_to_name}`
-                                : ""}
-                              . Это просто предупреждение, сохранить можно.
-                            </p>
-                          )}
-                          <Field label="Продавец">
-                            {/* Щелчок по имени открывает передачу лида коллеге. */}
-                            <button
-                              type="button"
-                              disabled={isNew || (readOnly && currentUser?.role !== "admin")}
-                              onClick={() => {
-                                setTransferError("");
-                                setTransferOpen(true);
-                              }}
-                              title={
-                                isNew
-                                  ? "Сначала сохраните лид"
-                                  : readOnly && currentUser?.role !== "admin"
-                                    ? "Сначала восстановите лид, чтобы передать его"
-                                    : "Передать лид другому сотруднику"
-                              }
-                              className="flex w-full items-center gap-1.5 rounded-[4px] pt-[2px] text-left transition-colors hover:bg-odoo-bg disabled:cursor-default disabled:hover:bg-transparent"
-                            >
-                              {owner ? (
-                                <>
-                                  <span className="flex h-5 w-5 shrink-0 items-center justify-center rounded-sm bg-odoo-primary text-[9px] font-semibold text-white">
-                                    {ownerAvatar}
-                                  </span>
-                                  <span className="truncate">{owner}</span>
-                                </>
-                              ) : (
-                                <span className="text-odoo-text-light">Не назначен</span>
-                              )}
-                            </button>
-                          </Field>
-                          {lead?.is_archived && (
-                            <Field label="Причина проигрыша">
-                              <span className="pt-[2px] text-odoo-text">
-                                {lead.loss_reason_name || "—"}
-                              </span>
-                            </Field>
-                          )}
-                        </InnerGroup>
+                        <CompanyGroup
+                          name={form.name}
+                          inn={form.inn}
+                          sameInn={sameInn}
+                          owner={owner}
+                          ownerAvatar={ownerAvatar}
+                          isNew={isNew}
+                          readOnly={readOnly}
+                          isAdmin={currentUser?.role === "admin"}
+                          isArchived={!!lead?.is_archived}
+                          lossReasonName={lead?.loss_reason_name ?? null}
+                          onNameChange={(v) => set("name", v)}
+                          onInnChange={(v) => set("inn", v)}
+                          onOpenTransfer={() => {
+                            setTransferError("");
+                            setTransferOpen(true);
+                          }}
+                        />
 
                         <InnerGroup verticalAlign="center">
                           <Field label="Назначенный бухгалтер" htmlFor="lead-accountant">
