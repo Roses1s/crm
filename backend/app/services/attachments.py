@@ -187,7 +187,7 @@ async def _store_upload(file: UploadFile, relative_dir: Path) -> tuple[str, str,
     Общая часть загрузки для лидов и заявок: различается только папка,
     остальное — белый список расширений, лимит размера и обезличенное имя.
     """
-    original = Path(file.filename or "file").name  # путь из имени клиента отбрасываем целиком: нужен только сам файл
+    original = Path(file.filename or "file").name  # путь из имени клиента отбрасываем целиком
     suffix = _checked_suffix(original)
     target = storage_root() / relative_dir / f"{uuid.uuid4().hex}{suffix}"
     # Одна активная загрузка на процесс: семафор не блокирует event loop,
