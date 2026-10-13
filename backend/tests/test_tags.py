@@ -35,11 +35,11 @@ async def test_manager_creates_but_cannot_delete_tag(
     assert created.json()["color"] == "#ff00aa"
     tag_id = created.json()["id"]
 
-    # Менеджеру удаление запрещено.
+    # Менеджеру удаление тега запрещено.
     denied = await auth_client.delete(f"/api/v1/crm/tags/{tag_id}", headers=headers)
     assert denied.status_code == 403
 
-    # Администратору — можно.
+    # Администратору удаление разрешено.
     deleted = await auth_client.delete(f"/api/v1/crm/tags/{tag_id}")
     assert deleted.status_code == 204
 

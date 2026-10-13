@@ -16,7 +16,8 @@ async def manager_headers(client: AsyncClient) -> dict[str, str]:
 
 
 async def test_owner_sees_full_card_of_own_lead(auth_client: AsyncClient, seeded: dict) -> None:
-    # seeded["lead"] принадлежит админу — auth_client как раз залогинен им.
+    # seeded["lead"] принадлежит администратору, а auth_client вошёл именно
+    # под ним.
     response = await auth_client.get("/api/v1/crm/customers")
     assert response.status_code == 200
     body = response.json()["results"]
@@ -40,11 +41,11 @@ async def test_colleague_sees_only_basic_fields_of_foreign_active_lead(
     row = response.json()["results"][0]
 
     assert row["can_open"] is False
-    # Разрешено: название, ИНН, кто ведёт.
+    # Разрешено видеть: название, ИНН и кто ведёт лид.
     assert row["name"] == "ООО «Уралпромснаб»"
     assert row["inn"] == "7451234565"
     assert row["assigned_to_name"]
-    # Запрещено: контакты, приоритет, этап, теги — всё пусто.
+    # Запрещено видеть: контакты, приоритет, этап и теги — всё пусто.
     assert row["logist_contact"] is None
     assert row["logist_phone"] is None
     assert row["logist_email"] is None

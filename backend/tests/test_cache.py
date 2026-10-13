@@ -13,7 +13,7 @@ CACHE_HEADER = "X-FastAPI-Cache"
 
 
 async def test_tags_list_is_cached_then_invalidated(auth_client: AsyncClient, seeded: dict) -> None:
-    # Первый запрос — промах кеша, второй такой же — попадание.
+    # Первый запрос — промах мимо кеша, второй такой же — попадание в кеш.
     first = await auth_client.get("/api/v1/crm/tags")
     assert first.status_code == 200
     assert first.headers.get(CACHE_HEADER) == "MISS"
@@ -22,7 +22,8 @@ async def test_tags_list_is_cached_then_invalidated(auth_client: AsyncClient, se
     assert second.headers.get(CACHE_HEADER) == "HIT"
     assert second.json() == first.json()
 
-    # Создание тега сбрасывает кеш: список сразу показывает новый тег.
+    # Создание тега сбрасывает кеш: список сразу показывает новый тег,
+    # а не устаревший набор.
     created = await auth_client.post(
         "/api/v1/crm/tags", json={"name": "Экспресс", "color": "#935116"}
     )

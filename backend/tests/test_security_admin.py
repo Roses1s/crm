@@ -57,7 +57,8 @@ async def test_failed_login_is_recorded(client: AsyncClient, seeded: dict[str, o
     assert response.status_code == 200
     rows = response.json()
     assert rows[0]["username"] == "admin@crmdetroid.ru"
-    # Две неудачные попытки сгруппированы в одну строку, удачная не считается.
+    # Две неудачные попытки сгруппированы в одну строку; удачная попытка
+    # в счёт неудач не входит.
     assert rows[0]["failures"] == 2
 
 
@@ -168,7 +169,8 @@ async def test_deleting_user_moves_leads_to_admin(
     headers = {"Authorization": f"Bearer {login.json()['access_token']}"}
 
     stages = (await client.get("/api/v1/crm/stages", headers=headers)).json()
-    # «Новый» есть и у администратора — карточка должна попасть в одноимённый этап.
+    # Этап «Новый» есть и у администратора: карточка должна попасть в
+    # одноимённый этап его доски.
     new_stage = next(s for s in stages if s["name"] == "Новый")
     created = await client.post(
         "/api/v1/crm/leads",
@@ -330,7 +332,7 @@ async def test_scan_backups_orders_by_freshness(
     assert [r["name"] for r in results] == ["crm-2026-10-06.dump", "crm-2026-10-01.dump"]
     assert results[0]["size"] == 20
     assert last_mtime == 2_000_000.0
-    # Чужие файлы каталога в список копий не попадают.
+    # Чужие файлы каталога в список резервных копий не попадают.
     (tmp_path / "notes.txt").write_text("мусор")
     assert [r["name"] for r in _scan_backups(tmp_path)[0]] == [
         "crm-2026-10-06.dump",

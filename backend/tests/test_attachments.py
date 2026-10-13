@@ -49,7 +49,7 @@ async def test_upload_and_download(auth_client: AsyncClient, seeded: dict) -> No
     downloaded = await auth_client.get(f"/api/v1/crm/attachments/{body['id']}")
     assert downloaded.status_code == 200
     assert downloaded.content == b"%PDF-1.4 fake"
-    # PDF показывается в окне, произвольный файл — только скачиванием.
+    # PDF открывается прямо в окне; произвольный тип — только скачиванием.
     assert downloaded.headers["content-disposition"].startswith("inline")
     assert downloaded.headers["cache-control"] == "private, no-store"
     assert downloaded.headers["x-content-type-options"] == "nosniff"
@@ -181,7 +181,8 @@ async def test_path_traversal_in_filename_is_neutralised(
         files={"file": ("../../etc/passwd.txt", b"root:x:0:0", "text/plain")},
     )
     assert response.status_code == 201
-    # Имя для показа остаётся, но на диск файл лёг внутрь каталога вложений.
+    # Имя для показа сохраняется, но на диске файл лежит внутри каталога
+    # вложений, а не по пути из запроса.
     assert response.json()["name"] == "passwd.txt"
     stored = list(Path(settings.attachments_dir).rglob("*"))
     assert all(Path(settings.attachments_dir) in p.parents for p in stored if p.is_file())
@@ -201,7 +202,7 @@ async def test_too_big_file_is_rejected(
     )
     assert response.status_code == 413
     assert response.json()["code"] == "file_too_large"
-    # Недописанный файл на диске не остаётся.
+    # После сбоя загрузки недописанного файла на диске не остаётся.
     assert {p for p in Path(settings.attachments_dir).rglob("*") if p.is_file()} == before
 
 
@@ -281,14 +282,15 @@ async def test_manager_cannot_delete_foreign_attachment(
     )
     manager_token = login.json()["access_token"]
 
-    # Лид принадлежит админу, поэтому для менеджера его вложения «не существуют».
+    # Лид принадлежит администратору, поэтому для менеджера его вложения
+    # «не существуют» — как и сама карточка.
     denied = await client.delete(
         f"/api/v1/crm/attachments/{attachment_id}",
         headers={"Authorization": f"Bearer {manager_token}"},
     )
     assert denied.status_code == 404
 
-    # Автор (админ) удалить может — и файл исчезает с диска.
+    # Автор (администратор) удалить может, и файл исчезает с диска.
     path = Path(
         (await auth_client.get(f"/api/v1/crm/leads/{lead_id}/attachments")).json()[0]["name"]
     )
@@ -317,7 +319,8 @@ async def test_shipment_attachment_upload_and_isolation(
     listed = await auth_client.get(f"/api/v1/shipments/{shipment_id}/attachments")
     assert [a["name"] for a in listed.json()] == ["Накладная.pdf"]
 
-    # Владелец решил показывать документы перевозки только на самой заявке.
+    # Документы перевозки показываем только на самой заявке (решение
+    # владельца), не в карточке лида.
     lead_files = await auth_client.get(f"/api/v1/crm/leads/{lead_id}/attachments")
     assert "Накладная.pdf" not in [a["name"] for a in lead_files.json()]
 
@@ -482,7 +485,8 @@ async def test_upload_is_blocked_when_disk_is_almost_full(
     отвечает понятной ошибкой, а не пишет файл «до упора».
     """
     lead = seeded["lead"]
-    # Требуем заведомо больше, чем есть на любом диске.
+    # Запрашиваем заведомо больше места, чем есть на любом диске: проверка
+    # обязана отказать, а не записать файл.
     monkeypatch.setattr(settings, "min_free_disk_mb", 10_000_000)
 
     response = await auth_client.post(

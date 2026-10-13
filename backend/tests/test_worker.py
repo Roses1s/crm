@@ -81,7 +81,8 @@ def test_cleanup_orphan_attachments_paginates_and_removes_orphans(
 
     with Session(engine) as session:
         for i in range(5):
-            # Чётные — указывают на существующий файл, нечётные — на удалённый.
+            # Чётные записи указывают на существующий файл, нечётные — на
+            # уже удалённый.
             path = existing_file if i % 2 == 0 else tmp_path / f"missing-{i}.txt"
             session.add(
                 Attachment(
@@ -96,8 +97,8 @@ def test_cleanup_orphan_attachments_paginates_and_removes_orphans(
 
     monkeypatch.setattr(settings, "database_url", f"sqlite+aiosqlite:///{db_path}")
     monkeypatch.setattr(worker_tasks, "_sync_engine", None)
-    # Партии по 2 при пяти записях — минимум три прохода цикла, иначе
-    # регрессия "обработали только первую страницу" прошла бы тест незамеченной.
+    # Партии по 2 при пяти записях дают минимум три прохода цикла: иначе
+    # регрессия «обработали только первую страницу» прошла бы незамеченной.
     monkeypatch.setattr(worker_tasks, "_CLEANUP_BATCH_SIZE", 2)
 
     try:
@@ -122,11 +123,11 @@ def test_pg_dump_command_keeps_password_out_of_argv(monkeypatch: pytest.MonkeyPa
     )
     cmd, env = _pg_dump_command(Path("/tmp/crm.dump"))
 
-    # Пароля нет ни в одном аргументе командной строки.
+    # Пароля нет ни в одном аргументе командной строки дампа.
     assert all("s3cr3t-pass" not in arg for arg in cmd)
-    # Пароль передаётся исключительно через окружение.
+    # Пароль передаётся исключительно через переменные окружения.
     assert env["PGPASSWORD"] == "s3cr3t-pass"
-    # Параметры подключения переданы флагами.
+    # Параметры подключения переданы флагами команды.
     assert "--host" in cmd and "dbhost" in cmd
     assert "--port" in cmd and "5433" in cmd
     assert "--username" in cmd and "crm" in cmd
@@ -153,7 +154,8 @@ def test_cleanup_orphan_files_removes_only_unknown_and_old(tmp_path: Path) -> No
     for file in (known, known_thumbnail, orphan_old, orphan_thumbnail, orphan_fresh):
         file.write_bytes(b"x" * 10)
 
-    # Старым файлам сдвигаем время изменения на сутки назад.
+    # Старым файлам сдвигаем время изменения на сутки назад, чтобы уборка
+    # признала их устаревшими.
     day_ago = time.time() - 24 * 3600
     os.utime(known, (day_ago, day_ago))
     os.utime(known_thumbnail, (day_ago, day_ago))

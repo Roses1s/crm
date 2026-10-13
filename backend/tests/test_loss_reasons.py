@@ -60,7 +60,7 @@ async def test_used_loss_reason_cannot_be_deleted(auth_client: AsyncClient, seed
     assert denied.status_code == 400
     assert denied.json()["code"] == "loss_reason_in_use"
 
-    # Причина осталась и в справочнике, и у проигранного лида.
+    # Причина сохранилась и в справочнике, и у проигранного лида.
     listed = await auth_client.get("/api/v1/crm/loss-reasons")
     assert "Перестал возить" in [r["name"] for r in listed.json()]
     card = await auth_client.get(f"/api/v1/crm/leads/{lead_id}")

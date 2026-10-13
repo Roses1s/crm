@@ -59,7 +59,8 @@ async def test_create_and_read_shipment(auth_client: AsyncClient, seeded: dict) 
     assert body["carrier_name"] == "ООО «АвтоТрансЛайн»"
     assert body["carrier_inn"] == "7447112236"
     assert body["carrier_contact"] == "Логист Иванов"
-    # Обычно номер по умолчанию равен id; при занятом id сервис добавляет суффикс.
+    # Обычно номер по умолчанию равен id; если этот номер занят, сервис
+    # добавляет суффикс.
     assert body["number"] == str(body["id"])
 
     listed = await auth_client.get("/api/v1/shipments")
@@ -80,13 +81,13 @@ async def test_shipment_created_at_is_choosable_and_editable(
     потом, а если не трогать поле вовсе — работает обычный now() из базы."""
     lead_id = seeded["lead"].id  # type: ignore[attr-defined]
 
-    # 1. Не передали created_at — подставляется текущее время сервером.
+    # 1. created_at не передали — текущее время подставляет сервер.
     default_created = (
         await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})
     ).json()
     assert default_created["created_at"]  # просто не пусто
 
-    # 2. Указали дату создания явно при заведении заявки — задним числом.
+    # 2. Дату создания указали явно при заведении заявки — задним числом.
     backdated = await auth_client.post(
         "/api/v1/shipments",
         json={"lead_id": lead_id, "created_at": "2026-01-15T09:30:00+00:00"},
@@ -103,7 +104,7 @@ async def test_shipment_created_at_is_choosable_and_editable(
     assert patched.status_code == 200, patched.text
     assert patched.json()["created_at"].startswith("2025-12-01T00:00:00")
 
-    # Заявка со старой датой создания должна и в списке её показывать.
+    # Заявка со старой датой создания должна показывать её и в списке.
     fetched = await auth_client.get(f"/api/v1/shipments/{shipment_id}")
     assert fetched.json()["created_at"].startswith("2025-12-01T00:00:00")
 
@@ -150,7 +151,8 @@ async def test_shipment_number_conflict_on_update(auth_client: AsyncClient, seed
     )
     assert duplicate.status_code == 409, duplicate.text
     assert duplicate.json()["code"] == "shipment_number_conflict"
-    # Следующий запрос должен пройти на новой сессии после ошибки целостности.
+    # Следующий запрос должен пройти на новой сессии после ошибки
+    # целостности, а не унаследовать сломанную транзакцию.
     unchanged = await auth_client.get(f"/api/v1/shipments/{second['id']}")
     assert unchanged.status_code == 200, unchanged.text
     assert unchanged.json()["number"] == str(second["id"])
@@ -221,9 +223,9 @@ async def test_shipments_search_escapes_like_wildcards(
     literal_match = await auth_client.get("/api/v1/shipments?search=50%25")
     assert literal_match.json()["count"] == 1
 
-    # Без экранирования «50» тоже матчился бы (ILIKE «%50%» воспринял бы
-    # «%» как спецсимвол маски) — здесь проверяем, что это не так: другая
-    # заявка без «%» в номере под такой поиск не попадает.
+    # Без экранирования «50» тоже совпал бы: ILIKE «%50%» воспринял бы
+    # «%» как спецсимвол маски. Проверяем обратное: другая заявка без
+    # «%» в номере под такой поиск не попадает.
     other = (await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})).json()
     await auth_client.patch(f"/api/v1/shipments/{other['id']}", json={"number": "50"})
     still_one = await auth_client.get("/api/v1/shipments?search=50%25")
@@ -316,7 +318,8 @@ async def test_status_change_is_written_to_shipment_timeline(
     assert entries[0]["old_value"] == "Новая"
     assert entries[0]["new_value"] == "Машина загрузилась"
 
-    # Запись о переносе заявки между этапами разрешено убрать любому сотруднику.
+    # Запись о переносе заявки между этапами разрешено убрать любому
+    # сотруднику.
     assert entries[0]["is_stage_change"] is True
     deleted = await auth_client.delete(
         f"/api/v1/shipments/{shipment_id}/timeline/{entries[0]['id']}"
@@ -324,7 +327,7 @@ async def test_status_change_is_written_to_shipment_timeline(
     assert deleted.status_code == 204
     assert (await auth_client.get(f"/api/v1/shipments/{shipment_id}/timeline")).json() == []
 
-    # Лента лида не должна показывать записи заявки.
+    # Лента лида записи заявки не показывает: у них разные ленты.
     lead_timeline = await auth_client.get(f"/api/v1/crm/leads/{lead_id}/timeline")
     assert all(e["field_label"] != "Этап" for e in lead_timeline.json())
 
@@ -490,7 +493,7 @@ async def test_reassignment_enforces_target_access_and_removes_old_owner_access(
     assert unchanged.json()["lead_id"] == manager_lead["id"]
 
     # Администратор вправе перенести заявку к своему лиду. После переноса
-    # прежний владелец не должен видеть её ни по прямому URL, ни в своём списке.
+    # прежний владелец не видит её ни по прямому адресу, ни в своём списке.
     moved_by_admin = await auth_client.patch(
         f"/api/v1/shipments/{shipment['id']}", json={"lead_id": admin_lead_id}
     )
@@ -552,13 +555,14 @@ async def test_shipment_carrier_is_free_text_without_directory(
     assert created.json()["carrier_name"] == "ИП Новиков"
     assert created.json()["carrier_inn"] == ""
 
-    # Можно взять точно такое же название/ИНН ещё раз — никакого конфликта.
+    # Точно такие же название и ИНН можно взять ещё раз — конфликта нет:
+    # перевозчик не является справочной сущностью.
     again = await auth_client.post(
         "/api/v1/shipments", json={"lead_id": lead_id, "carrier_name": "ИП Новиков"}
     )
     assert again.status_code == 201, again.text
 
-    # Перевозчика можно поменять и на самой заявке.
+    # Перевозчика можно поменять и на самой заявке, а не только при создании.
     patched = await auth_client.patch(
         f"/api/v1/shipments/{shipment_id}", json={"carrier_name": "ООО «Другой перевозчик»"}
     )
@@ -673,11 +677,11 @@ async def test_owner_and_admin_cannot_write_shipment_of_lost_lead(
     shipment_id = shipment["id"]
     await auth_client.post(f"/api/v1/crm/leads/{lead_id}/lose", json={"reason_id": reason_id})
 
-    # Нельзя создавать новую заявку на проигранный лид.
+    # Новую заявку на проигранный лид создавать нельзя.
     create_lost = await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})
     assert create_lost.status_code == 409
 
-    # Нельзя перенести существующую заявку к проигранному лиду.
+    # Существующую заявку к проигранному лиду перенести нельзя.
     active_lead = (
         await auth_client.post(
             "/api/v1/crm/leads",
@@ -696,7 +700,8 @@ async def test_owner_and_admin_cannot_write_shipment_of_lost_lead(
     )
     assert transfer_lost.status_code == 409
 
-    # Администратор — владелец тестового лида; чтение остаётся разрешено.
+    # Администратор — владелец тестового лида; чтение ему остаётся
+    # разрешено.
     assert (await auth_client.get(f"/api/v1/shipments/{shipment_id}")).status_code == 200
     assert (await auth_client.get(f"/api/v1/shipments/{shipment_id}/timeline")).status_code == 200
 
@@ -739,8 +744,8 @@ async def test_shipments_list_margin_and_totals(auth_client: AsyncClient, seeded
     итоги по всему фильтру — не только по открытой странице списка."""
     lead_id = seeded["lead"].id  # type: ignore[attr-defined]
 
-    # Заказчик 244 000 с НДС 22% (без НДС — 200 000), перевозчик 100 000 без
-    # НДС: маржа = (200 000 − 100 000) × 0,75 = 75 000.
+    # Заказчик 244 000 с НДС 22% (без НДС — 200 000), перевозчик 100 000
+    # без НДС: маржа = (200 000 − 100 000) × 0,75 = 75 000.
     first = (
         await auth_client.post(
             "/api/v1/shipments",
@@ -754,8 +759,8 @@ async def test_shipments_list_margin_and_totals(auth_client: AsyncClient, seeded
         )
     ).json()
 
-    # Заказчик 122 000 с НДС 22% (без НДС — 100 000), перевозчик 80 000 без
-    # НДС: маржа = 15 000.
+    # Заказчик 122 000 с НДС 22% (без НДС — 100 000), перевозчик 80 000
+    # без НДС: маржа = 15 000.
     second = (
         await auth_client.post(
             "/api/v1/shipments",
@@ -769,7 +774,7 @@ async def test_shipments_list_margin_and_totals(auth_client: AsyncClient, seeded
         )
     ).json()
 
-    # Третья заявка без цен: в колонках прочерк, в итоги не входит.
+    # Третья заявка без цен: в колонках прочерк, в итоги она не входит.
     unpriced = (await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})).json()
 
     page = (await auth_client.get("/api/v1/shipments")).json()
@@ -779,12 +784,13 @@ async def test_shipments_list_margin_and_totals(auth_client: AsyncClient, seeded
     assert by_id[unpriced["id"]]["margin"] is None
     assert by_id[unpriced["id"]]["customer_total"] is None
 
-    # Итоги: 75 000 + 15 000 = 90 000 маржи; 366 000 заказчику.
+    # Итоги: 75 000 + 15 000 = 90 000 маржи; 366 000 — сумма заказчику.
     totals = page["totals"]
     assert Decimal(totals["margin"]) == Decimal("90000.00")
     assert Decimal(totals["customer_total"]) == Decimal("366000.00")
 
-    # Итоги честны при маленькой странице: в results одна заявка, в totals — все.
+    # Итоги честны при маленькой странице: в results одна заявка, а в
+    # totals — все по фильтру.
     paged = (await auth_client.get("/api/v1/shipments?page_size=1")).json()
     assert len(paged["results"]) == 1
     assert Decimal(paged["totals"]["margin"]) == Decimal("90000.00")
@@ -855,13 +861,14 @@ async def test_shipments_filter_by_employee(auth_client: AsyncClient, seeded: di
     admin_id = seeded["admin"].id  # type: ignore[attr-defined]
     manager_id = seeded["manager"].id  # type: ignore[attr-defined]
 
-    # Заявка админа на его же лиде (цены — чтобы проверить итоги фильтра).
+    # Заявка администратора на его же лиде; цены нужны, чтобы проверить
+    # итоги фильтра.
     await auth_client.post(
         "/api/v1/shipments",
         json={"lead_id": seeded["lead"].id, "customer_price": "100000", "carrier_price": "80000"},
     )
 
-    # Лид и заявка менеджера: создаёт сам менеджер на своей доске.
+    # Лид и заявку менеджера создаёт сам менеджер на своей доске.
     headers = await manager_headers(auth_client)
     stages = (await auth_client.get("/api/v1/crm/stages", headers=headers)).json()
     manager_lead = (
@@ -881,7 +888,7 @@ async def test_shipments_filter_by_employee(auth_client: AsyncClient, seeded: di
         headers=headers,
     )
 
-    # Админ видит заявки каждого сотрудника по отдельности.
+    # Администратор видит заявки каждого сотрудника по отдельности.
     managers_list = (await auth_client.get(f"/api/v1/shipments?assigned_to={manager_id}")).json()
     assert managers_list["count"] == 1
     assert managers_list["results"][0]["lead_id"] == manager_lead["id"]
@@ -891,11 +898,12 @@ async def test_shipments_filter_by_employee(auth_client: AsyncClient, seeded: di
     assert admins_list["count"] == 1
     assert admins_list["results"][0]["lead_id"] == seeded["lead"].id
 
-    # Менеджеру чужие заявки по фильтру не отдают — явный отказ, не пустой список.
+    # Менеджеру чужие заявки по фильтру не отдают: явный отказ, а не
+    # пустой список.
     forbidden = await auth_client.get(f"/api/v1/shipments?assigned_to={admin_id}", headers=headers)
     assert forbidden.status_code == 403
 
-    # Без параметра менеджер и так видит только свои заявки.
+    # Без параметра фильтра менеджер и так видит только свои заявки.
     own = (await auth_client.get("/api/v1/shipments", headers=headers)).json()
     assert own["count"] == 1
     assert own["results"][0]["lead_id"] == manager_lead["id"]

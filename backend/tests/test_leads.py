@@ -324,7 +324,7 @@ async def test_cannot_move_lead_to_stage_of_another_board(
     patch = await patch_lead(auth_client, lead.id, {"stage_id": foreign_stage.id})
     assert patch.status_code == 404
 
-    # Лид остался на прежнем, своём этапе.
+    # Лид остался на прежнем этапе своей доски.
     check = await auth_client.get(f"/api/v1/crm/leads/{lead.id}")
     assert check.json()["stage_id"] == seeded["stage_new"].id  # type: ignore[index]
 
@@ -396,7 +396,7 @@ async def test_note_can_be_edited_only_by_author(auth_client: AsyncClient, seede
         )
     ).json()["id"]
 
-    # Автор правит свободно; в ответе виден номер автора.
+    # Автор правит своё примечание свободно; в ответе виден его номер.
     edited = await auth_client.patch(
         f"/api/v1/crm/leads/{lead_id}/timeline/{entry_id}",
         json={"body": "исправленная заметка"},
@@ -406,7 +406,7 @@ async def test_note_can_be_edited_only_by_author(auth_client: AsyncClient, seede
     assert edited.json()["body"] == "исправленная заметка"
     assert edited.json()["author_id"] == manager_id
 
-    # Администратор видит этот лид, но править чужое примечание не может.
+    # Администратор лид видит, но править чужое примечание не может.
     denied = await auth_client.patch(
         f"/api/v1/crm/leads/{lead_id}/timeline/{entry_id}",
         json={"body": "правка администратора"},
@@ -500,8 +500,8 @@ async def test_restore_lets_colleague_claim_a_lost_lead(
 
     headers = await manager_headers(auth_client)
 
-    # До восстановления менеджер видит карточку (она проиграна — общая), но
-    # изменить/забрать себе может только явным действием restore.
+    # До восстановления менеджер карточку видит (проигранная — общая), но
+    # изменить или забрать её себе может только явным действием restore.
     seen = await auth_client.get(f"/api/v1/crm/leads/{lead_id}", headers=headers)
     assert seen.status_code == 200
     assert seen.json()["loss_reason_name"] == "Перестал возить"
@@ -722,7 +722,8 @@ async def test_admin_pager_does_not_leak_into_another_managers_board(
     stage_id = seeded["stage_new"].id  # type: ignore[attr-defined]
     admin_lead_id = seeded["lead"].id  # type: ignore[attr-defined]
 
-    # Второй лид на доске админа — чтобы было куда листать внутри своей доски.
+    # Второй лид на доске администратора — чтобы было куда листать внутри
+    # своей доски.
     second_admin_lead = (
         await auth_client.post(
             "/api/v1/crm/leads",
@@ -730,7 +731,8 @@ async def test_admin_pager_does_not_leak_into_another_managers_board(
         )
     ).json()
 
-    # Лид менеджера на отдельной доске — не должен попасть в диапазон листания админа.
+    # Лид менеджера живёт на отдельной доске и не должен попасть в диапазон
+    # листания администратора.
     manager_id = seeded["manager"].id  # type: ignore[attr-defined]
     manager_stage = await create_manager_stage(session, manager_id)
     manager_lead = (
@@ -748,8 +750,9 @@ async def test_admin_pager_does_not_leak_into_another_managers_board(
     pager = (await auth_client.get(f"/api/v1/crm/leads/{admin_lead_id}/pager")).json()
     assert pager["total"] == 2  # только два лида админа, лид менеджера не считается
     assert manager_lead["id"] not in (pager["prev_id"], pager["next_id"])
-    # Оба лида админа в одном этапе; открытый — старше по номеру, поэтому он
-    # первый, а сосед — второй лид админа, а не лид менеджера.
+    # Оба лида администратора в одном этапе; открытый старше по номеру,
+    # поэтому он первый, а соседом идёт второй лид администратора, а не
+    # лид менеджера.
     assert pager["position"] == 1
     assert pager["prev_id"] is None
     assert pager["next_id"] == second_admin_lead["id"]
@@ -764,8 +767,8 @@ async def test_pager_follows_board_reading_order(auth_client: AsyncClient, seede
     stage_new = seeded["stage_new"].id  # type: ignore[attr-defined]
     stage_talks = seeded["stage_talks"].id  # type: ignore[attr-defined]
 
-    # Лид в «Переговорах» создаём РАНЬШЕ лида в «Новом»: по доске он всё равно
-    # дальше — колонка «Новый» стоит первой.
+    # Лид в «Переговорах» создаём раньше лида в «Новом»: в порядке чтения
+    # доски он всё равно дальше — колонка «Новый» стоит первой.
     in_talks = (
         await auth_client.post(
             "/api/v1/crm/leads",
@@ -779,12 +782,13 @@ async def test_pager_follows_board_reading_order(auth_client: AsyncClient, seede
         )
     ).json()
 
-    # Все три лида на доске админа; порядок чтения: сид-лид (Новый),
-    # «Поздний» (Новый), «Ранний» (Переговоры).
+    # Все три лида — на доске администратора; порядок чтения: сид-лид
+    # (Новый), «Поздний» (Новый), «Ранний» (Переговоры).
     first_id = seeded["lead"].id  # type: ignore[attr-defined]
 
-    # Проверяем каждый: позиция и соседи обязаны следовать порядку доски,
-    # а не времени создания (у «Раннего» номер меньше, чем у «Позднего»).
+    # Проверяем каждого: позиция и соседи обязаны следовать порядку
+    # доски, а не времени создания (у «Раннего» номер меньше, чем у
+    # «Позднего»).
     seeded_pager = (await auth_client.get(f"/api/v1/crm/leads/{first_id}/pager")).json()
     assert seeded_pager == {
         "position": 1,
@@ -865,7 +869,7 @@ async def test_manager_cannot_delete_lead_permanently(
     assert response.status_code == 403
     assert response.json()["code"] == "permission_denied"
 
-    # Лид остался на месте.
+    # Лид после отказа остался на своём месте.
     assert (
         await auth_client.get(f"/api/v1/crm/leads/{own_lead['id']}", headers=headers)
     ).status_code == 200
@@ -877,7 +881,7 @@ async def test_admin_deletes_lead_with_everything_attached(
     """Удаление администратором стирает заявку, ленту и файлы — и с диска тоже."""
     lead_id = seeded["lead"].id  # type: ignore[attr-defined]
 
-    # Заявка с вложением.
+    # Заявка с собственным вложением.
     shipment = (await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})).json()
     shipment_file = await auth_client.post(
         f"/api/v1/shipments/{shipment['id']}/attachments",
@@ -885,7 +889,7 @@ async def test_admin_deletes_lead_with_everything_attached(
     )
     assert shipment_file.status_code == 201, shipment_file.text
 
-    # Вложение самого лида и запись в ленте.
+    # Вложение самого лида и запись о нём в ленте.
     lead_file = await auth_client.post(
         f"/api/v1/crm/leads/{lead_id}/attachments",
         files={"file": ("Договор.pdf", b"%PDF-1.4 fake", "application/pdf")},
@@ -903,14 +907,14 @@ async def test_admin_deletes_lead_with_everything_attached(
     deleted = await auth_client.delete(f"/api/v1/crm/leads/{lead_id}/permanent")
     assert deleted.status_code == 204
 
-    # Лид пропал целиком — его не видно даже среди архивных.
+    # Лид пропал целиком: его не видно даже среди архивных (проигранных).
     assert (await auth_client.get(f"/api/v1/crm/leads/{lead_id}")).status_code == 404
     assert (await auth_client.get("/api/v1/crm/leads")).json()["count"] == 0
     archived = await auth_client.get("/api/v1/crm/leads", params={"is_archived": True})
     assert archived.json()["count"] == 0
     assert (await auth_client.get(f"/api/v1/shipments/{shipment['id']}")).status_code == 404
 
-    # Файлы стёрты с диска, а не просто помечены в базе.
+    # Файлы стёрты с диска, а не просто помечены удалёнными в базе.
     for p in files_on_disk:
         assert not p.exists()
 

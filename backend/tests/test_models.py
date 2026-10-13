@@ -23,8 +23,8 @@ async def test_user_leads_relation_is_not_eager_loaded(session: AsyncSession, se
     """
     admin = seeded["admin"]  # type: ignore[index]
 
-    # Свежая загрузка без identity-map "подсказок" — так же, как это делает
-    # get_current_user на каждый запрос.
+    # Свежая загрузка без «подсказок» identity map — так же, как это делает
+    # get_current_user на каждый запрос с токеном.
     fresh = (await session.execute(select(User).where(User.id == admin.id))).scalar_one()
 
     with pytest.raises(InvalidRequestError):

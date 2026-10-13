@@ -29,7 +29,8 @@ async def test_login_returns_access_token_and_sets_cookie(
     assert body["token_type"] == "bearer"
     assert body["access_token"]
     assert body["expires_in"] > 0
-    # Обновляющий токен в ответе не отдаём — иначе смысл куки теряется.
+    # Обновляющий токен в теле ответа не отдаём: иначе смысл HttpOnly-куки
+    # теряется.
     assert "refresh_token" not in body
 
     cookie = response.headers["set-cookie"]
@@ -82,7 +83,7 @@ async def test_logout_clears_cookie(client: AsyncClient, seeded: dict[str, objec
         json={"email": "admin@crmdetroid.ru", "password": TEST_PASSWORD},
     )
     assert (await client.post("/api/v1/auth/logout")).status_code == 204
-    # После выхода продлить сессию нечем.
+    # После выхода продлить сессию нечем: кука отозвана на сервере.
     assert (await client.post("/api/v1/auth/refresh")).status_code == 401
 
 
@@ -103,7 +104,7 @@ async def test_stolen_refresh_token_is_useless_after_logout(
 
     assert (await client.post("/api/v1/auth/logout")).status_code == 204
 
-    # «Злоумышленник» возвращает украденную куку на место.
+    # «Злоумышленник» подставляет ранее украденную куку.
     client.cookies.set("crm_refresh", stolen)
     response = await client.post("/api/v1/auth/refresh")
     assert response.status_code == 401
@@ -122,7 +123,8 @@ async def test_access_token_is_not_accepted_as_refresh(
         json={"email": "admin@crmdetroid.ru", "password": TEST_PASSWORD},
     )
     access = login.json()["access_token"]
-    # Подсовываем короткий токен в куку — он не должен приниматься как долгий.
+    # Короткий токен доступа подсовываем в куку: приниматься как долгий
+    # (обновляющий) он не должен.
     client.cookies.set("crm_refresh", access)
     response = await client.post("/api/v1/auth/refresh")
     assert response.status_code == 401
@@ -156,8 +158,8 @@ async def test_refresh_rotates_and_old_token_stops_working(
     first = await client.post("/api/v1/auth/refresh")
     assert first.status_code == 200
 
-    # Повторное использование отозванной куки нельзя допускать даже короткое
-    # время: перехваченная cookie иначе выпустит независимую новую сессию.
+    # Повторное использование отозванной куки недопустимо даже на короткое
+    # время: перехваченная кука иначе выпустит независимую новую сессию.
     client.cookies.set("crm_refresh", old_cookie)
     replay = await client.post("/api/v1/auth/refresh")
 

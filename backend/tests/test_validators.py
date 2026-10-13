@@ -29,5 +29,6 @@ def test_wrong_length_is_rejected() -> None:
 
 
 def test_non_digit_characters_are_stripped_before_validation() -> None:
-    # Тот же ИНН, но с пробелами и дефисами — валидатор чистит ввод сам.
+    # Тот же ИНН, но записанный с пробелами и дефисами: валидатор
+    # очищает ввод сам.
     assert validate_inn("77-07 08 38 93") == "7707083893"

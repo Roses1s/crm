@@ -17,23 +17,26 @@ import shutil
 import tempfile
 from collections.abc import AsyncGenerator
 
-# Куда указывать тестовую базу. По умолчанию — SQLite в памяти.
-# В CI на шаге «тесты на PostgreSQL» сюда приходит DSN сервиса postgres.
+# Куда указывает тестовая база. Значение по умолчанию — SQLite в памяти:
+# на шаге CI «тесты на PostgreSQL» сюда приходит DSN сервиса postgres.
 TEST_DATABASE_URL = os.environ.get("TEST_DATABASE_URL", "sqlite+aiosqlite:///:memory:")
 _IS_SQLITE = TEST_DATABASE_URL.startswith("sqlite")
 
-# Переменные окружения выставляются ДО импорта приложения.
-# Вложения в тестах пишутся во временный каталог, который чистится после прогона.
+# Переменные окружения выставляем до импорта приложения: настройки
+# читаются один раз при импорте, позже их не переопределить.
+# Вложения тесты пишут во временный каталог, который удаляется после
+# прогона: настоящие файлы проекта тесты не трогают.
 _ATTACHMENTS_TMP = tempfile.mkdtemp(prefix="crm-test-attachments-")
 
-# Обычные тесты быстрые и не подключают Valkey/Celery: кеш заменён памятью,
+# Обычный набор быстрый и не подключает Valkey/Celery: кеш заменён памятью,
 # ограничитель выключен. Реальные сервисы проверяет отдельный набор
 # integration_tests, который CI запускает на PostgreSQL и Valkey.
 os.environ.update(
     DATABASE_URL=TEST_DATABASE_URL,
     ATTACHMENTS_DIR=_ATTACHMENTS_TMP,
     MAX_UPLOAD_MB="1",
-    # HS256 использует тестовый ключ длиной не меньше рекомендованных 32 байт.
+    # Для HS256 используем тестовый ключ не короче рекомендованных 32 байт:
+    # короткий ключ отклонила бы сама библиотека.
     SECRET_KEY="test-secret-key-for-crm-jwt-tests-only-32-bytes",
     RATE_LIMIT_ENABLED="false",
     LOG_JSON="false",
@@ -82,20 +85,23 @@ async def _cache() -> AsyncGenerator[None, None]:
 @pytest.fixture
 async def engine() -> AsyncGenerator:
     if _IS_SQLITE:
-        # StaticPool + одно соединение: иначе каждая сессия получит свою пустую БД.
+        # StaticPool и одно соединение: иначе каждая сессия получит свою
+        # собственную пустую базу в памяти.
         test_engine = create_async_engine(
             TEST_DATABASE_URL,
             connect_args={"check_same_thread": False},
             poolclass=StaticPool,
         )
     else:
-        # На настоящей базе (PostgreSQL) соединения не переиспользуем между
-        # тестами, чтобы не тащить состояние: NullPool закрывает их сразу.
+        # На настоящей базе (PostgreSQL) соединения между тестами не
+        # переиспользуем, чтобы не тащить состояние: NullPool закрывает
+        # соединение сразу после возврата.
         test_engine = create_async_engine(TEST_DATABASE_URL, poolclass=NullPool)
 
     async with test_engine.begin() as conn:
-        # На постоянной базе таблицы могли остаться от прошлого теста —
-        # начинаем с чистого листа. Для SQLite в памяти это безвредный no-op.
+        # На постоянной базе таблицы могут остаться от прошлого теста —
+        # начинаем с чистого листа. Для SQLite в памяти это безвредный
+        # пустой проход.
         await conn.run_sync(Base.metadata.drop_all)
         await conn.run_sync(Base.metadata.create_all)
     yield test_engine
@@ -150,7 +156,8 @@ async def seeded(session: AsyncSession) -> dict[str, object]:
     session.add_all([admin, manager])
     await session.flush()
 
-    # Этапы принадлежат доске админа — как после перехода на личные воронки.
+    # Этапы относятся к доске администратора — как в боевой системе после
+    # перехода на личные воронки.
     new_stage = Stage(name="Новый", sequence=1, color="slate", owner_id=admin.id)
     talks_stage = Stage(name="Переговоры", sequence=2, color="blue", owner_id=admin.id)
     tag = Tag(name="Крупный клиент", color="#1e8449")

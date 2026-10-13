@@ -49,7 +49,7 @@ async def test_first_visit_creates_default_board(
     assert response.status_code == 200
     assert [s["name"] for s in response.json()] == DEFAULT_NAMES
 
-    # Повторный заход не должен плодить дубликаты.
+    # Повторный заход на доску не должен плодить дубликаты этапов.
     again = await client.get("/api/v1/crm/stages", headers=headers)
     assert [s["name"] for s in again.json()] == DEFAULT_NAMES
 
@@ -135,7 +135,7 @@ async def test_admin_opens_board_of_employee(
     assert board.status_code == 200
     assert [s["name"] for s in board.json()] == DEFAULT_NAMES
 
-    # Своя доска админа остаётся прежней.
+    # Собственная доска администратора остаётся прежней.
     own = await auth_client.get("/api/v1/crm/stages")
     assert "Переговоры" in [s["name"] for s in own.json()]
 
@@ -244,7 +244,8 @@ async def test_delete_stage_moves_leads_to_fallback(
     card = await auth_client.get(f"/api/v1/crm/leads/{lead.id}")  # type: ignore[attr-defined]
     assert card.json()["stage_id"] == stage_to.id  # type: ignore[attr-defined]
 
-    # Перенос виден в ленте карточки: смена колонки не происходит молча (Б-18).
+    # Перенос виден в ленте карточки: смена колонки не происходит молча
+    # (Б-18).
     timeline = await auth_client.get(f"/api/v1/crm/leads/{lead.id}/timeline")  # type: ignore[attr-defined]
     moved = [
         entry

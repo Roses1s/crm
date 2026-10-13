@@ -80,7 +80,7 @@ async def test_foreign_shipment_is_invisible(
         await client.get(f"/api/v1/shipments/{shipment_id}", headers=headers)
     ).status_code == 404
 
-    # И завести заявку по чужому лиду тоже нельзя.
+    # И создать заявку по чужому лиду тоже нельзя.
     denied = await client.post("/api/v1/shipments", json={"lead_id": lead_id}, headers=headers)
     assert denied.status_code == 404
 
@@ -117,21 +117,23 @@ async def test_pager_counts_only_own_leads(
     pager = await client.get(f"/api/v1/crm/leads/{lead_id}/pager", headers=headers)
     assert pager.status_code == 200
     body = pager.json()
-    # У менеджера ровно один свой лид, лид админа сюда попадать не должен.
+    # У менеджера ровно один свой лид; лид администратора сюда попадать
+    # не должен.
     assert body["total"] == 1
     assert body["position"] == 1
     assert body["prev_id"] is None
     assert body["next_id"] is None
 
-    # Чужую карточку через переключатель тоже не посмотреть.
+    # Чужую карточку не открыть и через переключатель «N / M».
     foreign_id = seeded["lead"].id  # type: ignore[attr-defined]
     denied = await client.get(f"/api/v1/crm/leads/{foreign_id}/pager", headers=headers)
     assert denied.status_code == 404
 
-    # Админ видит карточку менеджера, но листалка не смешивает две доски:
-    # у лида админа своя доска из одной карточки, сосед менеджера сюда не
-    # попадает (иначе стрелками «вперёд/назад» можно было бы случайно
-    # перескочить на чужую доску — баг, который правили 01.10.2026).
+    # Администратор видит карточку менеджера, но переключатель не
+    # смешивает две доски: у лида администратора своя доска из одной
+    # карточки, и сосед менеджера сюда не попадает. Иначе стрелками
+    # «вперёд/назад» можно было бы случайно перескочить на чужую доску —
+    # дефект, исправленный 01.10.2026.
     admin_pager = await auth_client.get(f"/api/v1/crm/leads/{foreign_id}/pager")
     assert admin_pager.json()["total"] == 1
 
@@ -157,16 +159,17 @@ async def test_lead_transfer_moves_card_to_colleague_board(
     )
     assert transfer.status_code == 204
 
-    # У бывшего владельца карточки больше нет.
+    # У бывшего владельца карточки после передачи больше нет.
     assert (await client.get(f"/api/v1/crm/leads/{lead_id}", headers=headers)).status_code == 404
 
     moved = (await auth_client.get(f"/api/v1/crm/leads/{lead_id}")).json()
     assert moved["assigned_to_id"] == admin_id
     admin_stages = (await auth_client.get("/api/v1/crm/stages")).json()
-    # Этап подобран по названию на доске получателя.
+    # Этап подобран по названию на доске получателя: id этапов у досок
+    # разные, совпадает только название колонки.
     assert moved["stage_id"] in [s["id"] for s in admin_stages]
 
-    # Передача видна в ленте.
+    # Передача видна в ленте карточки.
     timeline = (await auth_client.get(f"/api/v1/crm/leads/{lead_id}/timeline")).json()
     assert any(entry["field_label"] == "Продавец" for entry in timeline)
 
