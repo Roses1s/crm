@@ -6,7 +6,7 @@ import type { Customer } from "@/shared/types";
 import { StarRating } from "@/features/crm/board/StarRating";
 import { TagChip } from "@/shared/ui/tag-chip";
 
-/** Две буквы названия компании — для цветного квадрата вместо логотипа. */
+/** Две буквы названия компании для цветного квадрата вместо логотипа. */
 function companyInitials(name: string): string {
   const cleaned = name.replace(/[«»"']/g, "").trim();
   return cleaned.slice(0, 2).toUpperCase() || "—";
@@ -15,8 +15,8 @@ function companyInitials(name: string): string {
 /**
  * Плитка клиента — аналог карточки контакта в Odoo Contacts.
  *
- * Открыт (`can_open`) — свой лид или проигранный (чужой проигранный лид
- * может забрать себе любой сотрудник). Иначе плитка показывает только
+ * Открыта (`can_open`) — свой лид или проигранный: чужой проигранный лид
+ * может забрать себе любой сотрудник. Иначе плитка показывает только
  * название, ИНН и продавца, кликнуть на неё нельзя — курсор и цвет это
  * подсказывают.
  */

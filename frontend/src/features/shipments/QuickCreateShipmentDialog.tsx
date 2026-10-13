@@ -16,7 +16,7 @@ const labelCls = "mb-1 block text-[12px] font-medium text-odoo-text";
  * пять обязательных полей вместо полного бланка. Лид уже известен (карточка,
  * с которой открыли диалог), продавец заявке не нужен — он виден через лид.
  * Адреса, контакты, груз, машину и прочее дозаполняют на самой заявке после
- * создания, как и в QuickCreateLeadDialog для лида.
+ * создания, как и в QuickCreateLeadDialog.
  */
 export function QuickCreateShipmentDialog({
   leadId,
@@ -26,14 +26,14 @@ export function QuickCreateShipmentDialog({
   onClose: () => void;
 }) {
   const navigate = useNavigate();
-  // id=undefined → хук всегда шлёт POST /shipments, не PATCH.
+  // id=undefined: хук всегда шлёт POST /shipments, а не PATCH.
   const createShipment = useSaveShipment(undefined);
 
   const [loadingCities, setLoadingCities] = useState<string[]>([]);
   const [unloadingCities, setUnloadingCities] = useState<string[]>([]);
   const [loadingDate, setLoadingDate] = useState("");
   const [unloadingDate, setUnloadingDate] = useState("");
-  // Перевозчика просто вписывают текстом — любого, без справочника.
+  // Перевозчика вписывают текстом — любого, без справочника.
   const [carrierName, setCarrierName] = useState("");
   const [carrierInn, setCarrierInn] = useState("");
   const [carrierContact, setCarrierContact] = useState("");

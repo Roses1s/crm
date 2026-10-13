@@ -1,5 +1,5 @@
-// Форма карточки лида отделена от разметки: здесь видно, какие поля есть,
-// как выглядит пустая карточка и что считается изменением.
+// Состояние формы карточки лида отделено от разметки: здесь видно, какие
+// поля есть, как выглядит пустая карточка и что считается изменением.
 import type { Lead } from "@/shared/types";
 import type { LeadPayload } from "@/shared/api/hooks";
 
@@ -31,7 +31,8 @@ export function toForm(lead: Lead): FormState {
   };
 }
 
-/** Сравниваем состояния по нормализованному виду: порядок тегов не важен. */
+/** Состояния сравниваем по нормализованному виду: порядок тегов
+ *  значения не имеет. */
 export function normalized(state: FormState): string {
   return JSON.stringify({
     ...state,
@@ -39,7 +40,7 @@ export function normalized(state: FormState): string {
   });
 }
 
-/** Пустые строки превращаем в null — бэкенд ждёт именно так. */
+/** Пустые строки превращаем в null: бэкенд ждёт именно такой вид. */
 export function toPayload(state: FormState): LeadPayload {
   return {
     name: state.name.trim(),

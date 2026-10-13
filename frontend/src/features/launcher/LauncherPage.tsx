@@ -11,7 +11,7 @@ const ICONS: Record<string, typeof LayoutGrid> = {
   LayoutGrid,
 };
 
-/** Экран «Приложения». Список приходит из API и зависит от роли. */
+/** Экран «Приложения»: список приходит из API и зависит от роли. */
 export function LauncherPage() {
   const { data: apps = [] } = useLauncherApps();
 

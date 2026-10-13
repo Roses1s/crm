@@ -65,8 +65,8 @@ export function LeadCardBody({
 }
 
 /**
- * Карточка на доске. Перетаскивание включено через dnd-kit: карточку можно
- * тянуть в другую колонку, этап сохраняется на сервере (см. KanbanPage).
+ * Карточка на доске. Перетаскивание работает через dnd-kit: карточку
+ * можно тянуть в другую колонку, этап сохраняется на сервере (KanbanPage).
  */
 export function LeadCard({ lead, isOverlay }: { lead: Lead; isOverlay?: boolean }) {
   const [menuOpen, setMenuOpen] = useState(false);
@@ -74,8 +74,8 @@ export function LeadCard({ lead, isOverlay }: { lead: Lead; isOverlay?: boolean 
   const { attributes, listeners, setNodeRef, transform, transition, isDragging } = useSortable({
     id: `lead-${lead.id}`,
     disabled: isOverlay,
-    // Плавное расступание соседей: без своей длительности dnd-kit иногда
-    // отдаёт нулевой transition, и карточки переставляются рывком.
+    // Плавное расступание соседей: без собственной длительности dnd-kit
+    // иногда отдаёт нулевой transition, и карточки переставляются рывком.
     transition: { duration: 220, easing: "cubic-bezier(0.2, 0, 0, 1)" },
   });
   const style = isOverlay
@@ -83,7 +83,8 @@ export function LeadCard({ lead, isOverlay }: { lead: Lead; isOverlay?: boolean 
     : {
         transform: CSS.Translate.toString(transform),
         transition,
-        // Подсказка браузеру: слой готовится заранее, движение не дёргается.
+        // Подсказка браузеру: слой готовится заранее, и движение не
+        // дёргается.
         willChange: transform ? "transform" : undefined,
       };
 

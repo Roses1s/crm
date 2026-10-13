@@ -47,8 +47,8 @@ import {
 } from "@/shared/api/hooks";
 import type { Lead } from "@/shared/types";
 
-// Приземление карточки: чуть дольше и с «доводкой» в конце — так глаз успевает
-// проследить путь от курсора до места в колонке.
+// Приземление карточки: чуть дольше обычного и с «доводкой» в конце —
+// так глаз успевает проследить путь от курсора до места в колонке.
 const dropAnimation: DropAnimation = {
   duration: 260,
   easing: "cubic-bezier(0.2, 0, 0, 1)",
@@ -60,16 +60,18 @@ const dropAnimation: DropAnimation = {
 /**
  * Канбан лидов.
  *
- * Панель фильтров убрана: доска у каждого своя, нужную карточку ищут поиском.
+ * Панели фильтров нет: доска у каждого своя, нужную карточку ищут поиском.
  * В адресной строке живут поисковый запрос, режим просмотра и номер чужой
  * доски (`board`) — такую ссылку можно переслать коллеге. Перетаскивание
- * карточки меняет этап на сервере, после ответа доски перечитывают свои страницы.
+ * карточки меняет этап на сервере, после ответа колонки перечитывают свои
+ * страницы.
  */
 export function KanbanPage() {
   const [params, setParams] = useSearchParams();
 
   const search = params.get("search") ?? "";
-  // Админ может открыть доску сотрудника: номер лежит в адресе (?board=N).
+  // Администратор может открыть доску сотрудника: номер лежит в адресе
+  // (?board=N).
   const boardParam = params.get("board");
   const view = params.get("view") === "list" ? "list" : "kanban";
 
@@ -82,7 +84,7 @@ export function KanbanPage() {
   const [activeLead, setActiveLead] = useState<Lead | null>(null);
   const [newStage, setNewStage] = useState(false);
   // Кнопка «Новый»: вместо перехода на полную карточку — простая форма
-  // с четырьмя обязательными полями (см. QuickCreateLeadDialog).
+  // с четырьмя обязательными полями (QuickCreateLeadDialog).
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
   const [stageName, setStageName] = useState("");
   const boardFilterKey = JSON.stringify([search, boardUserId]);
@@ -106,7 +108,8 @@ export function KanbanPage() {
     [boardFilterKey],
   );
 
-  // Поиск уходит на сервер с задержкой — иначе запрос на каждую букву.
+  // Поиск уходит на сервер с задержкой: иначе запрос улетал бы на каждую
+  // букву.
   useEffect(() => {
     const timer = setTimeout(() => {
       setParams(
@@ -122,8 +125,8 @@ export function KanbanPage() {
     return () => clearTimeout(timer);
   }, [searchInput, setParams]);
 
-  // Фильтров в интерфейсе больше нет: доска у каждого своя, а нужную карточку
-  // ищут поиском. Из параметров остаётся чужая доска для администратора.
+  // Фильтров в интерфейсе нет: доска у каждого своя, нужную карточку ищут
+  // поиском. Из параметров адреса остаётся чужая доска для администратора.
   const { data: stages = [] } = useStages(boardUserId);
   const listQuery = useInfiniteLeads(
     { search, assigned: boardUserId },
@@ -149,9 +152,9 @@ export function KanbanPage() {
   }
 
   /**
-   * Сначала смотрим, под каким элементом курсор, и только если он не попал
-   * никуда — ищем ближайший. Один closestCorners промахивался: у соседней
-   * колонки угол мог оказаться ближе, чем у той, куда целится пользователь.
+   * Сначала определяем элемент прямо под курсором и только при промахе
+   * ищем ближайший. Один closestCorners промахивался: угол соседней
+   * колонки мог оказаться ближе, чем колонка, в которую целится человек.
    */
   function collisionDetection(args: Parameters<typeof closestCorners>[0]) {
     const stageIsDragged = isStageDragId(args.active.id);
@@ -168,13 +171,14 @@ export function KanbanPage() {
     useSensor(TouchSensor, {
       activationConstraint: { delay: 150, tolerance: 5 },
     }),
-    // Клавиатурный сенсор: доской можно управлять без мыши. Пробел/Enter —
-    // поднять карточку или этап, стрелки — выбрать место, ещё раз пробел/Enter —
-    // отпустить, Escape — отменить.
+    // Клавиатурный сенсор: доской можно управлять без мыши. Пробел/Enter
+    // поднимает карточку или этап, стрелки выбирают место, повторный
+    // Пробел/Enter отпускает, Escape отменяет.
     useSensor(KeyboardSensor, { coordinateGetter: sortableKeyboardCoordinates }),
   );
 
-  // Описание элемента для голосовых объявлений скринридера.
+  // Описание перетаскиваемого элемента для голосовых объявлений
+  // скринридера.
   function describeDragItem(id: UniqueIdentifier): string {
     if (isStageDragId(id)) {
       const stageId = Number(String(id).replace("stage-", ""));
@@ -186,7 +190,8 @@ export function KanbanPage() {
     return lead ? `лид «${lead.name}»` : "лид";
   }
 
-  // Объявления для скринридера на русском — что происходит при перетаскивании.
+  // Русские объявления скринридеру о том, что происходит при
+  // перетаскивании.
   const announcements: Announcements = {
     onDragStart: ({ active }) =>
       `Поднят ${describeDragItem(active.id)}. Стрелками выберите новое место.`,
@@ -264,7 +269,7 @@ export function KanbanPage() {
               excludeUserId={boardUserId}
               onPick={(userId) => {
                 // Строку поиска очищаем: на чужой доске отбор по фамилии
-                // сотрудника не нужен.
+                // сотрудника больше не нужен.
                 setSearchInput("");
                 setFilter("board", String(userId));
               }}
@@ -308,7 +313,7 @@ export function KanbanPage() {
             accessibility={{ announcements, screenReaderInstructions }}
             collisionDetection={collisionDetection}
             // Колонки переизмеряются постоянно: при прокрутке доски старые
-            // координаты давали «залипание» подсветки и промахи.
+            // координаты давали «залипание» подсветки и промахи курсора.
             measuring={{ droppable: { strategy: MeasuringStrategy.Always } }}
             onDragStart={onDragStart}
             onDragCancel={() => setActiveLead(null)}

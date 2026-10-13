@@ -13,7 +13,7 @@ import { TokenField } from "../TokenField";
 import { SInput } from "./fields";
 import { selectStateCls } from "./helpers";
 
-// Варианты транспорта нужны только этому блоку — переехали вместе с ним.
+// Варианты транспорта нужны только этому блоку и переехали вместе с ним.
 const TRANSPORT_OPTIONS: { value: string; label: string }[] = [
   { value: "ft_20", label: "Фура 20т" },
   { value: "ft_40", label: "Фура 40т" },

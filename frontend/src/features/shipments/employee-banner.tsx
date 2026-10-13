@@ -3,8 +3,9 @@ import { X } from "lucide-react";
 import { useUsers } from "@/shared/api/hooks";
 
 /**
- * Плашка «заявки сотрудника» — как плашка чужой доски у лидов. Без неё легко
- * забыть, что в списке отфильтрованы заявки одного человека, а не все.
+ * Плашка «заявки сотрудника» — как плашка чужой доски у лидов. Без неё
+ * легко забыть, что в списке отфильтрованы заявки одного человека, а
+ * не все.
  */
 export function EmployeeBanner({ userId, onLeave }: { userId: number; onLeave: () => void }) {
   const { data: users = [] } = useUsers();

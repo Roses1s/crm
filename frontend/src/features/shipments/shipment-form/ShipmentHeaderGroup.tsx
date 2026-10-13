@@ -19,7 +19,7 @@ import { Field, InnerGroup } from "@/shared/ui/odoo-form";
 import { selectStateCls } from "./helpers";
 import { SInput } from "./fields";
 
-// Наша компания — статичная шапка бланка.
+// Наша компания — статичная шапка бланка, не поле ввода.
 const OWN_COMPANY = 'ООО "Детроид"';
 
 type LeadOption = { id: number; name: string; inn: string };

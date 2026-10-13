@@ -2,7 +2,8 @@ import { X } from "lucide-react";
 
 import { useUsers } from "@/shared/api/hooks";
 
-/** Плашка «вы на чужой доске» — иначе легко забыть, чьи карточки смотришь. */
+/** Плашка «вы на чужой доске»: без неё легко забыть, чьи карточки
+ *  сейчас открыты. */
 export function BoardBanner({
   boardUserId,
   onLeave,

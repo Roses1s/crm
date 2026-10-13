@@ -9,13 +9,13 @@ import { CustomerTile } from "@/features/customers/CustomerTile";
  * «Клиенты» — аналог Odoo Contacts: абсолютно все лиды компании плиткой.
  *
  * Шапка повторяет страницу «Лиды» (тот же ControlPanel с поиском), но без
- * кнопки «Новый» и переключателя вид/канбан — здесь только просмотр, лиды
- * создаются в модуле CRM. Свой лид и любой проигранный открываются полностью,
- * чужой активный показан усечённо и не кликается — см. CustomerTile.
+ * кнопки «Новый» и переключателя вида — здесь только просмотр, лиды
+ * создаются в модуле CRM. Свой лид и любой проигранный открываются
+ * полностью, чужой активный показан усечённо и не кликается (CustomerTile).
  */
 /** Что показывать на странице: всё вперемешку, только активных или только
  * проигранных. Значение живёт в адресе (?view=…), чтобы ссылкой можно было
- * поделиться; посторонние значения считаем «все». */
+ * поделиться; посторонние значения считаем значением «все». */
 type CustomersView = "all" | "active" | "lost";
 
 export function CustomersPage() {
@@ -25,7 +25,8 @@ export function CustomersPage() {
 
   const rawView = params.get("view");
   const view: CustomersView = rawView === "active" || rawView === "lost" ? rawView : "all";
-  // «все» намеренно не посылаем: без параметра бэкенд отдаёт всё вперемешку.
+  // Значение «все» намеренно не посылаем: без параметра бэкенд отдаёт
+  // всё вперемешку.
   const archived = view === "all" ? null : view === "lost";
 
   function setView(next: CustomersView) {
@@ -64,8 +65,8 @@ export function CustomersPage() {
   } = useCustomers(search, archived);
   const customers = customersPage?.items ?? [];
 
-  // Переключатель состояния — тот же слот и стиль, что фильтр статусов на
-  // «Заявках», чтобы не заводить новый способ делать фильтр.
+  // Переключатель состояния занимает тот же слот и стиль, что фильтр
+  // статусов на «Заявках»: новый способ делать фильтр не заводим.
   const viewFilter = (
     <select
       className="h-8 rounded-[3px] border border-odoo-border bg-odoo-surface-sunken px-2 text-[13px] text-odoo-text-muted outline-none transition-colors hover:border-odoo-border focus:border-odoo-focus/40"

@@ -9,7 +9,7 @@ import { useLogin } from "@/shared/api/hooks";
 /**
  * Экран входа.
  *
- * Оформлен отдельно от рабочей плотной сетки CRM, но использует те же
+ * Оформлен отдельно от плотной рабочей сетки CRM, но использует те же
  * семантические роли цвета, поэтому контраст сохраняется в обеих темах.
  */
 export function LoginPage() {
@@ -82,8 +82,8 @@ export function LoginPage() {
               <span className={labelCls}>Пароль</span>
               <div className="relative">
                 <input
-                  // Тип меняется кнопкой «глаз»: на телефоне пароль набирают
-                  // вслепую и часто ошибаются.
+                  // Тип поля меняется кнопкой «глаз»: на телефоне пароль
+                  // набирают вслепую и часто ошибаются.
                   type={showPassword ? "text" : "password"}
                   required
                   autoComplete="current-password"

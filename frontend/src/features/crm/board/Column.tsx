@@ -14,7 +14,7 @@ import { STAGE_COLORS, stageColor } from "./stage-colors";
 /**
  * Колонка канбана: приёмник для перетаскивания карточек и меню управления
  * этапом (переименовать, цвет, удалить). Заголовок служит ручкой для
- * горизонтального перетаскивания этапа.
+ * горизонтального перетаскивания самого этапа.
  */
 export function Column({
   stage,
@@ -65,7 +65,8 @@ export function Column({
   const [editing, setEditing] = useState(false);
   const [name, setName] = useState(stage.name);
   const [menu, setMenu] = useState(false);
-  // Диалог удаления: у непустого этапа спрашиваем, куда переложить карточки.
+  // Диалог удаления: у непустого этапа спрашиваем, куда переложить
+  // карточки.
   const [confirmDelete, setConfirmDelete] = useState(false);
   const [moveTo, setMoveTo] = useState<number | null>(null);
   const color = stageColor(stage.color);
@@ -96,9 +97,9 @@ export function Column({
   }
 
   return (
-    // Зона приёма — вся колонка целиком, вместе с шапкой: раньше ref стоял
-    // только на списке карточек, и бросок в заголовок или в пустоту под ним
-    // проходил мимо — карточка возвращалась на место.
+    // Зона приёма — вся колонка целиком, вместе с шапкой: раньше ref
+    // стоял только на списке карточек, и бросок в заголовок или в пустоту
+    // под ним проходил мимо — карточка возвращалась на место.
     <div
       ref={setNodeRef}
       data-testid={`kanban-column-${stage.id}`}

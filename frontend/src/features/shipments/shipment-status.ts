@@ -1,7 +1,7 @@
 import { format } from "date-fns";
 
 /** Статусы заявки по-русски — используется в списке заявок и на вкладке
- *  заявок у лида, чтобы не дублировать перевод в двух местах. */
+ *  заявок у лида, чтобы перевод не дублировался в двух местах. */
 export const SHIPMENT_STATUS: Record<string, { label: string; cls: string }> = {
   new: { label: "Новая", cls: "bg-odoo-tag-yellow-bg text-odoo-tag-yellow-text" },
   checked: {

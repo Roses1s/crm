@@ -7,7 +7,7 @@ import { ownerInitials, ownerLabel } from "@/shared/lib/owner";
 import type { Lead } from "@/shared/types";
 import { StarRating } from "../board/StarRating";
 
-const LIST_COLUMNS = 8; // чекбокс + 7 колонок данных
+const LIST_COLUMNS = 8; // чекбокс выбора плюс 7 колонок данных
 const ROWS_PER_PAGE = LEAD_PAGE_SIZE;
 
 type SortKey =

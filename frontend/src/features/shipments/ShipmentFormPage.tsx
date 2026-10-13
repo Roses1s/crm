@@ -48,8 +48,9 @@ import { ShipmentHeaderGroup } from "./shipment-form/ShipmentHeaderGroup";
 import { UnloadingGroup } from "./shipment-form/UnloadingGroup";
 import { STextarea } from "./shipment-form/fields";
 
-// Этапы заявки — единая воронка (Новая → … → Машина выгрузилась). Статусбар
-// работает по числовым id, поэтому держим и id (позиция), и значение статуса.
+// Этапы заявки образуют единую воронку (Новая → … → Машина выгрузилась).
+// Статусбар обращается к этапам по числовым id, поэтому рядом со значением
+// статуса храним и id (позицию в воронке).
 const STAGES = [
   { id: 0, value: "new", name: "Новая" },
   { id: 1, value: "checked", name: "Проверена и подписана заявка" },
@@ -60,9 +61,9 @@ const STAGES = [
 const emptyForm = {
   number: "",
   lead_id: 0,
-  // Дата создания — по умолчанию «сейчас» (проставляется эффектом при
-  // открытии формы новой заявки, см. ниже), но её можно поправить задним
-  // числом прямо при заведении (см. toDatetimeLocal/fromDatetimeLocal).
+  // Дата создания по умолчанию — текущий момент (проставляет эффект при
+  // открытии формы новой заявки, ниже), но при заведении её разрешено
+  // поправить задним числом (toDatetimeLocal/fromDatetimeLocal).
   created_at: "",
   address_loading: "",
   address_unloading: "",
@@ -75,13 +76,13 @@ const emptyForm = {
   cargo_volume: "",
   comment: "",
 
-  // Позиция заказа.
+  // Позиция заказа: единственная строка «ТЭО» бланка.
   customer_price: "",
   customer_tax: "vat_22",
   carrier_price: "",
   carrier_tax: "vat_22",
 
-  // Заказчик (шапка).
+  // Заказчик: шапка бланка.
   customer_contact: "",
 
   // Погрузка.
@@ -96,7 +97,7 @@ const emptyForm = {
   unloading_date_to: "",
   unloading_time_from: "",
 
-  // Перевозчик — свободный текст прямо в заявке, без справочника.
+  // Перевозчик: свободный текст прямо в заявке, без справочника.
   carrier_name: "",
   carrier_inn: "",
   carrier_contact: "",
@@ -116,8 +117,9 @@ const emptyForm = {
   body_type: [] as string[],
   loading_method: [] as string[],
 
-  // Поле тегов убрано из карточки 03.10.2026, но значения продолжают ездить
-  // на сервер и обратно: так уже проставленные теги не стираются сохранением.
+  // Поле тегов убрано из карточки 03.10.2026, но значения продолжают
+  // ездить на сервер и обратно: уже проставленные теги не должны
+  // стираться обычным сохранением формы.
   tag_ids: [] as number[],
 };
 
@@ -125,13 +127,15 @@ type FormState = typeof emptyForm;
 
 export function ShipmentFormPage() {
   const { id } = useParams();
-  // key по id: переход между заявками пересоздаёт форму.
+  // Ключ по id: переход между заявками полностью пересоздаёт форму,
+  // чтобы состояние одной карточки не переехало в другую.
   return <ShipmentForm key={id ?? "new"} id={id} />;
 }
 
 function ShipmentForm({ id }: { id?: string }) {
   const isNew = !id || id === "new";
-  // Как и в карточке лида: номер есть в адресе, вложения не ждут ответа по заявке.
+  // Как и в карточке лида: номер известен из адреса сразу, поэтому
+  // вложения не ждут отдельного ответа по самой заявке.
   const savedId = isNew ? undefined : id;
   const navigate = useNavigate();
   const toast = useToast();
@@ -139,7 +143,8 @@ function ShipmentForm({ id }: { id?: string }) {
   const [leadSearch, setLeadSearch] = useState("");
 
   const { data: currentUser } = useMe();
-  // Ставка вычета маржи — с сервера, единственная копия в бэкенде (Т-08).
+  // Ставку вычета маржи берём с сервера: единственная копия живёт в
+  // бэкенде (Т-08), фронтенд свою не держит.
   const { data: meta } = useMeta();
   const { data: shipment, isLoading } = useShipment(id);
   const { data: leadsPage } = useLeads(isNew ? { search: leadSearch } : {});
@@ -155,8 +160,9 @@ function ShipmentForm({ id }: { id?: string }) {
   const uploadAttachment = useUploadShipmentAttachment(savedId);
   const deleteAttachment = useDeleteShipmentAttachment(savedId);
 
-  // Лениво: emptyForm — общий модуль, "сейчас" должно считаться в момент
-  // открытия именно этой формы, а не один раз при загрузке приложения.
+  // Начальное состояние считаем лениво: emptyForm — общий модуль, и
+  // «сейчас» должно вычисляться в момент открытия именно этой формы, а
+  // не один раз при загрузке приложения.
   const [form, setForm] = useState<FormState>(() => ({
     ...emptyForm,
     created_at: toDatetimeLocal(new Date().toISOString()),
@@ -170,7 +176,8 @@ function ShipmentForm({ id }: { id?: string }) {
   const [tab, setTab] = useState("lines");
   const loadedId = useRef<number | null>(null);
 
-  // Заявка из карточки лида приходит со ссылкой /shipments/new?lead=42.
+  // Заявка, созданная из карточки лида, приходит по ссылке вида
+  // /shipments/new?lead=42: лид уже выбран и подставляется в форму.
   useEffect(() => {
     const leadParam = searchParams.get("lead");
     if (isNew && leadParam) {
@@ -180,8 +187,8 @@ function ShipmentForm({ id }: { id?: string }) {
     }
   }, [isNew, searchParams]);
 
-  // Загруженную карточку кладём в форму один раз, чтобы фоновое обновление
-  // не затирало несохранённые правки.
+  // Загруженную карточку кладём в форму один раз: фоновое обновление
+  // данных не должно затирать несохранённые правки пользователя.
   useEffect(() => {
     if (shipment && loadedId.current !== shipment.id) {
       loadedId.current = shipment.id;
@@ -244,9 +251,9 @@ function ShipmentForm({ id }: { id?: string }) {
 
   const dirty = JSON.stringify(form) !== JSON.stringify(pristine);
   const saving = save.isPending;
-  // Автосохранение выключается после неудачной попытки и включается снова,
-  // когда человек что-то поправил. Без этого неудачный запрос повторялся
-  // каждые 3 секунды, пока открыта вкладка.
+  // После неудачной попытки автосохранение выключается и включается
+  // снова только от новой правки руками. Иначе неудачный запрос
+  // повторялся бы каждые 3 секунды, пока открыта вкладка.
   const autoSaveBlocked = useRef(false);
   const bypassNextNavigation = useRef(false);
   const proceedAfterSave = useRef(false);
@@ -271,7 +278,8 @@ function ShipmentForm({ id }: { id?: string }) {
     current.proceed();
   }, []);
 
-  // Если сохранение завершилось во время перехода, продолжаем только один раз.
+  // Если сохранение завершилось уже во время перехода со страницы,
+  // продолжаем сценарий перехода только один раз, а не повторно.
   useEffect(() => {
     if (blocker.state === "unblocked") {
       transitionProceeded.current = false;
@@ -317,7 +325,7 @@ function ShipmentForm({ id }: { id?: string }) {
 
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     // Правка руками снимает запрет автосохранения: прошлая попытка могла
-    // упасть именно из-за того, что сейчас исправляют.
+    // упасть именно из-за значения, которое сейчас исправляют.
     autoSaveBlocked.current = false;
     setForm((f) => ({ ...f, [key]: value }));
   }
@@ -334,10 +342,10 @@ function ShipmentForm({ id }: { id?: string }) {
       setError("Выберите лид, по которому создаётся заявка");
       return;
     }
-    // У новой заявки номер ещё не присвоен (поле пустое до создания — сервер
-    // сам подставит id). У уже существующей — это единственный видимый
-    // идентификатор, стирать его в пустоту нельзя (не на чем будет
-    // восстановиться само собой).
+    // У новой заявки номера ещё нет (поле пустое до создания, сервер сам
+    // подставит id). У существующей номер — единственный видимый
+    // идентификатор: стирать его в пустоту нельзя, восстановиться ему
+    // будет не из чего.
     if (!isNew && !form.number.trim()) {
       setError("Номер заявки не может быть пустым");
       return;
@@ -345,9 +353,9 @@ function ShipmentForm({ id }: { id?: string }) {
     const payload: ShipmentPayload = {
       ...form,
       number: form.number.trim(),
-      // Поле всегда заполнено (по умолчанию — «сейчас»), но на случай, если
-      // человек всё-таки очистил его руками, не шлём пустую строку: сервер
-      // не примет null/"" в NOT NULL колонку — просто не меняем дату.
+      // Поле по умолчанию заполнено («сейчас»), но если человек всё-таки
+      // очистил его руками, пустую строку не шлём: сервер не примет
+      // null/"" в колонку NOT NULL — дату в этом случае просто не меняем.
       created_at: form.created_at ? fromDatetimeLocal(form.created_at) : undefined,
       cargo_weight: form.cargo_weight || null,
       cargo_volume: form.cargo_volume || null,
@@ -387,10 +395,10 @@ function ShipmentForm({ id }: { id?: string }) {
     setForm(pristine);
   }
 
-  // Автосохранение: через 3с без правок сохраняем сами, кнопка в хедере
-  // остаётся — для спокойствия и чтобы сохранить можно было сразу, не ждя.
-  // Новую (ещё не созданную) заявку не трогаем — её создаёт только сам
-  // пользователь явным сохранением.
+  // Автосохранение: через 3 секунды без правок сохраняем сами. Кнопка в
+  // шапке остаётся — для спокойствия и ради сохранения сразу, не
+  // дожидаясь таймера. Ещё не созданную заявку автосохранение не трогает:
+  // её создаёт только пользователь явным сохранением.
   useEffect(() => {
     if (isNew || !dirty || saving || autoSaveBlocked.current) return;
     const timer = setTimeout(() => submit(), 3000);
@@ -398,7 +406,8 @@ function ShipmentForm({ id }: { id?: string }) {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [isNew, dirty, saving, form]);
 
-  // Смена этапа у сохранённой заявки уходит на сервер сразу — как в Odoo.
+  // Смена этапа у сохранённой заявки уходит на сервер сразу, без кнопки
+  // сохранения, — как в Odoo.
   function selectStage(stageIndex: number) {
     const stage = STAGES[stageIndex];
     if (!stage || isNew) return;

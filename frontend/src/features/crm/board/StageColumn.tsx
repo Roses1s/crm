@@ -4,7 +4,8 @@ import { useStageLeads } from "@/shared/api/hooks";
 import type { Lead, Stage } from "@/shared/types";
 import { Column } from "./Column";
 
-/** Загружает страницы одного этапа и оставляет Column простым компонентом. */
+/** Загружает страницы одного этапа и оставляет Column простым
+ *  компонентом без запросов. */
 export function StageColumn({
   stage,
   search,

@@ -67,7 +67,8 @@ import { useToast } from "@/shared/ui/toast-context";
 
 export function LeadFormPage() {
   const { id } = useParams();
-  // key по id: переход «предыдущий / следующий лид» пересоздаёт форму.
+  // Ключ по id: переход «предыдущий / следующий лид» пересоздаёт форму,
+  // чтобы правки одной карточки не переехали в соседнюю.
   return <LeadForm key={id ?? "new"} id={id} />;
 }
 
@@ -75,8 +76,9 @@ function LeadForm({ id }: { id?: string }) {
   const isNew = id === "new" || !id;
   const navigate = useNavigate();
   const toast = useToast();
-  // Номер лида известен сразу из адреса, поэтому заявки и вложения уходят
-  // на сервер вместе с самим лидом, а не вторым заходом после его ответа.
+  // Номер лида известен сразу из адреса, поэтому заявки и вложения
+  // запрашиваем параллельно с самим лидом, а не вторым заходом после его
+  // ответа.
   const savedId = isNew ? undefined : id;
 
   const { data: currentUser } = useMe();
@@ -106,33 +108,37 @@ function LeadForm({ id }: { id?: string }) {
   const [tab, setTab] = useState("shipments");
   const [actionsOpen, setActionsOpen] = useState(false);
   const [preview, setPreview] = useState<Attachment | null>(null);
-  // Передача лида коллеге: страница помнит только, открыто ли окно —
-  // запрос и текст ошибки живут в действии.
+  // Передача лида коллеге: страница хранит только признак открытого окна,
+  // а запрос и текст ошибки живут в самом действии (TransferLeadAction).
   const [transferOpen, setTransferOpen] = useState(false);
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteError, setDeleteError] = useState("");
-  // Отметить проигрышем: окно с выбором причины; запрос и ошибка живут в действии.
+  // Отметка проигрышем: окно с выбором причины; запрос и ошибка живут в
+  // самом действии (LoseLeadAction).
   const [loseOpen, setLoseOpen] = useState(false);
   const [restoreError, setRestoreError] = useState("");
-  // Кнопка «Новый» в шапке карточки — та же простая форма, что и на доске.
+  // Кнопка «Новый» в шапке карточки открывает ту же простую форму, что
+  // и на доске: второй реализации быстрого создания не держим.
   const [quickCreateOpen, setQuickCreateOpen] = useState(false);
-  // Кнопка «Создать заявку» — простая форма вместо полного бланка заявки.
+  // Кнопка «Создать заявку» открывает простую форму вместо полного
+  // бланка заявки: полную карточку дозаполнят позже.
   const [shipmentCreateOpen, setShipmentCreateOpen] = useState(false);
   const loadedId = useRef<number | null>(null);
-  // Автосохранение выключается после неудачной попытки и включается снова,
-  // когда человек что-то поправил. Без этого форма оставалась «грязной», и
-  // неудачный запрос повторялся каждые 3 секунды, пока открыта вкладка.
+  // После неудачной попытки автосохранение выключается и включается
+  // снова только от новой правки руками. Иначе форма оставалась
+  // «грязной», и неудачный запрос повторялся каждые 3 секунды, пока
+  // открыта вкладка.
   const autoSaveBlocked = useRef(false);
   const bypassNextNavigation = useRef(false);
   const proceedAfterSave = useRef(false);
 
-  // Предупреждение о дубле ИНН — некритичное, не блокирует сохранение;
-  // проверяется и при создании, и при редактировании (свой же лид исключён
-  // через exclude_id, иначе лид бы постоянно «находил дубль самого себя»).
+  // Предупреждение о дубле ИНН не блокирует сохранение. Проверяем и при
+  // создании, и при редактировании; собственный лид исключён через
+  // exclude_id — иначе карточка «находила бы дубль самой себя».
   const { data: sameInn = [] } = useCustomersByInn(form.inn.trim(), lead?.id);
 
   // Загруженную карточку кладём в форму один раз: фоновое обновление
-  // не должно затирать несохранённые правки.
+  // данных не должно затирать несохранённые правки пользователя.
   useEffect(() => {
     if (lead && loadedId.current !== lead.id) {
       loadedId.current = lead.id;
@@ -144,7 +150,7 @@ function LeadForm({ id }: { id?: string }) {
     }
   }, [lead]);
 
-  // У новой карточки этап по умолчанию — первый в воронке.
+  // У новой карточки этап по умолчанию — первый в воронке владельца.
   useEffect(() => {
     if (isNew && stages.length && !form.stage_id) {
       setForm((f) => ({ ...f, stage_id: stages[0].id }));
@@ -180,7 +186,8 @@ function LeadForm({ id }: { id?: string }) {
     current.proceed();
   }, []);
 
-  // Если сохранение завершилось во время перехода, продолжаем только один раз.
+  // Если сохранение завершилось уже во время перехода со страницы,
+  // продолжаем сценарий перехода только один раз, а не повторно.
   useEffect(() => {
     if (blocker.state === "unblocked") {
       transitionProceeded.current = false;
@@ -217,7 +224,8 @@ function LeadForm({ id }: { id?: string }) {
     if (!saving) save({ manual: true });
   }
 
-  // Предупреждение браузера при уходе со страницы с несохранёнными правками.
+  // Уход со страницы с несохранёнными правками предупреждаем стандартным
+  // диалогом браузера (beforeunload).
   useEffect(() => {
     if (!dirty || lead?.is_archived) return;
     const handler = (event: BeforeUnloadEvent) => event.preventDefault();
@@ -228,7 +236,7 @@ function LeadForm({ id }: { id?: string }) {
   function set<K extends keyof FormState>(key: K, value: FormState[K]) {
     if (lead?.is_archived || leadConflict) return;
     // Правка руками снимает запрет автосохранения: прошлая попытка могла
-    // упасть именно из-за того, что сейчас исправляют.
+    // упасть именно из-за значения, которое сейчас исправляют.
     autoSaveBlocked.current = false;
     setForm((f) => ({ ...f, [key]: value }));
   }
@@ -309,10 +317,10 @@ function LeadForm({ id }: { id?: string }) {
     setForm(pristine);
   }
 
-  // Автосохранение: через 3с без правок сохраняем сами, кнопка в хедере
-  // остаётся — для спокойствия и чтобы сохранить можно было сразу, не ждя.
-  // Новую (ещё не созданную) карточку не трогаем — её создаёт только сам
-  // пользователь явным сохранением.
+  // Автосохранение: через 3 секунды без правок сохраняем сами. Кнопка в
+  // шапке остаётся — для спокойствия и ради сохранения сразу, не
+  // дожидаясь таймера. Ещё не созданную карточку автосохранение не
+  // трогает: её создаёт только пользователь явным сохранением.
   useEffect(() => {
     if (isNew || !dirty || saving || autoSaveBlocked.current || lead?.is_archived) return;
     const timer = setTimeout(() => save(), 3000);
@@ -337,7 +345,8 @@ function LeadForm({ id }: { id?: string }) {
     });
   }
 
-  // Смена этапа у сохранённой карточки уходит на сервер сразу — как в Odoo.
+  // Смена этапа у сохранённой карточки уходит на сервер сразу, без
+  // кнопки сохранения, — как в Odoo.
   function selectStage(stageId: number) {
     if (lead?.is_archived || leadConflict || updateLead.isPending || stageId === form.stage_id)
       return;
@@ -367,7 +376,8 @@ function LeadForm({ id }: { id?: string }) {
   const owner = lead ? ownerLabel(lead) : "";
   const ownerAvatar = lead ? ownerInitials(lead) : "—";
   const isOwner = !!lead && !!currentUser && lead.assigned_to_id === currentUser.id;
-  // Любой проигранный лид остаётся только для чтения — до явного восстановления.
+  // Проигранный лид — только для чтения, пока его явно не восстановят:
+  // правки и вложения в этом состоянии запрещены.
   const readOnly = !!lead?.is_archived || leadConflict;
   const composerInitial = (currentUser?.first_name || currentUser?.email || "Я")
     .slice(0, 1)
@@ -391,8 +401,8 @@ function LeadForm({ id }: { id?: string }) {
       posting={addNote.isPending || uploadAttachment.isPending}
       uploading={uploadAttachment.isPending}
       onSubmit={(body, files) => {
-        // Сначала создаём запись, затем цепляем к ней файлы —
-        // так вложения попадают именно в эту строку ленты.
+        // Сначала создаём запись ленты, затем цепляем к ней файлы: так
+        // вложения попадают именно в эту строку, а не в соседнюю.
         if (!body && files.length === 0) return;
         addNote.mutate(body || "Вложение", {
           onSuccess: (entry) => {
@@ -447,17 +457,17 @@ function LeadForm({ id }: { id?: string }) {
       />
 
       {/*
-        Пара «форма + лента» занимает всю доступную ширину. Предел в пикселях
-        давал заметные поля по бокам при масштабе браузера меньше 100%.
-        Долевая ширина ленты живёт в FormWorkspace, чтобы не расходиться между
-        карточками и не превращаться в фиксированные пиксели.
+        Пара «форма + лента» занимает всю доступную ширину. Предел в
+        пикселях давал заметные поля по бокам при масштабе браузера
+        меньше 100%. Долевая ширина ленты живёт в FormWorkspace, чтобы
+        карточки лида и заявки выглядели одинаково.
       */}
       <FormWorkspace aside={chatter}>
         <main className="min-w-0 flex-1 lg:overflow-y-auto">
           {/*
-            Кнопки действий и лента этапов вынесены на отдельную панель НАД
-            листом карточки — как в Odoo 17, где статусбар и кнопки живут в
-            панели управления, а не на самом листе.
+            Кнопки действий и лента этапов вынесены на отдельную панель
+            над листом карточки — как в Odoo 17, где статусбар и кнопки
+            живут в панели управления, а не на самом листе.
           */}
           <LeadStageBar
             stages={stages}
@@ -553,9 +563,10 @@ function LeadForm({ id }: { id?: string }) {
                           </Field>
                           <Field label="Приоритет">
                             {/*
-                            Тот же виджет звёзд, что на канбане: при наведении
-                            подсвечивает звёзды до курсора, при уходе возвращает
-                            сохранённый приоритет, по клику сохраняет значение.
+                            Тот же виджет звёзд, что и на канбане: при
+                            наведении подсвечивает звёзды до курсора, при
+                            уходе возвращает сохранённый приоритет, по
+                            клику сохраняет значение.
                           */}
                             <span className="inline-flex items-center pt-[2px]">
                               <StarRating
@@ -607,8 +618,9 @@ function LeadForm({ id }: { id?: string }) {
           onCancel={() => setTransferOpen(false)}
           onTransferred={() => {
             setTransferOpen(false);
-            // Карточка больше не наша — возвращаемся на доску. Предупреждение
-            // о несохранённых правках не обходим: это прежний путь передачи.
+            // Карточка больше не наша — возвращаемся на доску.
+            // Предупреждение о несохранённых правках не обходим: это
+            // прежний путь передачи лида.
             navigate("/crm");
           }}
         />

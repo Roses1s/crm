@@ -8,7 +8,7 @@ import { EmployeeBanner } from "./employee-banner";
 import { formatShipmentDate, SHIPMENT_STATUS } from "./shipment-status";
 import { formatMoney } from "./money";
 
-/** Инициалы продавца для аватарки (до двух букв). */
+/** Инициалы продавца для круглой аватарки (не более двух букв). */
 function initials(name: string | null | undefined): string {
   if (!name) return "—";
   const parts = name.trim().split(/\s+/).filter(Boolean);
@@ -16,7 +16,8 @@ function initials(name: string | null | undefined): string {
   return (parts[0][0] + (parts[1]?.[0] ?? "")).toUpperCase();
 }
 
-/** Список заявок. Фильтр по статусу и поиск — в адресной строке и в запросе к API. */
+/** Список заявок. Фильтр по статусу и поиск живут в адресной строке и
+ *  уходят в запрос к API. */
 export function ShipmentsPage() {
   const navigate = useNavigate();
   const [params, setParams] = useSearchParams();
@@ -25,9 +26,9 @@ export function ShipmentsPage() {
   const [searchInput, setSearchInput] = useState(search);
   const { data: me } = useMe();
   const isAdmin = me?.role === "admin";
-  // Админ может оставить в списке заявки одного сотрудника: его номер живёт
-  // в адресе (?employee=N), ссылку можно переслать. Менеджеру отбор не
-  // показываем — сервер на такой запрос всё равно ответит 403.
+  // Администратор может оставить в списке заявки одного сотрудника: его
+  // номер живёт в адресе (?employee=N), ссылку можно переслать. Менеджеру
+  // отбор не показываем — сервер на такой запрос всё равно ответит 403.
   const employeeParam = Number(params.get("employee"));
   const employeeId =
     isAdmin && Number.isInteger(employeeParam) && employeeParam > 0 ? employeeParam : null;
@@ -41,10 +42,11 @@ export function ShipmentsPage() {
   const shipments = shipmentsPage?.items ?? [];
   const totals = shipmentsPage?.totals;
 
-  // Поиск дебаунсим на 300мс и пишем в адресную строку с replace — как на
-  // «Лидах» и «Клиентах» (KanbanPage/CustomersPage): иначе запрос к API
-  // улетал бы на каждое нажатие клавиши, а история браузера забивалась бы
-  // записью на каждый символ, ломая кнопку «Назад».
+  // Поиск отправляем с задержкой 300 мс и пишем в адресную строку через
+  // replace — как на «Лидах» и «Клиентах» (KanbanPage/CustomersPage):
+  // иначе запрос к API улетал бы на каждое нажатие клавиши, а история
+  // браузера забивалась бы записью на каждый символ и ломала кнопку
+  // «Назад».
   useEffect(() => {
     const timer = setTimeout(() => {
       setParams(
@@ -61,7 +63,7 @@ export function ShipmentsPage() {
     // eslint-disable-next-line react-hooks/exhaustive-deps
   }, [searchInput]);
 
-  /** Меняет один параметр адреса, не трогая остальные. */
+  /** Меняет один параметр адреса, не трогая остальные параметры. */
   function setFilter(key: string, value: string) {
     const next = new URLSearchParams(params);
     if (value) next.set(key, value);
@@ -101,8 +103,8 @@ export function ShipmentsPage() {
               excludeUserId={employeeId}
               actionLabel="показать заявки"
               onPick={(userId) => {
-                // Строку поиска очищаем: фамилия была нужна только чтобы
-                // выбрать сотрудника из подсказок.
+                // Строку поиска очищаем: фамилия была нужна только для
+                // выбора сотрудника из подсказок.
                 setSearchInput("");
                 setFilter("employee", String(userId));
               }}

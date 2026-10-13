@@ -23,15 +23,16 @@ export function LoseLeadAction({
   leadName: string;
   /** «Отмена» или Escape: просто закрыть окно. */
   onCancel: () => void;
-  /** Лид отмечен проигранным: страница закрывает окно и уводит на доску. */
+  /** Лид отмечен проигранным: страница закрывает окно и уводит на
+   *  доску. */
   onLosed: () => void;
 }) {
   const loseLead = useLoseLead();
   const [error, setError] = useState("");
 
   function confirm(reasonId: number) {
-    // Прошлый текст стираем сразу при новой попытке — иначе он висел бы,
-    // пока идёт запрос, и путал бы с ответом на него.
+    // Прошлый текст ошибки стираем сразу при новой попытке: иначе он
+    // висел бы, пока идёт запрос, и путался с ответом на него.
     setError("");
     loseLead.mutate(
       { id: leadId, reasonId },

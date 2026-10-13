@@ -4,7 +4,8 @@ import type { Stage } from "@/shared/types";
 
 const STAGE_DRAG_PREFIX = "column-";
 
-/** Идентификатор этапа в DnD не пересекается с приёмником карточек `stage-*`. */
+/** Идентификатор этапа в DnD не пересекается с приёмником карточек
+ *  `stage-*`. */
 export function stageDragId(stageId: number): string {
   return `${STAGE_DRAG_PREFIX}${stageId}`;
 }
@@ -13,7 +14,8 @@ export function isStageDragId(id: string | number): boolean {
   return String(id).startsWith(STAGE_DRAG_PREFIX);
 }
 
-/** Возвращает новый полный порядок или null, если перетаскивание не изменило его. */
+/** Возвращает новый полный порядок или null, если перетаскивание его
+ *  не изменило. */
 export function reorderedStageIds(
   stages: Stage[],
   activeId: string | number,

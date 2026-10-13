@@ -28,7 +28,7 @@ const emptyForm: FormState = {
 };
 
 /**
- * Модальное окно создания/редактирования пользователя — вызывается из
+ * Модальное окно создания и редактирования пользователя, вызывается из
  * `UsersPage`. Без `user` — создание (пароль обязателен), с `user` —
  * редактирование (пароль меняется, только если его вписали заново).
  */
@@ -55,7 +55,7 @@ export function UserFormDialog({ user, onClose }: { user?: User; onClose: () => 
     setForm((f) => ({ ...f, [key]: value }));
   }
 
-  // Частая ошибка: в поле имени вставляют адрес почты.
+  // Частая ошибка ввода: в поле имени вставляют адрес почты.
   const firstNameIsEmail = form.first_name.includes("@");
   const lastNameIsEmail = form.last_name.includes("@");
   const nameIsEmail = firstNameIsEmail || lastNameIsEmail;

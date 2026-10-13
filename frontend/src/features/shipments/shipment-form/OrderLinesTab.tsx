@@ -11,8 +11,8 @@ import { formatMoney } from "../money";
 import { SInput } from "./fields";
 import { netAmount, selectStateCls } from "./helpers";
 
-// Позиция заказа: одна фиксированная услуга, цена заказчика и перевозчика —
-// каждая со своей ставкой НДС.
+// Позиция заказа: одна фиксированная услуга; у цены заказчика и цены
+// перевозчика своя ставка НДС.
 const SERVICE_NAME = "Транспортно-экспедиционное обслуживание";
 
 const TAX_OPTIONS: { value: string; label: string }[] = [
@@ -26,7 +26,8 @@ type OrderLinesTabProps = {
   customerTax: string;
   carrierPrice: string;
   carrierTax: string;
-  /** Ставку вычета знает только сервер (GET /meta) — локальной копии нет (Т-08). */
+  /** Ставку вычета знает только сервер (GET /meta): локальной копии нет
+   *  (Т-08). */
   deductionRate: number | null;
   onCustomerPriceChange: (value: string) => void;
   onCustomerTaxChange: (value: string) => void;
@@ -49,9 +50,9 @@ export function OrderLinesTab({
 }: OrderLinesTabProps) {
   const customerNet = netAmount(customerPrice, customerTax);
   const carrierNet = netAmount(carrierPrice, carrierTax);
-  // Из получившейся разницы дополнительно вычитаем долю доп. расходов —
-  // по требованию владельца бизнеса (не связанные с НДС). Пока константа
-  // не приехала с сервера, живой пересчёт не показываем.
+  // Из получившейся разницы дополнительно вычитаем долю дополнительных
+  // расходов — по требованию владельца бизнеса (с НДС не связаны). Пока
+  // константа не приехала с сервера, живой пересчёт не показываем.
   const margin =
     deductionRate != null && customerNet != null && carrierNet != null
       ? (customerNet - carrierNet) * (1 - deductionRate)
