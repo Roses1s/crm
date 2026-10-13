@@ -1,4 +1,4 @@
-/** Мутации лида должны обновлять все списки и карточки, где он отображается. */
+/** Мутации лида обновляют все списки и карточки, где он отображается. */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";

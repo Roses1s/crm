@@ -1,4 +1,5 @@
-/** Все быстрые изменения лида отправляют серверу версию карточки, которую видел пользователь. */
+/** Быстрые изменения лида отправляют серверу версию карточки, которую
+ *  видел пользователь. */
 import { QueryClient, QueryClientProvider } from "@tanstack/react-query";
 import { act, renderHook, waitFor } from "@testing-library/react";
 import type { ReactNode } from "react";
