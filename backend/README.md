@@ -73,7 +73,7 @@ pip-compile --generate-hashes --extra dev --output-file requirements-dev.lock py
 backend/
 ├── app/
 │   ├── main.py            create_app: middleware, обработчики ошибок, lifespan
-│   ├── cli.py             createsuperuser / seed
+│   ├── cli.py             createsuperuser / seed / resetboard (доска к стандартной)
 │   ├── core/
 │   │   ├── config.py      pydantic-settings: всё из переменных окружения
 │   │   ├── security.py    bcrypt + JWT (access / refresh)
@@ -94,7 +94,7 @@ backend/
 │   ├── services/          бизнес-логика, отделённая от HTTP: leads · shipments ·
 │   │                      attachments · customers · stages · tags · search
 │   └── worker/            Celery: приложение и задачи (бэкапы, уборка)
-├── alembic/               миграции: 26 шт., первая создаёт всю схему
+├── alembic/               миграции: 27 шт., первая создаёт всю схему
 ├── tests/                 pytest + httpx ASGITransport
 ├── requirements.lock      версии для production-образа (с хешами)
 ├── requirements-dev.lock  те же плюс инструменты разработки (для CI)
@@ -278,7 +278,7 @@ celery -A app.worker.celery_app.celery beat   -l info
 ```
 
 Первая миграция (`initial schema`) создаёт базовую схему, остальные двадцать
-пять меняют её по ходу работы. Сейчас в базе десять таблиц: `users`, `stages`,
+шесть меняют её по ходу работы. Сейчас в базе десять таблиц: `users`, `stages`,
 `tags`, `leads`, `loss_reasons`, `shipments`, `timeline_entries`,
 `attachments`, `login_attempts`, `revoked_tokens`.
 

@@ -65,13 +65,13 @@ backend/                    FastAPI
 ├── app/worker/             Celery: бэкапы базы и вложений, уборка файлов и отозванных токенов
 ├── app/cli.py              createsuperuser, seed, resetboard (сброс доски к стандартной)
 ├── alembic/                27 миграций
-└── tests/                  pytest; локально 198 прошло, 7 пропущено на SQLite
+└── tests/                  pytest: 214 тест-функций (гонки и интеграции — на PostgreSQL)
 
 frontend/                   React 19
 ├── src/app/                router, providers, layout (AppShell, Navbar, ControlPanel)
-├── src/features/           auth · launcher · crm (board, list, lead-form) · shipments · customers · accounting · admin
+├── src/features/           auth · launcher · crm (board, list, lead-form) · shipments (shipment-form) · customers · accounting · admin
 ├── src/shared/             API-клиент, Zod-схемы, хуки по разделам с общим barrel-файлом, QueryClient, UI и общие типы
-└── src/test/               окружение Vitest и поддельный сервер; 118 frontend-тестов
+└── src/test/               окружение Vitest и поддельный сервер; 423 теста в 58 файлах (прогон 13.10.2026)
 
 deploy/                     инфраструктура сервера
 ├── nginx/conf.d/           боевые конфиги сайта
@@ -138,11 +138,15 @@ Zod-схемами. У страницы клиентов появился отд
 разделён по областям, а прежний путь `shared/api/hooks.ts` оставлен как общий
 вход.
 
-**Production на 11.10.2026:** версия `2d6684d` (исправления ревью 11.10:
-немедленный отзыв refresh-токена, readiness healthcheck, повтор продления для
-нескольких вкладок), схема БД — `c5e93b9d1995`. После выкладки все 7
-контейнеров запущены, сайт отвечает. Предрелизный дамп —
-`/var/backups/crm/crm-pre-deploy-20261011-210306-2d6684d.dump`. В томе
+**Production на 13.10.2026:** версия `1524fab` (выкладка 13.10.2026 в 13:12,
+27 с: рефакторинг карточки лида и формы заявки по компонентам, тесты защиты
+маршрутов и страницы входа; бэкенд и схема БД не менялись), схема БД —
+`c5e93b9d1995`. После выкладки все 7 контейнеров запущены, сайт отвечает.
+Предрелизный дамп —
+`/var/backups/crm/crm-pre-deploy-20261013-131205-1524fab.dump`.
+Предыдущий релиз — `2d6684d` от 11.10.2026 (исправления ревью: немедленный
+отзыв refresh-токена, readiness healthcheck, повтор продления для нескольких
+вкладок). В томе
 `crm_backups`, смонтированном в контейнерах как `/var/backups/crm`, лежат
 ежедневные дампы и предрелизные дампы выкладок. Celery Beat и worker работают;
 исполнение расписания подтверждено файлами в томе (ежедневные дампы с 30.09 и
