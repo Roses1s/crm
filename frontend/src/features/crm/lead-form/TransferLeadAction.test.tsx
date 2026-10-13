@@ -2,11 +2,10 @@
  * Действие «Передать лид»: сам запрос, текст ошибки и сообщения странице.
  *
  * Тесты написаны ДО переноса кода (порядок согласован с владельцем 12.10.2026):
- * файла `TransferLeadAction.tsx` пока нет, поэтому ниже стоит временная обвязка
- * `TransferActionHarness` — побайтово то же подключение, которое сегодня живёт в
- * `LeadFormPage.tsx`: хук `useTransferLead`, состояние `transferError` и колбэки
- * `mutate(...)`. В коммите переноса обвязка удаляется, а проверки начинают
- * обращаться к настоящему действию — сами сценарии не меняются.
+ * сначала поведение закрепляла временная обвязка, повторявшая подключение
+ * страницы, и только потом появился сам `TransferLeadAction.tsx`. Обвязка
+ * удалена — проверки ниже обращаются к настоящему действию, а сами сценарии при
+ * переносе не менялись.
  *
  * Что уже покрыто в других файлах и здесь намеренно НЕ дублируется:
  * — разметка окна (загрузка, пустой список, восемь строк, поиск, «Назад»,
@@ -22,11 +21,10 @@
  */
 import { fireEvent, screen, waitFor } from "@testing-library/react";
 import userEvent from "@testing-library/user-event";
-import { useState } from "react";
+import type { ComponentProps } from "react";
 import { afterEach, describe, expect, it, vi } from "vitest";
 
-import { TransferDialog } from "./TransferDialog";
-import { useTransferLead } from "@/shared/api/hooks";
+import { TransferLeadAction } from "./TransferLeadAction";
 import { clearTokens, setAccessToken } from "@/shared/api/auth";
 import { startFakeApi, type FakeServer } from "@/test/fake-api";
 import { renderWithProviders } from "@/test/utils";
@@ -47,47 +45,8 @@ const COLLEAGUES = [KUZNETSOV, SOKOLOVA];
 
 const TRANSFER_PATH = "/crm/leads/10/transfer";
 
-interface ActionProps {
-  leadId: number;
-  leadName: string;
-  leadIsLost: boolean;
-  onCancel: () => void;
-  onTransferred: () => void;
-}
-
-/**
- * Временная обвязка вместо ещё не созданного `TransferLeadAction.tsx`.
- *
- * Повторяет текущее поведение страницы без изменений: при успехе действие
- * только сообщает странице (она закрывает окно и уходит на доску), при отказе
- * показывает сообщение сервера, а при пустом сообщении — общий текст.
- */
-function TransferActionHarness({
-  leadId,
-  leadName,
-  leadIsLost,
-  onCancel,
-  onTransferred,
-}: ActionProps) {
-  const transferLead = useTransferLead(leadId);
-  const [error, setError] = useState("");
-
-  return (
-    <TransferDialog
-      leadName={leadName}
-      leadIsLost={leadIsLost}
-      pending={transferLead.isPending}
-      error={error}
-      onCancel={onCancel}
-      onConfirm={(userId) =>
-        transferLead.mutate(userId, {
-          onSuccess: () => onTransferred(),
-          onError: (err: Error) => setError(err.message || "Не удалось передать лид"),
-        })
-      }
-    />
-  );
-}
+/** Пропсы действия — берутся из самого компонента, отдельной копии нет. */
+type ActionProps = ComponentProps<typeof TransferLeadAction>;
 
 let server: FakeServer | undefined;
 
@@ -100,7 +59,7 @@ afterEach(() => {
 function renderAction(overrides: Partial<ActionProps> = {}) {
   const handlers = { onCancel: vi.fn(), onTransferred: vi.fn() };
   const view = renderWithProviders(
-    <TransferActionHarness
+    <TransferLeadAction
       leadId={10}
       leadName="ООО Ромашка"
       leadIsLost={false}
@@ -165,6 +124,9 @@ describe("Действие «Передать лид»", () => {
     expect(screen.getByText(/ООО Ромашка/)).toBeVisible();
     expect(transferCalls()).toHaveLength(0);
     expect(handlers.onTransferred).not.toHaveBeenCalled();
+    // До ответа сервера своих сообщений у действия нет: общий текст не висит
+    // с самого открытия, а появляется только после отказа.
+    expect(screen.queryByText("Не удалось передать лид")).not.toBeInTheDocument();
 
     await user.click(confirmButton());
 
