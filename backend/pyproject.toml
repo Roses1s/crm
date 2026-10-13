@@ -2,7 +2,7 @@
 name = "crm-backend"
 version = "0.1.0"
 description = "CRM Detroid — FastAPI backend"
-# В продакшене образ собирается на Python 3.13 (см. Dockerfile).
+# На production образ собирается на Python 3.13 (см. Dockerfile).
 # Нижняя граница 3.11 оставлена, чтобы код запускался и на машинах разработчиков.
 requires-python = ">=3.11"
 
@@ -12,10 +12,10 @@ dependencies = [
     "gunicorn>=23.0",
     "sqlalchemy[asyncio]>=2.0.36",
     "asyncpg>=0.30",
-    # Синхронный драйвер для задач Celery (там нет цикла событий).
+    # Синхронный драйвер для задач Celery: там нет цикла событий.
     "psycopg[binary]>=3.2",
     "alembic>=1.14",
-    # Миниатюры в чаттере, формат WebP; Pillow использует сборки с поддержкой WebP.
+    # Миниатюры в чаттере, формат WebP: Pillow — сборки с поддержкой WebP.
     "pillow>=11.3",
     "pydantic[email]>=2.10",
     "pydantic-settings>=2.7",
@@ -26,14 +26,14 @@ dependencies = [
     "bcrypt>=4.0,<5",
     "python-multipart>=0.0.20",
     "celery[redis]>=5.5",
-    # redis-клиент (протокол Valkey совместим с Redis).
-    # Ставим без extra [redis] у fastapi-cache2: тот extra тянет redis<5.
+    # Клиент Redis (протокол Valkey с Redis совместим).
+    # Ставится без extra [redis] у fastapi-cache2: тот тянет redis<5.
     "redis>=5.2",
     "structlog>=24.4",
     "sentry-sdk[fastapi]>=2.19",
     "slowapi>=0.1.9",
     "fastapi-cache2>=0.2.2",
-    # fastapi-cache2 импортирует starlette.templating -> требует jinja2
+    # fastapi-cache2 импортирует starlette.templating, а тот требует jinja2.
     "jinja2>=3.1",
 ]
 
@@ -57,7 +57,7 @@ build-backend = "setuptools.build_meta"
 include = ["app*"]
 
 # ----------------------------------------------------------------------------
-#  Ruff — линтер и форматтер (заменяет flake8 + isort + black)
+#  Ruff: линтер и форматтер (заменяет flake8 + isort + black)
 # ----------------------------------------------------------------------------
 [tool.ruff]
 line-length = 100
@@ -84,12 +84,12 @@ ignore = [
 
 [tool.ruff.lint.per-file-ignores]
 "tests/*" = ["E501"]
-# В conftest переменные окружения выставляются ДО импорта приложения —
+# В conftest переменные окружения выставляются до импорта приложения:
 # иначе настройки успеют закешироваться с боевыми значениями.
 "tests/conftest.py" = ["E402", "E501"]
 
 # ----------------------------------------------------------------------------
-#  Mypy — статическая типизация
+#  Mypy: статическая типизация
 # ----------------------------------------------------------------------------
 [tool.mypy]
 python_version = "3.11"
