@@ -31,7 +31,6 @@ import {
   useStages,
   useTags,
   useUpdateLead,
-  useTransferLead,
   useUploadAttachment,
 } from "@/shared/api/hooks";
 import { ownerInitials, ownerLabel } from "@/shared/lib/owner";
@@ -47,7 +46,7 @@ import { QuickCreateLeadDialog } from "@/features/crm/lead-form/QuickCreateLeadD
 import { QuickCreateShipmentDialog } from "@/features/shipments/QuickCreateShipmentDialog";
 import { LostRibbon } from "@/features/crm/lead-form/LostRibbon";
 import { ShipmentsTab } from "@/features/crm/lead-form/ShipmentsTab";
-import { TransferDialog } from "@/features/crm/lead-form/TransferDialog";
+import { TransferLeadAction } from "@/features/crm/lead-form/TransferLeadAction";
 import { Chatter } from "@/shared/ui/chatter";
 import { FilePreview } from "@/shared/ui/file-preview";
 import { UnsavedChangesDialog } from "@/shared/ui/unsaved-changes-dialog";
@@ -97,7 +96,6 @@ function LeadForm({ id }: { id?: string }) {
   const editNote = useEditNote(id);
   const deleteTimelineEntry = useDeleteTimelineEntry(id);
   const uploadAttachment = useUploadAttachment(savedId);
-  const transferLead = useTransferLead(savedId);
   const deleteAttachment = useDeleteAttachment(savedId);
 
   const [form, setForm] = useState<FormState>(empty);
@@ -108,9 +106,9 @@ function LeadForm({ id }: { id?: string }) {
   const [tab, setTab] = useState("shipments");
   const [actionsOpen, setActionsOpen] = useState(false);
   const [preview, setPreview] = useState<Attachment | null>(null);
-  // Передача лида коллеге: диалог выбора и подтверждения.
+  // Передача лида коллеге: страница помнит только, открыто ли окно —
+  // запрос и текст ошибки живут в действии.
   const [transferOpen, setTransferOpen] = useState(false);
-  const [transferError, setTransferError] = useState("");
   const [deleteOpen, setDeleteOpen] = useState(false);
   const [deleteError, setDeleteError] = useState("");
   // Отметить проигрышем: окно с выбором причины; запрос и ошибка живут в действии.
@@ -533,10 +531,7 @@ function LeadForm({ id }: { id?: string }) {
                           lossReasonName={lead?.loss_reason_name ?? null}
                           onNameChange={(v) => set("name", v)}
                           onInnChange={(v) => set("inn", v)}
-                          onOpenTransfer={() => {
-                            setTransferError("");
-                            setTransferOpen(true);
-                          }}
+                          onOpenTransfer={() => setTransferOpen(true)}
                         />
 
                         <InnerGroup verticalAlign="center">
@@ -605,22 +600,17 @@ function LeadForm({ id }: { id?: string }) {
       </FormWorkspace>
 
       {transferOpen && lead && (
-        <TransferDialog
+        <TransferLeadAction
+          leadId={lead.id}
           leadName={lead.name}
           leadIsLost={lead.is_archived}
-          pending={transferLead.isPending}
-          error={transferError}
           onCancel={() => setTransferOpen(false)}
-          onConfirm={(userId) =>
-            transferLead.mutate(userId, {
-              onSuccess: () => {
-                setTransferOpen(false);
-                // Карточка больше не наша — возвращаемся на доску.
-                navigate("/crm");
-              },
-              onError: (err: Error) => setTransferError(err.message || "Не удалось передать лид"),
-            })
-          }
+          onTransferred={() => {
+            setTransferOpen(false);
+            // Карточка больше не наша — возвращаемся на доску. Предупреждение
+            // о несохранённых правках не обходим: это прежний путь передачи.
+            navigate("/crm");
+          }}
         />
       )}
 
