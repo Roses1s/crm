@@ -23,7 +23,8 @@ test("защищённый адрес после входа возвращает
   await fillCredentials(page);
 
   await expect(page).toHaveURL(/\/crm$/);
-  await expect(page.getByText("Тестовый клиент 001")).toBeVisible();
+  // На первой странице канбана 20 лидов; 001 загружается отдельной страницей.
+  await expect(page.getByText("Тестовый клиент 021")).toBeVisible();
 });
 
 test("лаунчер, вложенный маршрут /admin и неизвестный адрес", async ({ page }) => {

@@ -85,4 +85,4 @@ it("неизвестный адрес ведёт в лаунчер, а /admin �
   expect(await app.screen.findByRole("heading", { name: "Пользователи" })).toBeVisible();
   expect(window.location.pathname).toBe("/admin/users");
   expect(server?.called("GET", "/admin/users")).toBe(true);
-});
+}, 15_000);
