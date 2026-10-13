@@ -31,7 +31,7 @@ log = get_logger(__name__)
 LAST_ADMIN_LOCK_NAMESPACE = 4230
 
 
-# --- сотрудники ---------------------------------------------------------------
+# --- Сотрудники ---
 
 
 async def list_users(session: AsyncSession) -> list[User]:
@@ -57,8 +57,8 @@ async def update_user(session: AsyncSession, user_id: int, payload: UserUpdate) 
     if user is None:
         raise NotFoundError(f"Пользователь {user_id} не найден")
     data = payload.model_dump(exclude_unset=True)
-    # Снятие роли администратора или отключение учётной записи проверяем до
-    # изменения: последний администратор должен остаться.
+    # Снятие роли и отключение проверяем до внесения изменения: система не
+    # должна остаться без последнего действующего администратора.
     loses_admin = data.get("role") is not None and data["role"] != Role.admin
     gets_disabled = data.get("is_active") is False
     if loses_admin or gets_disabled:
@@ -117,9 +117,11 @@ async def transfer_leads(session: AsyncSession, *, from_user: User, to_user: Use
     if not leads:
         return 0
 
-    # У администратора может не быть доски, если он ни разу её не открывал.
-    # Не коммитим здесь: блокировка «последнего админа» должна удерживаться
-    # до переноса лидов и удаления сотрудника в конце этой же транзакции.
+    # Доски у администратора может не быть, если он её ни разу не открывал.
+    # Отдельный коммит здесь не делаем: блокировка «последнего
+    # администратора» обязана дожить до переноса лидов и удаления сотрудника
+    # в конце этой же транзакции, иначе параллельный запрос проскочит между
+    # проверкой и удалением.
     await ensure_default_stages(session, to_user.id, commit=False)
     target_stages = list(
         (
@@ -128,8 +130,9 @@ async def transfer_leads(session: AsyncSession, *, from_user: User, to_user: Use
             )
         ).scalars()
     )
-    # По правилу продукта все лиды удаляемого сотрудника идут в первый этап
-    # доски администратора — не пытаемся сохранять название старого этапа.
+    # По продуктовому правилу лиды удаляемого сотрудника уходят в первый
+    # этап доски администратора. Название прежнего этапа сохранять не
+    # пытаемся: доски у сотрудников разные, и такого этапа там может не быть.
     fallback = target_stages[0]
 
     previous_owner = (from_user.full_name or from_user.email)[:255]
@@ -189,7 +192,7 @@ async def ensure_not_last_admin(session: AsyncSession, user: User) -> None:
         )
 
 
-# --- безопасность -------------------------------------------------------------
+# --- Безопасность ---
 
 
 def scan_backups(directory: Path) -> tuple[list[dict[str, Any]], float | None]:

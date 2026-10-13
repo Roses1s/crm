@@ -42,11 +42,12 @@ from app.services.leads import get_editable_lead, get_lead_or_404
 
 log = get_logger(__name__)
 
-CHUNK = 1024 * 1024  # читаем файл мегабайтными кусками, не целиком в память
+CHUNK = 1024 * 1024  # файл читаем кусками по мегабайту, а не целиком в память
 
-# Белый список расширений. Сознательно без .svg и .htm(l): такие файлы браузер
-# разбирает как разметку, и открытие вложения могло бы стать XSS на домене.
-# Заодно отсекаются .exe и прочее, чего в CRM делать нечего.
+# Разрешённые расширения — белый список. Сознательно без .svg и .htm(l):
+# браузер разбирает их как разметку, и открытие вложения обернулось бы XSS
+# на домене сервиса. Заодно отсекаются исполняемые и прочие файлы, которым
+# в CRM делать нечего.
 ALLOWED_EXTENSIONS: dict[str, str] = {
     ".pdf": "application/pdf",
     ".png": "image/png",
@@ -65,21 +66,23 @@ ALLOWED_EXTENSIONS: dict[str, str] = {
     ".7z": "application/x-7z-compressed",
 }
 
-# Эти типы браузер может открыть прямо в окне — остальные всегда скачиваются.
+# Только эти типы браузеру разрешено открывать прямо в окне; всё остальное
+# всегда уходит скачиванием, чтобы содержимое не выполнилось как страница.
 INLINE_TYPES = {"image/png", "image/jpeg", "image/gif", "image/webp", "application/pdf"}
 IMAGE_TYPES = frozenset({"image/png", "image/jpeg", "image/gif", "image/webp"})
 THUMBNAIL_CONTENT_TYPE = "image/webp"
 THUMBNAIL_MAX_EDGE = 480
-# Максимум около 72 МБ RGB или 96 МБ RGBA до уменьшения. Порог защищает
-# API от архивов-картинок и оставляет место для обычных фото с телефона.
+# Предел пикселей: около 72 МБ RGB или 96 МБ RGBA в развёрнутом виде.
+# Порог защищает API от «архивов» под видом картинок и при этом оставляет
+# запас для обычных фотографий с телефона.
 THUMBNAIL_MAX_PIXELS = 24_000_000
 THUMBNAIL_QUALITY = 82
-# Уменьшение большой картинки временно занимает заметную память; не даём
-# нескольким запросам одновременно декодировать изображения в одном worker.
+# Декодирование большой картинки заметно нагружает память, поэтому внутри
+# одного процесса worker изображения одновременно не обрабатываются.
 _THUMBNAIL_SLOT = threading.BoundedSemaphore(1)
 
-# В каждом gunicorn worker одновременно записывается не больше одного файла.
-# Асинхронный семафор не занимает поток, пока запрос ждёт своей очереди.
+# В каждый процесс gunicorn одновременно пишется не больше одного файла.
+# Асинхронный семафор ждёт очереди, не занимая поток выполнения.
 _UPLOAD_SLOTS: weakref.WeakKeyDictionary[asyncio.AbstractEventLoop, asyncio.Semaphore] = (
     weakref.WeakKeyDictionary()
 )
@@ -105,7 +108,7 @@ def storage_root() -> Path:
     return Path(settings.attachments_dir)
 
 
-# --- запись файла на диск ---------------------------------------------------
+# --- Запись файла на диск ---
 
 
 def _checked_suffix(original: str) -> str:
@@ -169,8 +172,8 @@ async def _save_upload(upload: UploadFile, target: Path) -> int:
                 )
             await run_in_threadpool(out.write, chunk)
     except BaseException:
-        # Любой сбой (превышен лимит, обрыв соединения) — недописанный файл
-        # не должен остаться на диске.
+        # При любом сбое (превышен лимит, оборвалось соединение) недописанный
+        # файл на диске не остаётся: он не виден в базе и стал бы мусором.
         await run_in_threadpool(out.close)
         await run_in_threadpool(target.unlink, missing_ok=True)
         raise
@@ -184,11 +187,12 @@ async def _store_upload(file: UploadFile, relative_dir: Path) -> tuple[str, str,
     Общая часть загрузки для лидов и заявок: различается только папка,
     остальное — белый список расширений, лимит размера и обезличенное имя.
     """
-    original = Path(file.filename or "file").name  # отбрасываем путь целиком
+    original = Path(file.filename or "file").name  # путь из имени клиента отбрасываем целиком: нужен только сам файл
     suffix = _checked_suffix(original)
     target = storage_root() / relative_dir / f"{uuid.uuid4().hex}{suffix}"
-    # Один активный upload на worker. Семафор не блокирует event loop и
-    # вместе с резервом на все worker-процессы предотвращает гонку диска.
+    # Одна активная загрузка на процесс: семафор не блокирует event loop,
+    # а суммарный резерв по всем процессам не даёт загрузкам устроить
+    # гонку за диском.
     slot = _upload_slot()
     await slot.acquire()
     try:
@@ -214,8 +218,9 @@ def _render_thumbnail(original: Path, target: Path) -> None:
     """Создаёт небольшую WebP-копию, не меняя загруженный оригинал."""
     try:
         with warnings.catch_warnings():
-            # Очень большие изображения отклоняем понятной ошибкой, а не
-            # позволяем Pillow развернуть их в памяти без ограничений.
+            # Изображение сверх предела пикселей отклоняем понятной ошибкой:
+            # позволять Pillow разворачивать его в памяти без ограничений
+            # нельзя.
             warnings.simplefilter("error", Image.DecompressionBombWarning)
             with Image.open(original) as source:
                 if source.format not in {"PNG", "JPEG", "GIF", "WEBP"}:
@@ -233,8 +238,8 @@ def _render_thumbnail(original: Path, target: Path) -> None:
 
                 image = ImageOps.exif_transpose(source)
                 try:
-                    # Для GIF используем первый кадр; исходная анимация остаётся
-                    # нетронутой и доступна при открытии полного файла.
+                    # Миниатюру GIF делаем из первого кадра; сама анимация
+                    # не изменяется и доступна при открытии полного файла.
                     image.thumbnail(
                         (THUMBNAIL_MAX_EDGE, THUMBNAIL_MAX_EDGE), Image.Resampling.LANCZOS
                     )
@@ -293,17 +298,19 @@ def _ensure_thumbnail(original: Path, target: Path) -> None:
             _render_thumbnail(original, target)
 
 
-# --- вложения лида ----------------------------------------------------------
+# --- Вложения лида ---
 
 
 async def list_lead_attachments(
     session: AsyncSession, user: User, lead_id: int
 ) -> list[Attachment]:
-    # Чтение — вложения проигранного лида видны всем, как и сам лид.
+    # Правило чтения повторяет карточку: вложения проигранного лида видны
+    # всем сотрудникам, как и сам лид.
     await get_lead_or_404(session, lead_id, user, allow_lost=True)
     stmt = (
         select(Attachment)
-        # Файлы заявок показываются только на самой заявке — решение владельца.
+        # Файлы заявки в карточке лида не показываем: их место только на
+        # самой заявке (решение владельца).
         .where(Attachment.lead_id == lead_id, Attachment.shipment_id.is_(None))
         .order_by(Attachment.created_at.desc())
     )
@@ -323,7 +330,9 @@ async def upload_lead_attachment(
         if entry is None or entry.lead_id != lead_id or entry.shipment_id is not None:
             raise NotFoundError(f"Запись ленты {entry_id} не найдена")
 
-    # Тип берём из расширения, а не из заголовка клиента: заголовку верить нельзя.
+    # Тип файла определяем по расширению, а не по заголовку клиента:
+    # заголовок подделывается одной строкой, расширению мы доверяем после
+    # сверки с белым списком.
     name, content_type, size, target = await _store_upload(file, Path(str(lead_id)))
 
     attachment = Attachment(
@@ -340,7 +349,8 @@ async def upload_lead_attachment(
         await get_editable_lead(session, lead_id, user, for_update=True)
         await session.commit()
     except BaseException:
-        # Файл уже записан на диск; при неудачной проверке/транзакции удаляем только его.
+        # Файл к этому моменту уже на диске; если проверка или транзакция
+        # упадёт, удаляем именно его, не трогая остальные файлы лида.
         await run_in_threadpool(target.unlink, missing_ok=True)
         raise
     await session.refresh(attachment)
@@ -349,7 +359,7 @@ async def upload_lead_attachment(
     return attachment
 
 
-# --- вложения заявки --------------------------------------------------------
+# --- Вложения заявки ---
 
 
 async def _shipment_or_404(
@@ -364,7 +374,8 @@ async def _shipment_or_404(
     shipment = await session.get(Shipment, shipment_id)
     if shipment is None:
         raise NotFoundError(f"Заявка {shipment_id} не найдена")
-    # Запись во вложения запрещена, пока связанный лид проигран.
+    # Пока связанный лид проигран, запись во вложения запрещена: проигранная
+    # карточка во всей системе доступна только для чтения.
     if for_write:
         await get_editable_lead(session, shipment.lead_id, user, for_update=lock_for_write)
     else:
@@ -398,14 +409,15 @@ async def upload_shipment_attachment(
         if entry is None or entry.shipment_id != shipment_id:
             raise NotFoundError(f"Запись {entry_id} не найдена")
 
-    # Файлы заявки лежат в отдельной папке, чтобы не смешиваться с файлами лида.
+    # Файлы заявки храним в отдельной папке: смешивать их с файлами самого
+    # лида нельзя, у них разные карточки и сроки жизни на экране.
     name, content_type, size, target = await _store_upload(
         file, Path("shipments") / str(shipment_id)
     )
 
     attachment = Attachment(
-        # lead_id заполняем от заявки: так файл не потеряется при подсчёте
-        # объёма по лиду и удалится вместе с ним.
+        # lead_id у файла заявки заполняем от самой заявки: файл учитывается
+        # в объёме лида и удаляется вместе с ним, а не остаётся сиротой.
         lead_id=shipment.lead_id,
         shipment_id=shipment_id,
         entry_id=entry_id,
@@ -428,7 +440,7 @@ async def upload_shipment_attachment(
     return attachment
 
 
-# --- скачивание и удаление --------------------------------------------------
+# --- Скачивание и удаление ---
 
 
 async def get_for_download(
@@ -438,15 +450,17 @@ async def get_for_download(
     attachment = await session.get(Attachment, attachment_id)
     if attachment is None:
         raise NotFoundError(f"Вложение {attachment_id} не найдено")
-    # Чтение — файл проигранного лида можно открыть, как и саму карточку.
+    # Правило чтения повторяет карточку: файл проигранного лида можно
+    # открыть, как и сам лид.
     await get_lead_or_404(session, attachment.lead_id, user, allow_lost=True)
 
     path = Path(attachment.storage_path)
     if not path.is_file():
         raise NotFoundError("Файл не найден на диске — возможно, он был удалён")
 
-    # Картинки и PDF можно показать в окне, остальное — только скачать:
-    # так исполняемый или html-файл не выполнится в браузере.
+    # В окне показываем только картинки и PDF; остальные типы только
+    # скачиваются, чтобы исполняемый или HTML-файл не выполнился в браузере
+    # от имени нашего домена.
     disposition = "inline" if attachment.content_type in INLINE_TYPES else "attachment"
     return attachment, path, disposition
 
@@ -458,7 +472,8 @@ async def get_thumbnail(
     attachment = await session.get(Attachment, attachment_id)
     if attachment is None:
         raise NotFoundError(f"Вложение {attachment_id} не найдено")
-    # Доступ совпадает с get_for_download: те же лид и режим чтения проигранного.
+    # Доступ повторяет get_for_download: тот же лид и тот же режим чтения
+    # проигранной карточки; миниатюра не должна быть лазейкой мимо проверки.
     await get_lead_or_404(session, attachment.lead_id, user, allow_lost=True)
 
     if attachment.content_type not in IMAGE_TYPES:
@@ -479,16 +494,18 @@ async def delete_attachment(session: AsyncSession, user: User, attachment_id: in
     attachment = await session.get(Attachment, attachment_id)
     if attachment is None:
         raise NotFoundError(f"Вложение {attachment_id} не найдено")
-    # Удаление любого вложения — операция записи, в том числе у заявки.
+    # Удаление вложения — операция записи даже у заявки проигранного лида:
+    # режим «только чтение» здесь не действует.
     await get_editable_lead(session, attachment.lead_id, user, for_update=True)
 
-    # Свой файл удаляет автор, чужой — только администратор.
+    # Свой файл удаляет его автор; чужой — только администратор.
     if attachment.uploaded_by_id != user.id and user.role != Role.admin:
         raise PermissionDeniedError("Удалить чужое вложение может только администратор")
 
-    # Сначала запись, потом файл: если бы транзакция не прошла после удаления
-    # файла, запись осталась бы в базе, а файла уже не было. Удаление с диска
-    # выносим в пул потоков, как и остальную работу с файлами.
+    # Порядок — сначала запись в базе, потом файл: при обратной
+    # последовательности упавшая транзакция оставила бы запись о файле,
+    # которого уже нет. Удаление с диска уводим в пул потоков, как и
+    # остальную блокирующую работу с файлами.
     path = Path(attachment.storage_path)
     await session.delete(attachment)
     await session.commit()
@@ -497,7 +514,7 @@ async def delete_attachment(session: AsyncSession, user: User, attachment_id: in
     log.info("attachment.deleted", attachment_id=attachment_id, by=user.id)
 
 
-# --- место на диске ---------------------------------------------------------
+# --- Место на диске ---
 
 
 def _scan_disk_usage() -> dict[str, int]:
@@ -514,7 +531,8 @@ def _scan_disk_usage() -> dict[str, int]:
             total_bytes += path.stat().st_size
             files += 1
         except OSError:
-            # Вложение могло исчезнуть во время обхода или быть недоступно.
+            # Вложение могло исчезнуть прямо во время обхода или оказаться
+            # недоступным: обход не должен падать из-за одного файла.
             continue
     return {
         "files": files,

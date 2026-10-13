@@ -34,7 +34,7 @@ from app.services.tags import fetch_tags
 
 log = get_logger(__name__)
 
-# Русские подписи этапов для записи в ленту при смене этапа.
+# Русские подписи этапов: ими смена этапа записывается в ленту заявки.
 STAGE_LABELS: dict[ShipmentStatus, str] = {
     ShipmentStatus.new: "Новая",
     ShipmentStatus.checked: "Проверена и подписана заявка",
@@ -43,7 +43,7 @@ STAGE_LABELS: dict[ShipmentStatus, str] = {
 }
 
 
-# --- доступ -----------------------------------------------------------------
+# --- Доступ ---
 
 
 async def get_shipment_or_404(
@@ -71,15 +71,16 @@ async def get_shipment_or_404(
         .options(selectinload(Shipment.tags))
         .execution_options(populate_existing=True)
     )
-    # Единый порядок блокировок — сначала лид, потом заявка. Иначе PATCH
-    # заявки (shipment -> lead) мог бы deadlock-нуться с удалением лида
-    # (lead -> cascade shipment).
+    # Блокировки берём в едином порядке — сначала лид, потом заявка. Иначе
+    # PATCH заявки (заявка → лид) встретился бы с удалением лида (лид →
+    # каскад заявок) во взаимной блокировке.
     if user is not None and for_write:
         initial = (await session.execute(stmt)).unique().scalar_one_or_none()
         if initial is None:
             raise NotFoundError(f"Заявка {shipment_id} не найдена")
-        # Если переносим заявку, блокируем обе карточки в одном порядке по id.
-        # Так встречные переносы A→B и B→A не берут блокировки в разном порядке.
+        # При переносе заявки блокируем обе карточки в одинаковом порядке
+        # по id: встречные переносы A→B и B→A не возьмут блокировки в
+        # разном порядке и не зависнут друг на друге.
         lead_ids = sorted(
             lead_id for lead_id in {initial.lead_id, target_lead_id} if lead_id is not None
         )
@@ -100,9 +101,10 @@ async def get_shipment_or_404(
             shipment = initial
     else:
         if for_update:
-            # `Shipment.lead` тянет nullable joined-связи этапа/ответственного.
-            # PostgreSQL запрещает FOR UPDATE всей такой выборки, поэтому явно
-            # блокируем только базовую строку shipments.
+            # `Shipment.lead` тянет присоединённые связи этапа и
+            # ответственного, а PostgreSQL запрещает FOR UPDATE на всей
+            # такой выборке. Поэтому явно блокируем только базовую строку
+            # shipments.
             stmt = stmt.with_for_update(of=Shipment)
         shipment = (await session.execute(stmt)).unique().scalar_one_or_none()
         if shipment is None:
@@ -140,7 +142,7 @@ def visible_shipments(stmt: Any, user: User) -> Any:
     return stmt.where(Shipment.lead_id.in_(select(Lead.id).where(Lead.assigned_to_id == user.id)))
 
 
-# --- операции над заявками --------------------------------------------------
+# --- Операции над заявками ---
 
 
 async def _filter_totals(session: AsyncSession, stmt: Any) -> dict[str, Decimal]:
@@ -160,7 +162,7 @@ async def _filter_totals(session: AsyncSession, stmt: Any) -> dict[str, Decimal]
 
     def net_price(price: Any, tax_col: Any) -> Any:
         # CASE подставляет делитель «1 + ставка/100» по значению ставки —
-        # как net_divisor() в Python, те же константы.
+        # зеркалит net_divisor() в Python на тех же константах.
         return price / case(
             *((tax_col == rate.value, literal(net_divisor(rate), Numeric)) for rate in TaxRate)
         )
@@ -176,8 +178,9 @@ async def _filter_totals(session: AsyncSession, stmt: Any) -> dict[str, Decimal]
     row = (
         await session.execute(
             stmt.with_only_columns(
-                # ROUND вокруг SUM — не только про копейки: в SQLite суммы
-                # идут через float, и округление убирает двоичные хвосты.
+                # ROUND вокруг SUM нужен не только ради копеек: в SQLite
+                # суммы идут через float, и округление срезает двоичные
+                # «хвосты» вида 0.30000000000000004.
                 func.round(func.coalesce(func.sum(margin_expr), 0), 2),
                 func.round(func.coalesce(func.sum(Shipment.customer_price), 0), 2),
             ).order_by(None)
@@ -210,7 +213,7 @@ async def list_shipments(
     )
     if assigned_to is not None:
         # Фильтр «заявки сотрудника» — инструмент администратора: менеджер
-        # и без него видит только свои заявки, чужие ему смотреть нельзя.
+        # и без фильтра видит только свои заявки, чужие ему недоступны.
         if user.role != Role.admin:
             raise PermissionDeniedError("Заявки сотрудника может смотреть только администратор")
         stmt = stmt.where(
@@ -219,7 +222,8 @@ async def list_shipments(
     if status_filter is not None:
         stmt = stmt.where(Shipment.status == status_filter)
     if search and search.strip():
-        # Экранирование служебных символов ILIKE — в app/services/search.py.
+        # Экранирование служебных символов ILIKE — app/services/search.py:
+        # поиск по номеру не должен срабатывать как маска.
         pattern = like_pattern(search)
         stmt = stmt.join(Lead, Shipment.lead_id == Lead.id)
         stmt = stmt.where(
@@ -231,10 +235,11 @@ async def list_shipments(
         )
     items, total = await paginate(
         session,
-        # В ответе нужны название лида и имя продавца. Этап, причина проигрыша
-        # и теги лида не показываются — не загружаем их; теги самой заявки
-        # остаются в ответе. Явные связи вместо устаревшего noload сохраняют
-        # поля ответа и не тянут лишние данные (Б-23 ревью 06.10).
+        # В ответе нужны название лида и имя продавца. Этап, причина
+        # проигрыша и теги лида в списке не показываются — и не
+        # загружаются; теги самой заявки в ответе остаются. Явные связи
+        # вместо устаревшего noload сохраняют поля ответа и не тянут
+        # лишнего (ревью 06.10, Б-23).
         stmt.options(
             joinedload(Shipment.lead).options(
                 load_only(Lead.id, Lead.name, Lead.assigned_to_id),
@@ -247,21 +252,24 @@ async def list_shipments(
         params,
     )
     page = build_page(items, total, params)
-    # Итоги «Итого» — по всему фильтру, а не только по открытой странице.
+    # Итоги «Итого» считаем по всему фильтру, а не только по открытой
+    # странице: пользователь видит суммы по всей выборке.
     page["totals"] = await _filter_totals(session, stmt)
     return page
 
 
 async def create_shipment(session: AsyncSession, user: User, payload: ShipmentCreate) -> Shipment:
-    # Заявка может ссылаться только на активный лид, который пользователь вправе менять.
+    # Заявка ссылается только на активный лид, который пользователь вправе
+    # изменять: чужие и проигранные карточки недоступны.
     await get_editable_lead(session, payload.lead_id, user, for_update=True)
-    # created_at исключаем отдельно: колонка NOT NULL со server_default=now().
-    # Если прислали None (поле не заполнили), явная передача None в конструктор
-    # модели перекрыла бы server_default и упала бы на вставке NULL — вместо
-    # этого просто не передаём атрибут, и дата проставится сама по умолчанию.
+    # created_at исключаем отдельно: колонка NOT NULL со
+    # server_default=now(). Явный None в конструкторе перекрыл бы значение
+    # по умолчанию и упал на вставке NULL, поэтому атрибут просто не
+    # передаём — дату проставит сама база.
     data = payload.model_dump(exclude={"tag_ids", "created_at"})
     if not payload.number:
-        # До получения id временный номер не должен нарушить уникальность.
+        # Временный номер до получения id не должен нарушать уникальность:
+        # настоящий номер подставится сразу после вставки.
         data["number"] = f"tmp-{uuid4().hex}"
     shipment = Shipment(**data)
     if payload.created_at is not None:
@@ -269,8 +277,8 @@ async def create_shipment(session: AsyncSession, user: User, payload: ShipmentCr
     shipment.tags = await fetch_tags(session, payload.tag_ids)
     session.add(shipment)
     await session.flush()
-    # Обычно номер по умолчанию равен id. Если пользователь уже присвоил этот
-    # номер другой заявке, добавляем суффикс вместо отказа создать новую.
+    # Номер по умолчанию равен id. Если пользователь уже занял такой номер
+    # другой заявкой, добавляем суффикс вместо отказа в создании.
     if not payload.number:
         shipment.number = await _default_shipment_number(session, shipment.id)
     await session.commit()
@@ -294,13 +302,13 @@ async def update_shipment(
 
     new_lead_id = data.get("lead_id")
     if new_lead_id is not None and new_lead_id != shipment.lead_id:
-        # Проверяем новый лид теми же строгими правами, что и при создании
-        # заявки: менеджер не может записать свою заявку в карточку коллеги.
+        # Новый лид проверяем теми же строгими правами, что и при создании
+        # заявки: менеджер не запишет свою заявку в карточку коллеги.
         # Целевой лид уже проверен и заблокирован get_shipment_or_404 выше.
 
-        # lead_id у timeline и attachments денормализован для авторизации,
-        # подсчёта места и каскадного удаления. Поэтому переносим весь агрегат
-        # одной транзакцией, а не только строку shipments.
+        # lead_id у ленты и вложений денормализован ради проверки доступа,
+        # подсчёта места и каскадного удаления. Поэтому переносим весь
+        # агрегат одной транзакцией, а не только строку shipments.
         await session.execute(
             update(TimelineEntry)
             .where(TimelineEntry.shipment_id == shipment.id)
@@ -335,7 +343,8 @@ async def set_status(
     previous = shipment.status
     shipment.status = payload.status
     if previous != payload.status:
-        # Смена этапа попадает в ленту заявки — как история этапов у лида.
+        # Смена этапа записывается в ленту заявки — как история движения
+        # по этапам у карточки лида.
         session.add(
             TimelineEntry(
                 lead_id=shipment.lead_id,
@@ -353,13 +362,14 @@ async def set_status(
 
 
 async def lead_shipments(session: AsyncSession, user: User, lead_id: int) -> list[Shipment]:
-    # Чтение — заявки проигранного лида видны всем, как и сам лид.
+    # Правило чтения повторяет карточку: заявки проигранного лида видны
+    # всем сотрудникам, как и сам лид.
     await get_lead_or_404(session, lead_id, user, allow_lost=True)
     stmt = select(Shipment).where(Shipment.lead_id == lead_id).order_by(Shipment.created_at.desc())
     return list((await session.execute(stmt)).unique().scalars().all())
 
 
-# --- лента чаттера заявки ---------------------------------------------------
+# --- Лента чаттера заявки ---
 
 
 async def _get_entry_or_404(
@@ -409,8 +419,9 @@ async def update_entry(
     entry = await _get_entry_or_404(session, shipment_id, entry_id)
     if entry.type is not EntryType.note:
         raise AppError("Изменять можно только примечания", code="not_editable")
-    # Только автор (та же защита, что у примечаний лида — ревью 03.10, Б-11):
-    # правка чужой записи оставала бы прежнюю подпись автора.
+    # Только автор (та же защита, что у примечаний лида, ревью 03.10,
+    # Б-11): отредактированная чужая запись сохранила бы подпись прежнего
+    # автора над чужим текстом.
     if entry.author_id != user.id:
         raise PermissionDeniedError("Изменить примечание может только его автор")
     entry.body = payload.body
@@ -422,10 +433,10 @@ async def update_entry(
 async def delete_entry(session: AsyncSession, user: User, shipment_id: int, entry_id: int) -> None:
     await get_shipment_or_404(session, shipment_id, user, for_update=True, for_write=True)
     entry = await _get_entry_or_404(session, shipment_id, entry_id)
-    # Системная история — аудит изменения заявки. Если разрешить удалить её
-    # через ту же ручку, поля можно переписать без проверяемого следа.
-    # Исключение одно — запись о переносе заявки между этапами: её по решению
-    # владельца (05.10.2026) может убрать любой сотрудник.
+    # Системная история — аудит изменений заявки. Разрешить её удаление
+    # через ту же ручку — значит дать переписать поля без проверяемого
+    # следа. Единственное исключение — запись о переносе между этапами:
+    # её по решению владельца (05.10.2026) может убрать любой сотрудник.
     if entry.type is not EntryType.note and not entry.is_stage_change:
         raise AppError(
             "Удалить можно только примечание или запись о смене этапа",

@@ -41,8 +41,8 @@ log = get_logger("worker")
 
 BACKUP_DIR = Path(settings.backup_dir)
 
-# Движок создаётся при первом обращении, а не при импорте модуля: иначе любая
-# проблема с драйвером роняла бы воркер ещё до старта Celery.
+# Движок создаём лениво, при первом обращении, а не при импорте модуля:
+# иначе проблема с драйвером роняла бы воркер ещё до старта Celery.
 _sync_engine: Engine | None = None
 
 
@@ -99,7 +99,8 @@ def backup_database() -> dict[str, Any]:
     )
     if result.returncode != 0:
         error = result.stderr.strip()[:500]
-        # Частый случай: клиент старее сервера — дамп снять нельзя.
+        # Частая причина: версия клиента старее сервера базы — таким
+        # pg_dump снять копию нельзя, это нужно видеть в журнале задачи.
         if "server version" in error:
             error += " | нужен postgresql-client той же мажорной версии, что и сервер"
         log.error("backup.failed", stderr=error)
@@ -137,16 +138,19 @@ def backup_attachments() -> dict[str, Any]:
 
     try:
         with tarfile.open(temporary, "w:gz") as archive:
-            # В архив входят оригиналы и уже созданные WebP-миниатюры. При
-            # восстановлении пустые кеши также будут автоматически пересозданы.
+            # В архив входят оригиналы и уже созданные WebP-миниатюры.
+            # Отсутствующие миниатюры при восстановлении пересоздадутся
+            # автоматически из оригиналов.
             archive.add(source, arcname="attachments")
-        # Финальное имя появляется только после успешного завершения архивации.
+        # Финальное имя присваиваем только после успешной архивации:
+        # недописанный архив не должен выглядеть готовой копией.
         temporary.replace(target)
     except BaseException:
         temporary.unlink(missing_ok=True)
         raise
 
-    # Оставляем только N последних архивов файлов.
+    # Оставляем только N последних архивов файлов: старые удаляются,
+    # чтобы тома бэкапов не росли без ограничения.
     archives = sorted(BACKUP_DIR.glob("files-*.tar.gz"), key=lambda f: f.stat().st_mtime)
     removed = 0
     for old in archives[: max(0, len(archives) - settings.backup_files_keep)]:
@@ -158,7 +162,8 @@ def backup_attachments() -> dict[str, Any]:
     return {"ok": True, "file": target.name, "size": size}
 
 
-# Размер одной партии при постраничном проходе cleanup_orphan_attachments.
+# Размер партии при постраничном проходе cleanup_orphan_attachments:
+# ограничивает память и длительность одной транзакции уборки.
 _CLEANUP_BATCH_SIZE = 500
 
 
@@ -226,7 +231,8 @@ def cleanup_login_attempts() -> dict[str, Any]:
     """
     cutoff = datetime.now(tz=UTC) - timedelta(days=settings.login_attempts_keep_days)
     with _session() as session:
-        # CursorResult даёт rowcount; аннотация execute() о нём не знает.
+        # CursorResult содержит rowcount, хотя аннотация execute() о нём
+        # не знает: обращаемся к нему напрямую.
         result = cast(
             "CursorResult[Any]",
             session.execute(delete(LoginAttempt).where(LoginAttempt.created_at < cutoff)),
@@ -263,15 +269,15 @@ def cleanup_orphan_files() -> dict[str, Any]:
     batch: list[Path] = []
 
     def clean_batch(files: list[Path]) -> tuple[int, int]:
-        # Проверяем существование только старых файлов текущей партии, а не
-        # загружаем в память пути всех вложений из большой базы.
+        # Существование проверяем только у старых файлов текущей партии, а
+        # не загружаем в память пути всех вложений большой базы.
         candidates = {str(file) for file in files}
-        # Для миниатюр проверяем также путь оригинала: у миниатюр нет своей
-        # строки Attachment, но они должны жить, пока жив оригинал.
-        # thumbnail_path(original) использует original.stem, поэтому из
-        # "uuid.thumbnail.webp" нельзя восстановить расширение оригинала.
-        # Добавляем все разрешённые расширения, иначе валидная миниатюра могла
-        # бы быть удалена как сирота, хотя оригинал ещё есть в БД.
+        # Для миниатюр проверяем и путь оригинала: собственной строки
+        # Attachment у миниатюры нет, но жить она должна, пока жив оригинал.
+        # thumbnail_path(original) строится из original.stem, поэтому по
+        # имени "uuid.thumbnail.webp" расширение оригинала не восстановить.
+        # Перебираем все разрешённые расширения, иначе действующая
+        # миниатюра могла бы удалиться как сирота при живом оригинале.
         candidates.update(
             str(file.with_name(file.name.removesuffix(".thumbnail.webp") + suffix))
             for file in files

@@ -95,8 +95,8 @@ async def update_tag(session: AsyncSession, tag_id: int, changes: Mapping[str, A
     """Меняет тег, не позволяя занять имя другой записи."""
     name = changes.get("name")
     if name is not None:
-        # Тот же ключ блокировки использует создание — оно тоже не может
-        # обойти проверку во время переименования.
+        # Создание тега использует тот же ключ блокировки: обойти проверку
+        # имени во время параллельного переименования оно не может.
         await lock_tag_name(session, name)
 
     tag = await session.get(Tag, tag_id)

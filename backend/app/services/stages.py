@@ -17,8 +17,9 @@ from app.models.timeline import LEAD_STAGE_LABEL, EntryType, TimelineEntry
 from app.models.user import Role, User
 from app.services.lead_versions import advance_lead_version
 
-# Набор, с которого начинает каждый менеджер. Дальше он правит его под себя:
-# переименовывает, двигает, удаляет — у коллег доска не меняется.
+# Стартовый набор этапов, с которого начинает каждый менеджер. Дальше он
+# правит его под себя — переименовывает, двигает, удаляет; доски коллег от
+# этого не меняются.
 DEFAULT_STAGES: list[tuple[str, str]] = [
     ("Новый", "slate"),
     ("Перезвонить", "orange"),
@@ -46,9 +47,9 @@ async def ensure_default_stages(
     процесс, а SQL-функции такой нет.
     """
     if session.bind is not None and session.bind.dialect.name == "postgresql":
-        # Пара чисел задаёт собственное пространство ключей: 4227 — «доски
-        # CRM», второе — номер сотрудника. Блокировка живёт до конца
-        # транзакции (суффикс _xact) и отпускается сама.
+        # Пара чисел — пространство ключей блокировки: 4227 означает «доски
+        # CRM», второе число — номер сотрудника. Блокировка с суффиксом
+        # _xact живёт до конца транзакции и отпускается сама.
         await session.execute(
             text("SELECT pg_advisory_xact_lock(4227, :owner_id)"), {"owner_id": owner_id}
         )
@@ -116,8 +117,8 @@ async def delete_stage(
         .with_for_update(of=Lead)
     )
     leads = list((await session.execute(leads_stmt)).unique().scalars())
-    # Проигранные лиды read-only до восстановления. Удаление этапа не должно
-    # менять их stage_id/версию/историю исподтишка.
+    # Проигранные лиды — только чтение до восстановления: удаление этапа не
+    # должно исподтишка менять их stage_id, версию и историю.
     if any(lead.is_archived for lead in leads):
         raise AppError(
             "В этапе есть проигранные лиды. Восстановите их перед удалением этапа",
@@ -130,15 +131,16 @@ async def delete_stage(
                 "В этапе есть лиды — укажите fallback_stage_id для их переноса",
                 code="stage_not_empty",
             )
-        # Переносить можно только в этап той же доски, иначе лид уедет к коллеге.
+        # Переносить разрешено только в этап той же доски: иначе лид уехал
+        # бы на чужую доску и пропал с доски владельца.
         fallback = await session.get(Stage, fallback_stage_id)
         if fallback is None or fallback.owner_id != stage.owner_id:
             raise NotFoundError(f"Этап {fallback_stage_id} не найден на этой доске")
         for lead in leads:
             lead.stage_id = fallback_stage_id
             advance_lead_version(lead)
-            # Перенос попадает в ленту карточки: без записи смена колонки
-            # происходила бы молча и её было бы не найти в истории (Б-18).
+            # Перенос записываем в ленту карточки: без записи смена колонки
+            # происходила бы молча, и след не нашёлся бы в истории (Б-18).
             session.add(
                 TimelineEntry(
                     lead_id=lead.id,
@@ -149,11 +151,11 @@ async def delete_stage(
                     new_value=fallback.name,
                 )
             )
-        # ВАЖНО: записываем перенос в базу ДО удаления этапа. Без этого
-        # SQLAlchemy при удалении родителя сам «отцепляет» его лиды —
-        # выставляет leads.stage_id = NULL, — и база отвергает запись
+        # ВАЖНО: перенос записываем в базу ДО удаления этапа. Иначе
+        # SQLAlchemy при удалении родителя сама «отцепит» его лиды —
+        # выставит leads.stage_id = NULL, — а база отвергнет запись
         # (колонка обязательная). Снаружи это выглядело как ошибка
-        # «Запись с такими данными уже существует» на обычном удалении
+        # «Запись с такими данными уже существует» при обычном удалении
         # непустой колонки канбана.
         await session.flush()
 

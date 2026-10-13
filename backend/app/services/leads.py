@@ -32,7 +32,7 @@ from app.services.tags import fetch_tags
 log = get_logger(__name__)
 
 
-# --- доступ и выборки -------------------------------------------------------
+# --- Доступ и выборки ---
 
 
 def visible_only(stmt: Select[Lead], user: User) -> Select[Lead]:
@@ -53,8 +53,8 @@ async def get_lead_or_404(
     чтения. Восстановление и передача используют эту функцию напрямую, потому
     что сами возвращают карточку в работу.
     """
-    # populate_existing перезаписывает уже загруженные связи: без него после
-    # смены этапа в ответе оставался бы старый stage из identity map.
+    # populate_existing заставляет перезаписать уже загруженные связи: без
+    # него после смены этапа ответ унёс бы старый stage из identity map.
     stmt = (
         select(Lead)
         .where(Lead.id == lead_id)
@@ -64,9 +64,9 @@ async def get_lead_or_404(
     lead = (await session.execute(stmt)).unique().scalar_one_or_none()
     if lead is None:
         raise NotFoundError(f"Лид {lead_id} не найден")
-    # Чужой лид для менеджера просто «не существует»: так из ответа нельзя
-    # узнать даже факт, что такая карточка есть у коллеги. Исключение —
-    # проигранный лид при allow_lost: он общий, его можно посмотреть.
+    # Чужой лид для менеджера «не существует» (404): по ответу нельзя узнать
+    # даже сам факт, что карточка есть у коллеги. Исключение — проигранный
+    # лид при allow_lost: он общий и доступен для просмотра всем.
     forbidden = user is not None and user.role != Role.admin and lead.assigned_to_id != user.id
     if forbidden and not (allow_lost and lead.is_archived):
         raise NotFoundError(f"Лид {lead_id} не найден")
@@ -111,8 +111,8 @@ def apply_filters(
     assigned_to: int | None,
 ) -> Select[Lead]:
     if search:
-        # `%` и `_` экранируем: иначе поиск «50%» вёл бы себя как маска и
-        # возвращал вообще все записи (см. app/services/search.py).
+        # Служебные символы `%` и `_` экранируются: иначе поиск «50%»
+        # сработал бы как маска и вернул все записи (app/services/search.py).
         pattern = like_pattern(search)
         stmt = stmt.where(
             or_(
@@ -134,7 +134,7 @@ def apply_filters(
     return stmt
 
 
-# --- операции над лидами ----------------------------------------------------
+# --- Операции над лидами ---
 
 
 async def list_leads(
@@ -153,8 +153,8 @@ async def list_leads(
         visible_only(
             select(Lead)
             .options(selectinload(Lead.tags))
-            # id делает порядок страниц устойчивым, даже когда несколько
-            # карточек получили одинаковое время изменения.
+            # id вторым ключом делает порядок страниц устойчивым, даже когда
+            # у нескольких карточек одинаковое время изменения.
             .order_by(Lead.updated_at.desc(), Lead.id.desc()),
             user,
         ),
@@ -171,9 +171,9 @@ async def list_leads(
 
 async def create_lead(session: AsyncSession, user: User, payload: LeadCreate) -> Lead:
     data = payload.model_dump(exclude={"tag_ids"})
-    # Сначала определяем владельца: этап обязан принадлежать именно его доске.
-    # Проверка только при PATCH оставляла дыру в POST и могла спрятать новый
-    # лид на чужой канбан (ревью 06.10, Б-10).
+    # Владельца определяем до проверки этапа: этап обязан принадлежать его
+    # доске. Когда проверка жила только в PATCH, создание через POST могло
+    # спрятать новый лид на чужой канбан (ревью 06.10, Б-10).
     assigned_to_id = data["assigned_to_id"]
     if assigned_to_id is None or user.role != Role.admin:
         assigned_to_id = user.id
@@ -181,8 +181,8 @@ async def create_lead(session: AsyncSession, user: User, payload: LeadCreate) ->
     data["assigned_to_id"] = assigned_to_id
 
     lead = Lead(**data)
-    # Теги проставляем ДО add/flush: у ещё не сохранённого объекта присваивание
-    # коллекции не требует подгрузки старого значения из базы.
+    # Теги проставляем до add/flush: у ещё не сохранённого объекта
+    # присваивание коллекции не требует подгрузки старого значения из базы.
     lead.tags = await fetch_tags(session, payload.tag_ids)
     session.add(lead)
     await session.commit()
@@ -196,13 +196,14 @@ async def update_lead(session: AsyncSession, user: User, lead_id: int, payload: 
     data = payload.model_dump(exclude_unset=True, exclude={"expected_updated_at"})
     tag_ids = data.pop("tag_ids", None)
 
-    # Смена этапа попадает в ленту — так в чаттере видно историю движения.
+    # Смена этапа записывается в ленту: в чаттере видна история движения
+    # карточки по воронке.
     new_stage = data.get("stage_id")
     if new_stage is not None and new_stage != lead.stage_id:
-        # Этапы личные: нельзя переставить лид на колонку чужой доски — она
-        # не относится к доске владельца лида, и карточка просто пропала бы
-        # из любого канбана (та же защита, что у fallback_stage_id в
-        # DELETE /crm/stages/{id} и у board_stage_for при передаче лида).
+        # Этапы принадлежат личным доскам: переставить лид на колонку чужой
+        # доски нельзя — карточка пропала бы из любого канбана. Та же защита
+        # стоит у fallback_stage_id в DELETE /crm/stages/{id} и у
+        # board_stage_for при передаче лида.
         if lead.assigned_to_id is None:
             raise AppError(
                 "У лида нет ответственного — сначала назначьте продавца",
@@ -221,14 +222,14 @@ async def update_lead(session: AsyncSession, user: User, lead_id: int, payload: 
             )
         )
 
-    # Сравнение и смена версии — один условный UPDATE. Если другой запрос
-    # успел сохранить карточку, второй UPDATE затронет ноль строк и не сможет
-    # затереть его поля. Версию двигаем минимум на микросекунду: SQLite в
-    # тестах и часть драйверов округляют CURRENT_TIMESTAMP до целой секунды.
+    # Сравнение и сдвиг версии — один условный UPDATE: если другой запрос
+    # уже сохранил карточку, обновление затронет ноль строк и не затрёт его
+    # поля. Версию двигаем минимум на микросекунду: SQLite в тестах и часть
+    # драйверов округляют CURRENT_TIMESTAMP до целой секунды.
     next_updated_at = next_lead_updated_at(lead.updated_at)
     if session.get_bind().dialect.name == "sqlite":
         # SQLite хранит CURRENT_TIMESTAMP без дробной части, а SQLAlchemy
-        # сравнивает DateTime с суффиксом .000000. Нормализуем обе стороны
+        # сравнивает DateTime с суффиксом .000000. Обе стороны нормализуем
         # как текст, сохраняя ненулевые микросекунды версии.
         expected_utc = (
             expected_updated_at.replace(tzinfo=UTC)
@@ -259,7 +260,8 @@ async def update_lead(session: AsyncSession, user: User, lead_id: int, payload: 
     for key, value in data.items():
         setattr(lead, key, value)
     if tag_ids is not None:
-        # lead загружен с selectinload(tags) -> коллекция уже в памяти.
+        # lead загружен с selectinload(tags): коллекция тегов уже в памяти,
+        # дополнительного запроса за ней не будет.
         lead.tags = await fetch_tags(session, tag_ids)
 
     await session.commit()
@@ -275,8 +277,8 @@ async def lose_lead(session: AsyncSession, user: User, lead_id: int, payload: Le
     всегда показывал Odoo: «Активный: Да → Нет» и «Причина проигрыша: — → …».
     """
     lead = await get_editable_lead(session, lead_id, user, for_update=True)
-    # Удаление справочника блокирует ту же строку; назначение и удаление
-    # причины тем самым сериализуются на PostgreSQL.
+    # Удаление причины в справочнике блокирует ту же строку, что и
+    # назначение: обе операции сериализуются на уровне PostgreSQL.
     reason = (
         await session.execute(
             select(LossReason).where(LossReason.id == payload.reason_id).with_for_update()
@@ -320,8 +322,9 @@ async def restore_lead(session: AsyncSession, user: User, lead_id: int) -> None:
     проигранный лид и кому-то другому — см. `transfer_lead`, там та же логика
     восстановления работает для произвольного получателя.
     """
-    # Блокируем строку до проверки состояния: два одновременных запроса не
-    # должны оба успешно восстановить один лид и перезаписать владельца.
+    # Строку блокируем до проверки состояния: два одновременных запроса не
+    # должны оба «успешно» восстановить один лид и перезаписать владельца
+    # друг у друга.
     stmt = (
         select(Lead)
         .where(Lead.id == lead_id)
@@ -384,8 +387,9 @@ async def delete_lead_permanently(session: AsyncSession, user: User, lead_id: in
     """
     if user.role != Role.admin:
         raise PermissionDeniedError("Безвозвратно удалить лид может только администратор")
-    # Сериализуем удаление с загрузкой файлов: uploader блокирует эту же строку
-    # перед commit, поэтому список файлов будет полным либо upload отменится.
+    # Удаление сериализуем с загрузкой файлов: загрузчик блокирует эту же
+    # строку перед коммитом, поэтому список файлов будет полным — либо
+    # загрузка отменится целиком.
     stmt = (
         select(Lead)
         .where(Lead.id == lead_id)
@@ -397,9 +401,8 @@ async def delete_lead_permanently(session: AsyncSession, user: User, lead_id: in
     if lead is None:
         raise NotFoundError(f"Лид {lead_id} не найден")
 
-    # lead_id у вложений заявки тоже указывает на лид (см. комментарий в
-    # models/timeline.py), поэтому один запрос находит файлы и самого лида,
-    # и всех его заявок разом.
+    # lead_id заполнен и у вложений заявки (models/timeline.py), поэтому
+    # один запрос находит файлы самого лида и всех его заявок разом.
     attachments = (
         (await session.execute(select(Attachment).where(Attachment.lead_id == lead_id)))
         .scalars()
@@ -411,14 +414,14 @@ async def delete_lead_permanently(session: AsyncSession, user: User, lead_id: in
             original = Path(attachment.storage_path)
             paths.extend((original, thumbnail_path(original)))
 
-    # Строки из базы удаляются каскадом (заявки и лента — через ORM-cascade на
-    # Lead, вложения — через ON DELETE CASCADE в базе), поэтому достаточно
-    # удалить сам объект лида.
+    # Всё остальное удаляется каскадом: заявки и лента — ORM-каскадом на
+    # Lead, вложения — ON DELETE CASCADE в базе. Поэтому достаточно удалить
+    # сам объект лида.
     await session.delete(lead)
     await session.commit()
 
-    # Диск чистим уже после успешного commit: если бы файл стёрся раньше,
-    # а транзакция потом откатилась, он пропал бы, а запись в базе осталась.
+    # Диск чистим только после успешного коммита: стёртый раньше файл при
+    # откате транзакции пропал бы, а запись о нём в базе осталась.
     for path in paths:
         await run_in_threadpool(path.unlink, missing_ok=True)
 
@@ -439,8 +442,9 @@ async def transfer_lead(
     сотрудником» здесь не ошибка, если лид как раз нужно восстановить тому же
     человеку, у которого он был до проигрыша.
     """
-    # Передача может одновременно восстановить проигранный лид; используем
-    # ту же блокировку, что и restore_lead, чтобы операции не перезаписывали друг друга.
+    # Передача может одновременно восстановить проигранный лид, поэтому
+    # берём ту же блокировку, что и restore_lead: операции не должны
+    # перезаписывать друг друга.
     stmt = (
         select(Lead)
         .where(Lead.id == lead_id)
@@ -452,8 +456,9 @@ async def transfer_lead(
     if lead is None:
         raise NotFoundError(f"Лид {lead_id} не найден")
     forbidden = user.role != Role.admin and lead.assigned_to_id != user.id
-    # Передача не должна обходить общий запрет чтения проигранных лидов:
-    # их может передать только администратор через явную операцию восстановления.
+    # Передача не обходит общий запрет на работу с проигранными: передать
+    # такой лид может только администратор через явную операцию
+    # восстановления, а не обычным действием менеджера.
     if forbidden or (lead.is_archived and user.role != Role.admin):
         raise NotFoundError(f"Лид {lead_id} не найден")
     was_lost = lead.is_archived
@@ -471,7 +476,8 @@ async def transfer_lead(
     lead.assigned_to_id = target.id
     lead.stage_id = stage.id
 
-    # Передача попадает в ленту: по истории видно, кто и кому отдал клиента.
+    # Передача записывается в ленту: по истории видно, кто, кому и когда
+    # отдал клиента.
     entries = [
         TimelineEntry(
             lead_id=lead.id,
@@ -501,11 +507,12 @@ async def transfer_lead(
     log.info("lead.transferred", lead_id=lead.id, to=target.id, was_lost=was_lost, by=user.id)
 
 
-# --- лента чаттера ----------------------------------------------------------
+# --- Лента чаттера ---
 
 
 async def lead_timeline(session: AsyncSession, user: User, lead_id: int) -> list[TimelineEntry]:
-    # Чтение — проигранный лид открыт всем, см. get_lead_or_404(allow_lost=True).
+    # Чтение повторяет карточку: проигранный лид открыт всем
+    # (get_lead_or_404 с allow_lost=True).
     await get_lead_or_404(session, lead_id, user, allow_lost=True)
     stmt = (
         select(TimelineEntry)
@@ -542,10 +549,9 @@ async def update_timeline_entry(
     entry = await _get_entry_or_404(session, lead_id, entry_id)
     if entry.type is not EntryType.note:
         raise AppError("Изменять можно только примечания", code="not_editable")
-    # Править примечание может только его автор: строка в ленте подписана
-    # именем автора, и переписанный чужой текст выглядел бы как слова автора.
-    # Администратору тоже нельзя — при необходимости запись можно удалить
-    # и написать свою (ревью 03.10, Б-11).
+    # Примечание правит только автор: запись подписана его именем, и
+    # переписанный чужой текст выглядел бы его словами. Администратору тоже
+    # нельзя — при необходимости запись удаляют и пишут свою (03.10, Б-11).
     if entry.author_id != user.id:
         raise PermissionDeniedError("Изменить примечание может только его автор")
     entry.body = payload.body
@@ -559,10 +565,10 @@ async def delete_timeline_entry(
 ) -> None:
     await get_editable_lead(session, lead_id, user, for_update=True)
     entry = await _get_entry_or_404(session, lead_id, entry_id)
-    # История передач и проигрыша — системный аудит, а не пользовательская
-    # заметка: она остаётся неизменяемой даже при прямом вызове API.
-    # Исключение — запись о переносе карточки между этапами: её по решению
-    # владельца (05.10.2026) может убрать любой сотрудник.
+    # История передач и проигрыша — системный аудит, а не заметка
+    # пользователя: она неизменяема даже при прямом вызове API. Единственное
+    # исключение — запись о переносе между этапами: её по решению владельца
+    # (05.10.2026) может убрать любой сотрудник.
     if entry.type is not EntryType.note and not entry.is_stage_change:
         raise AppError(
             "Удалить можно только примечание или запись о смене этапа",
@@ -581,7 +587,8 @@ async def delete_timeline_entry(
 
     await session.delete(entry)
     await session.commit()
-    # Строки вложений удалены каскадом; удаляем файлы только после commit.
+    # Строки вложений удалены каскадом; сами файлы удаляем только после
+    # коммита — при откате записи и файлы должны остаться парой.
     for path in paths:
         await run_in_threadpool(path.unlink, missing_ok=True)
     log.info(
@@ -593,7 +600,7 @@ async def delete_timeline_entry(
     )
 
 
-# --- переключатель «N / M» --------------------------------------------------
+# --- Переключатель «N / M» ---
 
 
 async def lead_pager(session: AsyncSession, user: User, lead_id: int) -> dict[str, int | None]:
@@ -617,24 +624,25 @@ async def lead_pager(session: AsyncSession, user: User, lead_id: int) -> dict[st
     """
     lead = await get_lead_or_404(session, lead_id, user)
 
-    # Через API карточку «ничьей» оставить нельзя (в LeadUpdate нет
-    # ответственного, передача — отдельной ручкой), но на случай прямых
-    # правок базы листание не ломается: сравнение с NULL в SQL всегда ложно,
-    # поэтому у лида без ответственного диапазон просто не сужается его
+    # Оставить карточку «ничьей» через API нельзя (в LeadUpdate
+    # ответственного нет, передача — отдельной ручкой), но листание не
+    # ломается и при прямых правках базы: сравнение с NULL в SQL всегда
+    # ложно, и диапазон лида без ответственного просто не сужается его
     # доской (Б-27).
     board_filter = (
         Lead.assigned_to_id == lead.assigned_to_id if lead.assigned_to_id is not None else true()
     )
     base = visible_only(select(Lead).where(Lead.is_archived.is_(False)), user).where(board_filter)
-    # Этап нужен для порядка «колонка за колонкой»; соединение один-к-одному,
-    # поэтому строки не размножаются и счёт остаётся честным.
+    # Этап нужен для порядка «колонка за колонкой»; соединение здесь
+    # один-к-одному, поэтому строки не размножаются и счёт не врёт.
     board = base.with_only_columns(Lead.id).join(Stage, Lead.stage_id == Stage.id)
 
     total = int(
         (await session.execute(select(func.count()).select_from(board.subquery()))).scalar_one()
     )
 
-    # «Выше в порядке чтения» — меньшая тройка (этап, номер этапа, номер лида).
+    # «Выше в порядке чтения» означает меньшую тройку: этап, порядковый
+    # номер этапа внутри доски, номер лида внутри колонки.
     sequence, stage_pk = lead.stage.sequence, lead.stage.id
     before = or_(
         Stage.sequence < sequence,
@@ -653,8 +661,8 @@ async def lead_pager(session: AsyncSession, user: User, lead_id: int) -> dict[st
         ).scalar_one()
     )
 
-    # Предыдущий — самый «нижний» из стоящих выше, следующий — самый «верхний»
-    # из стоящих ниже.
+    # Предыдущая карточка — самая «нижняя» среди стоящих выше по порядку
+    # чтения, следующая — самая «верхняя» среди стоящих ниже.
     prev_id = (
         await session.execute(
             board.where(before)
