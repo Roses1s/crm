@@ -14,24 +14,17 @@ import {
 } from "@/features/crm/lead-form/form-state";
 import { ApiError } from "@/shared/api/client";
 import {
-  useAddNote,
   useCreateLead,
   useCustomersByInn,
-  useDeleteAttachment,
   useDeleteLead,
-  useDeleteTimelineEntry,
-  useEditNote,
   useLead,
-  useLeadAttachments,
   useLeadPager,
   useLeadShipments,
-  useLeadTimeline,
   useMe,
   useRestoreLead,
   useStages,
   useTags,
   useUpdateLead,
-  useUploadAttachment,
 } from "@/shared/api/hooks";
 import { ownerInitials, ownerLabel } from "@/shared/lib/owner";
 import type { Attachment } from "@/shared/types";
@@ -39,6 +32,7 @@ import { ClientGroup } from "@/features/crm/lead-form/ClientGroup";
 import { CompanyGroup } from "@/features/crm/lead-form/CompanyGroup";
 import { describe } from "@/features/crm/lead-form/describe-error";
 import { DeleteLeadDialog } from "@/features/crm/lead-form/DeleteLeadDialog";
+import { LeadChatter } from "@/features/crm/lead-form/LeadChatter";
 import { LeadHeaderBar } from "@/features/crm/lead-form/LeadHeaderBar";
 import { LeadStageBar } from "@/features/crm/lead-form/LeadStageBar";
 import { LoseLeadAction } from "@/features/crm/lead-form/LoseLeadAction";
@@ -47,7 +41,6 @@ import { QuickCreateShipmentDialog } from "@/features/shipments/QuickCreateShipm
 import { LostRibbon } from "@/features/crm/lead-form/LostRibbon";
 import { ShipmentsTab } from "@/features/crm/lead-form/ShipmentsTab";
 import { TransferLeadAction } from "@/features/crm/lead-form/TransferLeadAction";
-import { Chatter } from "@/shared/ui/chatter";
 import { FilePreview } from "@/shared/ui/file-preview";
 import { UnsavedChangesDialog } from "@/shared/ui/unsaved-changes-dialog";
 import {
@@ -85,20 +78,13 @@ function LeadForm({ id }: { id?: string }) {
   const { data: lead, isLoading, refetch: refetchLead } = useLead(id);
   const { data: stages = [] } = useStages();
   const { data: allTags = [] } = useTags();
-  const { data: timeline = [] } = useLeadTimeline(id);
   const { data: shipments = [] } = useLeadShipments(savedId);
   const { data: pager } = useLeadPager(id);
-  const { data: attachments = [] } = useLeadAttachments(savedId);
 
   const createLead = useCreateLead();
   const updateLead = useUpdateLead(id);
   const restoreLead = useRestoreLead();
   const deleteLead = useDeleteLead();
-  const addNote = useAddNote(id);
-  const editNote = useEditNote(id);
-  const deleteTimelineEntry = useDeleteTimelineEntry(id);
-  const uploadAttachment = useUploadAttachment(savedId);
-  const deleteAttachment = useDeleteAttachment(savedId);
 
   const [form, setForm] = useState<FormState>(empty);
   const [pristine, setPristine] = useState<FormState>(empty);
@@ -393,35 +379,13 @@ function LeadForm({ id }: { id?: string }) {
     },
   ];
 
-  const chatter = !isNew ? (
-    <Chatter
-      timeline={timeline}
+  const chatter = savedId ? (
+    <LeadChatter
+      leadId={savedId}
       authorInitials={composerInitial}
-      attachments={attachments}
-      posting={addNote.isPending || uploadAttachment.isPending}
-      uploading={uploadAttachment.isPending}
-      onSubmit={(body, files) => {
-        // Сначала создаём запись ленты, затем цепляем к ней файлы: так
-        // вложения попадают именно в эту строку, а не в соседнюю.
-        if (!body && files.length === 0) return;
-        addNote.mutate(body || "Вложение", {
-          onSuccess: (entry) => {
-            for (const file of files) {
-              uploadAttachment.mutate({
-                file,
-                entryId: Number(entry.id),
-              });
-            }
-          },
-        });
-      }}
-      onUpload={(file, entryId) => uploadAttachment.mutate({ file, entryId })}
-      onDelete={(file) => deleteAttachment.mutate(file.id)}
-      onPreview={(file) => setPreview(file)}
-      onEditNote={(entryId, body) => editNote.mutate({ entryId, body })}
-      onDeleteEntry={(entry) => deleteTimelineEntry.mutate(Number(entry.id))}
       currentUserId={currentUser?.id}
       readOnly={readOnly}
+      onPreview={setPreview}
     />
   ) : undefined;
 
