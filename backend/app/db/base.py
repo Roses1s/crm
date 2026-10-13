@@ -7,8 +7,9 @@ from datetime import datetime
 from sqlalchemy import DateTime, MetaData, func
 from sqlalchemy.orm import DeclarativeBase, Mapped, mapped_column
 
-# Единые имена ограничений: без них Alembic генерирует безымянные индексы,
-# которые потом невозможно изменить миграцией.
+# Имена ограничений задаём по единой схеме: безымянные индексы и связи,
+# которые Alembic генерирует сам, потом невозможно надёжно изменить или
+# удалить миграцией.
 NAMING_CONVENTION = {
     "ix": "ix_%(column_0_label)s",
     "uq": "uq_%(table_name)s_%(column_0_name)s",

@@ -15,8 +15,9 @@ from pydantic_settings import BaseSettings, SettingsConfigDict
 
 Environment = Literal["local", "staging", "production"]
 
-# Значение из примера .env и дефолт в коде — если дошло до production as is,
-# значит кто-то забыл переопределить переменную окружения.
+# Значение совпадает одновременно с примером из .env и со значением по
+# умолчанию в коде: если оно в таком виде дошло до production — переменную
+# окружения при настройке сервера забыли переопределить.
 _INSECURE_DEFAULT_SECRET_KEYS = {"dev-secret-change-me", "test-secret", "ЗАМЕНИТЕ_МЕНЯ"}
 _MIN_SECRET_KEY_LENGTH = 32  # см. рекомендацию PyJWT/RFC 7518 §3.2 для HS256
 
@@ -29,72 +30,76 @@ class Settings(BaseSettings):
         case_sensitive=False,
     )
 
-    # --- приложение -------------------------------------------------------
+    # --- Приложение ---
     app_name: str = "CRM Детроид API"
     api_prefix: str = "/api/v1"
     environment: Environment = "local"
     log_level: str = "INFO"
     log_json: bool = True
 
-    # --- безопасность -----------------------------------------------------
+    # --- Безопасность ---
     secret_key: str = "dev-secret-change-me"
     jwt_algorithm: str = "HS256"
     access_token_ttl_minutes: int = 30
     refresh_token_ttl_days: int = 14
     cors_origins: list[str] = Field(default_factory=lambda: ["http://localhost:5173"])
 
-    # --- база данных ------------------------------------------------------
+    # --- База данных ---
     postgres_host: str = "postgres"
     postgres_port: int = 5432
     postgres_user: str = "crm"
     postgres_password: str = "crm"
     postgres_db: str = "crm"
-    # Прямой DSN перекрывает разобранные по частям настройки (нужно тестам и CI).
+    # Готовый DSN, если задан, имеет приоритет над сборкой из отдельных
+    # частей: этим пользуются тесты и CI со своими временными базами.
     database_url: str | None = None
-    # Бюджет соединений с Postgres считается так:
+    # Бюджет соединений с PostgreSQL складывается так:
     #   GUNICORN_WORKERS * (db_pool_size + db_max_overflow)
     #   + запас на Celery worker/beat и ручные psql/alembic-сессии
     #   <= max_connections из команды postgres в docker-compose.yml.
-    # Сейчас: 3 воркера * (10 + 20) = 90, + ~15 от Celery (свой движок с
-    # дефолтным QueuePool) + запас — против max_connections=120. Если меняете
-    # GUNICORN_WORKERS или эти два числа, пересчитайте max_connections заодно,
-    # иначе под нагрузкой можно упереться в лимит соединений Postgres.
+    # Сейчас: 3 воркера * (10 + 20) = 90, плюс ~15 у Celery (собственный
+    # движок с пулом по умолчанию) и запас — при пределе max_connections=120.
+    # Меняя GUNICORN_WORKERS или параметры пула, пересчитайте заодно и
+    # max_connections, иначе под нагрузкой упрёмся в лимит соединений.
     db_pool_size: int = 10
     db_max_overflow: int = 20
     db_echo: bool = False
 
-    # --- Valkey (кеш, брокер Celery) --------------------------------------
+    # --- Valkey: кеш и брокер Celery ---
     valkey_url: str = "redis://valkey:6379/0"
     celery_broker_db: int = 1
     celery_result_db: int = 2
     cache_ttl_seconds: int = 60
 
-    # --- ограничение частоты запросов -------------------------------------
+    # --- Ограничение частоты запросов ---
     rate_limit_enabled: bool = True
     rate_limit_login: str = "10/minute"
     rate_limit_default: str = "300/minute"
 
-    # --- вложения ----------------------------------------------------------
+    # --- Вложения ---
     attachments_dir: str = "/var/lib/crm/attachments"
-    # Лимит файла; client_max_body_size nginx должен быть чуть выше из-за multipart overhead.
+    # Предельный размер файла. Лимит nginx (client_max_body_size) должен быть
+    # чуть выше: к телу файла добавляются служебные данные multipart.
     max_upload_mb: int = 25
-    # Предохранитель по месту: если на диске останется меньше, загрузка файлов
-    # перестаёт приниматься. Нужен, чтобы заполненный диск не остановил
-    # PostgreSQL — на сервере всего 15 ГБ и общий раздел с базой.
+    # Предохранитель по свободному месту: ниже этого остатка загрузка файлов
+    # отклоняется. Диск у сервера общий с базой (всего 15 ГБ), и заполнение
+    # его файлами остановило бы PostgreSQL.
     min_free_disk_mb: int = 1024
 
-    # --- резервные копии ---------------------------------------------------
+    # --- Резервные копии ---
     backup_dir: str = "/var/backups/crm"
     backup_keep_days: int = 14
-    # Копия считается устаревшей, если её нет дольше этого срока.
+    # Если свежей копии нет дольше этого срока, она считается устаревшей:
+    # по этому признаку видно, что ночная задача перестала работать.
     backup_stale_hours: int = 36
-    # Файлы вложений архивируются отдельно и реже: дамп базы их не содержит.
+    # Вложения архивируются отдельной задачей и реже, чем база: в дамп базы
+    # сами файлы не входят, там только записи о них.
     backup_files_keep: int = 4
-    # Сколько дней хранить журнал попыток входа (раздел «Безопасность»).
-    # Без срока таблица росла бы вечно.
+    # Срок хранения журнала попыток входа (раздел «Безопасность») в днях.
+    # Без срока давности таблица журнала росла бы неограниченно.
     login_attempts_keep_days: int = 90
 
-    # --- наблюдаемость ----------------------------------------------------
+    # --- Наблюдаемость ---
     sentry_dsn: str | None = None
     sentry_traces_sample_rate: float = 0.1
 

@@ -123,8 +123,8 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(RequestValidationError)
     async def _validation_error(_: Request, exc: RequestValidationError) -> JSONResponse:
-        # exc.errors() содержит объекты исключений в ctx — их нельзя отдать в JSON,
-        # поэтому оставляем только поле, сообщение и тип ошибки.
+        # В exc.errors() внутри ctx лежат сами объекты исключений: в JSON их
+        # не сериализовать, поэтому наружу уходят только поле, текст и тип.
         errors = [
             {
                 "loc": [str(part) for part in err.get("loc", [])],
@@ -149,8 +149,9 @@ def register_exception_handlers(app: FastAPI) -> None:
 
     @app.exception_handler(DataError)
     async def _data_error(_: Request, exc: DataError) -> JSONResponse:
-        # Например, число вышло за точность Numeric или строка за пределы
-        # колонки. Это некорректные данные запроса, а не необработанный 500.
+        # Сюда попадают, например, число вне точности Numeric или строка
+        # длиннее колонки: это ошибка во входных данных (ответ 4xx), а не
+        # внутренний сбой сервера (500).
         log.warning("db.data_error", error=str(exc.orig))
         return JSONResponse(
             status_code=status.HTTP_422_UNPROCESSABLE_CONTENT,

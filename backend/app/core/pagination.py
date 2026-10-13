@@ -51,7 +51,8 @@ async def paginate(
     """Возвращает срез записей и общее количество."""
     total_stmt = select(func.count()).select_from(statement.order_by(None).subquery())
     total = int((await session.execute(total_stmt)).scalar_one())
-    # Не отправляем в БД заведомо пустую страницу с огромным OFFSET.
+    # Заведомо пустую страницу в базу не отправляем: огромный OFFSET заставил
+    # бы PostgreSQL прочитать и отбросить все строки до неё ради пустоты.
     if params.offset >= total:
         return [], total
     rows = (

@@ -27,7 +27,7 @@ log = get_logger(__name__)
 router = APIRouter(prefix="/admin", tags=["администрирование"])
 
 
-# --- сотрудники ---------------------------------------------------------------
+# --- Сотрудники ---
 
 
 @router.get("/users", response_model=list[UserRead], summary="Пользователи")
@@ -53,7 +53,7 @@ async def delete_user(user_id: int, session: SessionDep, current: AdminUser) -> 
     await service.delete_user(session, current=current, user_id=user_id)
 
 
-# --- безопасность -------------------------------------------------------------
+# --- Безопасность ---
 
 
 @router.get("/backups", summary="Список резервных копий")
@@ -61,7 +61,8 @@ async def list_backups(_: AdminUser) -> dict[str, Any]:
     """Файлы из каталога бэкапов + признак «копия устарела»."""
     from app.api.v1.attachments import disk_usage
 
-    # Чтение каталога — блокирующие вызовы, выносим в пул потоков.
+    # Чтение каталога блокирует поток выполнения, поэтому уводим его в пул
+    # потоков: иначе на время чтения завис бы весь обработчик запросов.
     results, last_mtime = await run_in_threadpool(service.scan_backups, Path(settings.backup_dir))
     age_hours = service.backup_age_hours(last_mtime)
 

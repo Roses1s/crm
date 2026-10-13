@@ -16,8 +16,9 @@ from app.core.config import settings
 
 
 def configure_logging() -> None:
-    # Процессоры из structlog.processors, а не structlog.stdlib: логгер у нас
-    # PrintLogger, у него нет атрибута .name, которого ждёт stdlib-версия.
+    # Процессоры берём из structlog.processors, а не structlog.stdlib: наш
+    # логгер — PrintLogger, и у него нет атрибута .name, который ждёт
+    # stdlib-вариант.
     processors: list[Any] = [
         structlog.contextvars.merge_contextvars,
         structlog.processors.add_log_level,
@@ -39,7 +40,8 @@ def configure_logging() -> None:
         cache_logger_on_first_use=True,
     )
 
-    # Логи uvicorn/gunicorn направляем в тот же поток и формат.
+    # Чужие логгеры (uvicorn, gunicorn) перенаправляем в общий поток и
+    # формат: иначе часть записей выглядела бы иначе и терялась при разборе.
     logging.basicConfig(
         format="%(message)s",
         stream=sys.stdout,

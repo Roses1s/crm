@@ -64,7 +64,8 @@ async def create_lead(payload: LeadCreate, session: SessionDep, user: CurrentUse
 
 @router.get("/{lead_id}", response_model=LeadRead, summary="Карточка лида")
 async def get_lead(lead_id: int, session: SessionDep, user: CurrentUser) -> Any:
-    # Чтение — проигранный лид открыт всем, его можно посмотреть и забрать.
+    # Читать карточку разрешено шире, чем править: проигранный лид виден всем
+    # сотрудникам — иначе его никто не смог бы забрать себе в работу.
     return await service.get_lead_or_404(session, lead_id, user, allow_lost=True)
 
 

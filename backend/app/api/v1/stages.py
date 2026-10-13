@@ -37,7 +37,8 @@ async def list_stages(
             raise PermissionDeniedError("Чужую доску может открыть только администратор")
         board_owner = owner_id
 
-    # Первый заход на доску: этапов ещё нет — создаём стандартную воронку.
+    # У нового сотрудника этапов ещё нет: при первом заходе на доску создаём
+    # стандартную воронку, иначе доска открылась бы пустой и нерабочей.
     await ensure_default_stages(session, board_owner)
     stmt = select(Stage).where(Stage.owner_id == board_owner).order_by(Stage.sequence, Stage.id)
     return list((await session.execute(stmt)).scalars().all())

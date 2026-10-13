@@ -15,7 +15,8 @@ from app.schemas.crm import LossReasonCreate, LossReasonRead
 
 router = APIRouter(prefix="/crm/loss-reasons", tags=["crm: причины проигрыша"])
 
-# Список короткий и меняется редко — кешируем его целиком, как теги.
+# Справочник короткий и почти не меняется, поэтому кешируем список целиком
+# — по той же схеме, что и теги.
 CACHE_NS = "loss_reasons"
 
 
@@ -48,8 +49,9 @@ async def create_loss_reason(
     "/{reason_id}", status_code=status.HTTP_204_NO_CONTENT, summary="Удалить причину проигрыша"
 )
 async def delete_loss_reason(reason_id: int, session: SessionDep, _: AdminUser) -> None:
-    # Сериализуем удаление со сменой причины у лида: иначе проверка count()
-    # могла пройти одновременно с назначением этой причины.
+    # Удаление причины сериализуем с её назначением лиду: без блокировки
+    # проверка «причина не используется» могла пройти одновременно с
+    # назначением, и причина исчезла бы из-под свежей записи.
     reason = (
         await session.execute(
             select(LossReason).where(LossReason.id == reason_id).with_for_update()
@@ -57,10 +59,9 @@ async def delete_loss_reason(reason_id: int, session: SessionDep, _: AdminUser) 
     ).scalar_one_or_none()
     if reason is None:
         raise NotFoundError(f"Причина {reason_id} не найдена")
-    # Причина «в работе» — часть истории проигранных лидов: у причины в базе
-    # стоит ondelete=SET NULL, и удаление молча стёрло бы её из карточек,
-    # которые уже проиграли с этой причиной (ревью 03.10, Б-15). Неиспользуемую
-    # можно удалить свободно.
+    # Используемую причину не удаляем: в базе у связи стоит ondelete=SET
+    # NULL, и удаление молча стёрло бы причину из истории уже проигранных
+    # лидов (ревью 03.10, Б-15). Свободную причину удалять безопасно.
     in_use = int(
         (
             await session.execute(select(func.count()).where(Lead.loss_reason_id == reason.id))

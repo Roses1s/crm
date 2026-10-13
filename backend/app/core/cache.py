@@ -61,7 +61,7 @@ async def invalidate(namespace: str) -> None:
     """
     try:
         await FastAPICache.clear(namespace=namespace)
-    except Exception as exc:  # кеш не должен ломать основную операцию
+    except Exception as exc:  # сбой кеша не вправе ломать основную операцию
         log.warning("cache.invalidate_failed", namespace=namespace, error=str(exc))
 
 

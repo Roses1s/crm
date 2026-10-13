@@ -60,8 +60,8 @@ def create_app() -> FastAPI:
         redoc_url=None,
         openapi_url="/openapi.json" if not settings.is_production else None,
         lifespan=lifespan,
-        # Фронтенд ходит по адресам без завершающего слеша — не заставляем
-        # браузер ходить по редиректам.
+        # Фронтенд обращается к адресам без завершающего слеша: маршруты
+        # принимаем как есть, чтобы не гонять браузер по редиректам.
         redirect_slashes=True,
     )
 

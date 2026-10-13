@@ -23,7 +23,8 @@ from app.services.attachments import (
 )
 
 router = APIRouter(prefix="/crm", tags=["crm: вложения"])
-# Заявки живут вне префикса /crm, поэтому их вложениям нужен отдельный роутер.
+# Вложения заявок вынесены в отдельный роутер: заявки находятся вне префикса
+# /crm, и общий роутер вложений лидов их адреса не покрывает.
 shipment_router = APIRouter(tags=["заявки: вложения"])
 
 
@@ -127,5 +128,6 @@ async def delete_attachment(attachment_id: int, session: SessionDep, user: Curre
     await service.delete_attachment(session, user, attachment_id)
 
 
-# disk_usage переэкспортируем: им пользуется раздел «Безопасность» в админке.
+# disk_usage реэкспортируется отсюда для раздела «Безопасность» в админке:
+# он показывает заполненность диска по тому же пути, что и вложения.
 __all__ = ["ALLOWED_EXTENSIONS", "INLINE_TYPES", "disk_usage", "router", "shipment_router"]

@@ -17,7 +17,8 @@ from app.core.config import settings
 
 def _engine_kwargs() -> dict[str, Any]:
     kwargs: dict[str, Any] = {"echo": settings.db_echo, "pool_pre_ping": True, "future": True}
-    # У SQLite (тесты) нет пула соединений в привычном смысле.
+    # В тестах на SQLite пул соединений не применяется: у этой базы нет
+    # серверных соединений в том смысле, как у PostgreSQL.
     if not settings.sqlalchemy_dsn.startswith("sqlite"):
         kwargs |= {"pool_size": settings.db_pool_size, "max_overflow": settings.db_max_overflow}
     return kwargs

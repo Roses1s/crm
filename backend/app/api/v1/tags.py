@@ -27,7 +27,8 @@ from app.services.tags import update_tag as update_tag_service
 
 router = APIRouter(prefix="/crm/tags", tags=["crm: теги"])
 
-# Список тегов одинаков для всех и меняется редко — кешируем его целиком.
+# Список общий для всех сотрудников и меняется редко, поэтому отдаём его
+# из кеша целиком, а не запросом в базу на каждый экран.
 CACHE_NS = "tags"
 
 
@@ -39,18 +40,19 @@ async def list_tags(session: SessionDep, _: CurrentUser) -> list[Tag]:
 
 @router.post("", response_model=TagRead, status_code=status.HTTP_201_CREATED, summary="Создать тег")
 async def create_tag(payload: TagCreate, session: SessionDep, _: CurrentUser) -> Tag:
-    # Повторное имя без учёта регистра возвращает существующий тег; сервис
-    # сериализует параллельное создание имён.
+    # Имя, совпадающее с существующим без учёта регистра, возвращает готовый
+    # тег вместо дубля; параллельное создание одинаковых имён сериализует
+    # сервис, чтобы гонка не породила два тега с одним названием.
     tag, created = await create_or_get_tag(session, name=payload.name, color=payload.color)
     if created:
-        await invalidate(CACHE_NS)  # список тегов изменился — сбрасываем кеш
+        await invalidate(CACHE_NS)  # состав тегов изменился: кеш списка недостоверен
     return tag
 
 
 @router.patch("/{tag_id}", response_model=TagRead, summary="Переименовать / перекрасить тег")
 async def update_tag(tag_id: int, payload: TagUpdate, session: SessionDep, _: CurrentUser) -> Tag:
     tag = await update_tag_service(session, tag_id, payload.model_dump(exclude_unset=True))
-    await invalidate(CACHE_NS)  # тег изменился — сбрасываем кеш
+    await invalidate(CACHE_NS)  # тег изменился: кеш списка недостоверен
     return tag
 
 
@@ -63,4 +65,4 @@ async def delete_tag(tag_id: int, session: SessionDep, _: AdminUser) -> None:
         raise NotFoundError(f"Тег {tag_id} не найден")
     await session.delete(tag)
     await session.commit()
-    await invalidate(CACHE_NS)  # список тегов изменился — сбрасываем кеш
+    await invalidate(CACHE_NS)  # состав тегов изменился: кеш списка недостоверен
