@@ -27,8 +27,9 @@ class User(Base, TimestampMixin):
     hashed_password: Mapped[str] = mapped_column(String(255), nullable=False)
     first_name: Mapped[str] = mapped_column(String(100), default="", nullable=False)
     last_name: Mapped[str] = mapped_column(String(100), default="", nullable=False)
-    # native_enum=False -> VARCHAR + CHECK: одинаково работает в PostgreSQL и SQLite,
-    # и добавление новой роли не требует ALTER TYPE.
+    # native_enum=False даёт VARCHAR + CHECK вместо типа PostgreSQL: схема
+    # одинаково работает в PostgreSQL и SQLite, а новая роль добавляется
+    # миграцией без ALTER TYPE.
     role: Mapped[Role] = mapped_column(
         Enum(Role, native_enum=False, length=20, values_callable=lambda e: [x.value for x in e]),
         default=Role.manager,
@@ -37,13 +38,14 @@ class User(Base, TimestampMixin):
     is_active: Mapped[bool] = mapped_column(Boolean, default=True, nullable=False)
 
     # lazy="raise": обратная сторона Lead.assigned_to нужна только ORM для
-    # back_populates, в коде к ней никто не обращается (UserRead её не отдаёт).
-    # С lazy="selectin" SQLAlchemy тянула бы ВСЕ лиды пользователя (с джойнами
-    # на stage/assigned_to/loss_reason и отдельным запросом тегов) при каждой
-    # загрузке User — а User грузится в get_current_user на каждый запрос с
-    # токеном. "raise" вместо обычного "select" — чтобы случайное обращение
-    # к user.leads в будущем упало сразу понятной ошибкой, а не тихо вернуло
-    # лишний SELECT на каждый HTTP-вызов.
+    # back_populates, код к ней не обращается (UserRead её не отдаёт). При
+    # lazy="selectin" SQLAlchemy тянула бы все лиды пользователя (с
+    # соединениями на этап, ответственного и причину проигрыша плюс
+    # отдельный запрос тегов) при каждой загрузке User, а User загружается
+    # в get_current_user на каждый запрос с токеном. Режим "raise" выбран
+    # вместо обычного "select", чтобы случайное обращение к user.leads
+    # сразу падало понятной ошибкой, а не добавляло тихий лишний SELECT
+    # в каждый HTTP-вызов.
     leads: Mapped[list[Lead]] = relationship(back_populates="assigned_to", lazy="raise")
 
     @property

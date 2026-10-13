@@ -30,9 +30,10 @@ def validate_inn(value: str | None) -> str:
     `validate_inn_optional` — у ИНН перевозчика в заявке. Задаём проверку один
     раз здесь, а не копируем в каждой схеме.
     """
-    # Явный null в PATCH («inn»: null) раньше доходил сюда и падал TypeError'ом
-    # уже внутри генератора — Pydantic превращает в 422 только ValueError,
-    # поэтому пользователь получал 500 вместо понятной ошибки.
+    # Явный null в PATCH («inn»: null) прежде доходил до генератора и падал
+    # TypeError уже внутри него. Pydantic превращает в ответ 422 только
+    # ValueError, поэтому пользователь получал необъяснимый 500 вместо
+    # понятной ошибки валидации.
     if value is None:
         raise ValueError("ИНН нельзя очистить: поле обязательно")
     digits = "".join(ch for ch in value if ch.isdigit())

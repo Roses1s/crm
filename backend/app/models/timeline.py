@@ -19,8 +19,9 @@ class EntryType(enum.StrEnum):
     message = "message"
 
 
-#: Подписи записей истории о переносе карточки между этапами: у лида и у заявки.
-#: Такие записи разрешено удалять любому сотруднику, остальная история неизменяема.
+#: Подписи системных записей о переносе между этапами — отдельно для лида
+#: и для заявки. Только такие записи разрешено удалять любому сотруднику:
+#: остальная история неизменяема.
 LEAD_STAGE_LABEL = "Этапы лидов"
 SHIPMENT_STAGE_LABEL = "Этап"
 STAGE_FIELD_LABELS = frozenset({LEAD_STAGE_LABEL, SHIPMENT_STAGE_LABEL})
@@ -45,9 +46,9 @@ class TimelineEntry(Base, TimestampMixin):
     lead_id: Mapped[int] = mapped_column(
         ForeignKey("leads.id", ondelete="CASCADE"), nullable=False, index=True
     )
-    # Лента заявки: запись принадлежит и заявке (shipment_id), и её лиду
-    # (lead_id остаётся заполненным для каскадного удаления). У записей лида
-    # shipment_id пуст — так две ленты не смешиваются.
+    # У записи ленты заявки заполнены оба поля: shipment_id и lead_id (второй
+    # нужен каскадному удалению вместе с лидом). У записей самого лида
+    # shipment_id пуст — по этому признаку две ленты не смешиваются.
     shipment_id: Mapped[int | None] = mapped_column(index=True)
     author_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))
 
@@ -111,8 +112,9 @@ class Attachment(Base, TimestampMixin):
     entry_id: Mapped[int | None] = mapped_column(
         ForeignKey("timeline_entries.id", ondelete="CASCADE"), index=True
     )
-    # Заявка всегда принадлежит лиду, поэтому lead_id остаётся заполненным и у
-    # файлов заявки: так работает и подсчёт объёма по лиду, и каскадное удаление.
+    # Файл заявки тоже всегда связан с её лидом, поэтому lead_id заполнен и
+    # здесь: на это опираются подсчёт объёма файлов по лиду и каскадное
+    # удаление вложений вместе с карточкой.
     shipment_id: Mapped[int | None] = mapped_column(index=True)
 
     uploaded_by_id: Mapped[int | None] = mapped_column(ForeignKey("users.id", ondelete="SET NULL"))

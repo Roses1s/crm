@@ -37,10 +37,10 @@ shipment_tags = Table(
 
 
 class ShipmentStatus(enum.StrEnum):
-    new = "new"  # Новая
-    checked = "checked"  # Проверена и подписана заявка
-    loaded = "loaded"  # Машина загрузилась
-    unloaded = "unloaded"  # Машина выгрузилась
+    new = "new"  # Только создана
+    checked = "checked"  # Заявка проверена и подписана
+    loaded = "loaded"  # Машина прошла загрузку
+    unloaded = "unloaded"  # Машина прошла выгрузку
 
 
 class TransportType(enum.StrEnum):
@@ -55,18 +55,19 @@ class TransportType(enum.StrEnum):
 class TaxRate(enum.StrEnum):
     """Ставка НДС в позиции заказа — у заказчика и перевозчика выбирается независимо."""
 
-    vat_22 = "vat_22"  # НДС 22%
-    no_vat = "no_vat"  # Без НДС
-    vat_0 = "vat_0"  # НДС 0%
+    vat_22 = "vat_22"  # Ставка НДС 22%
+    no_vat = "no_vat"  # НДС не применяется
+    vat_0 = "vat_0"  # Ставка НДС 0%
 
 
-# Маржа «видимого» значения урезана на фиксированную долю — решение владельца
-# (доп. расходы/комиссия, не связанные с НДС). Копия константы живёт на
-# фронтенде (MARGIN_DEDUCTION_RATE в ShipmentFormPage.tsx) для живого
-# пересчёта в карточке — менять только в обоих местах сразу.
+# Показываемая маржа уменьшается на фиксированную долю — это решение
+# владельца (дополнительные расходы и комиссия вне НДС). Дубликат константы
+# на фронтенде (MARGIN_DEDUCTION_RATE в ShipmentFormPage.tsx) нужен для
+# живого пересчёта в карточке: менять значение только синхронно в обоих
+# местах, иначе сервер и карточка покажут разную маржу.
 MARGIN_DEDUCTION_RATE = Decimal("0.25")
 
-# Проценты действующих ставок НДС.
+# Действующие ставки НДС в процентах: единый справочник для расчётов.
 _TAX_RATE_PERCENT: dict[TaxRate, Decimal] = {
     TaxRate.vat_22: Decimal("22"),
     TaxRate.no_vat: Decimal("0"),
@@ -123,10 +124,12 @@ class Shipment(Base, TimestampMixin):
     """Заявка на перевозку."""
 
     __tablename__ = "shipments"
-    # Составной ключ нужен дочерним строкам заявки: timeline/attachments
-    # обязаны ссылаться не просто на существующую заявку, а на ту же пару
-    # «заявка + лид». Так БД сама не допускает рассинхронизацию lead_id.
-    # Индекс под сортировку списка (created_at DESC) — см. М-03 ревью 06.10.
+    # Составной ключ связывает дочерние записи (ленту и вложения) не просто
+    # с существующей заявкой, а с конкретной парой «заявка + её лид». Так
+    # сама база не допускает, чтобы lead_id у дочерней записи разошёлся
+    # с лидом заявки.
+    # Индекс обеспечивает сортировку списка по убыванию created_at без
+    # полной сортировки таблицы (ревью 06.10, М-03).
     __table_args__ = (
         UniqueConstraint("id", "lead_id", name="uq_shipments_id_lead_id"),
         UniqueConstraint("number", name="uq_shipments_number"),
@@ -134,9 +137,9 @@ class Shipment(Base, TimestampMixin):
     )
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    # Номер заявки — видимый пользователю идентификатор, который можно
-    # переименовать (в отличие от id). По умолчанию он равен id, если этот номер
-    # уже занят — к id добавляется суффикс. Уникальность проверяет база данных.
+    # Номер — видимый пользователю идентификатор заявки; в отличие от id,
+    # его можно изменить. По умолчанию номер равен id, а если такой текст
+    # уже занят, к нему добавляется суффикс. Уникальность гарантирует база.
     number: Mapped[str] = mapped_column(String(40), default="", nullable=False)
     lead_id: Mapped[int] = mapped_column(
         ForeignKey("leads.id", ondelete="CASCADE"), nullable=False, index=True
@@ -161,8 +164,8 @@ class Shipment(Base, TimestampMixin):
     cargo_volume: Mapped[Decimal | None] = mapped_column(Numeric(10, 2))
     comment: Mapped[str] = mapped_column(Text, default="", nullable=False)
 
-    # --- Позиция заказа: единственная строка «ТЭО», цена отдельно для
-    # заказчика и для перевозчика — у каждой своя ставка НДС. ---
+    # --- Позиция заказа: одна строка «ТЭО», цена заказчика и цена
+    # перевозчика задаются отдельно, у каждой своя ставка НДС ---
     customer_price: Mapped[Decimal | None] = mapped_column(Numeric(12, 2))
     customer_tax: Mapped[TaxRate] = mapped_column(
         _enum(TaxRate), default=TaxRate.vat_22, nullable=False
@@ -172,12 +175,12 @@ class Shipment(Base, TimestampMixin):
         _enum(TaxRate), default=TaxRate.vat_22, nullable=False
     )
 
-    # --- Заказчик (шапка) ---
+    # --- Заказчик: шапка заявки ---
     customer_address: Mapped[str] = mapped_column(Text, default="", nullable=False)
     customer_contact: Mapped[str] = mapped_column(String(255), default="", nullable=False)
     customer_signer: Mapped[str] = mapped_column(String(255), default="", nullable=False)
 
-    # --- Погрузка (мультигорода — список тегов) ---
+    # --- Погрузка: несколько городов задаются списком тегов ---
     loading_cities: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
     loading_date_from: Mapped[date | None] = mapped_column(Date)
     loading_date_to: Mapped[date | None] = mapped_column(Date)
@@ -191,10 +194,10 @@ class Shipment(Base, TimestampMixin):
     unloading_time_from: Mapped[str] = mapped_column(String(40), default="", nullable=False)
     unloading_time_to: Mapped[str] = mapped_column(String(40), default="", nullable=False)
 
-    # --- Перевозчик: никакого справочника — перевозчика просто вписывают
-    # текстом прямо в заявку (компания, ИНН, контакт). Пересечений/проверок
-    # на дубли между заявками сознательно нет — это не бизнес-сущность
-    # системы, а текст, который вводит продавец. ---
+    # --- Перевозчик: справочника нет, данные вписываются текстом прямо
+    # в заявку (компания, ИНН, контакт). Проверок на дубли между заявками
+    # сознательно нет: перевозчик здесь не сущность системы, а текст,
+    # который вводит продавец ---
     carrier_name: Mapped[str] = mapped_column(String(255), default="", nullable=False)
     carrier_inn: Mapped[str] = mapped_column(String(12), default="", nullable=False)
     carrier_contact: Mapped[str] = mapped_column(String(255), default="", nullable=False)
@@ -215,8 +218,9 @@ class Shipment(Base, TimestampMixin):
     loading_method: Mapped[list[str]] = mapped_column(JSON, default=list, nullable=False)
 
     lead: Mapped[Lead] = relationship(back_populates="shipments", lazy="joined")
-    # Теги заявки остались в базе, но с 03.10.2026 не показываются в карточке
-    # (решение владельца). Значения сохраняются как есть: форма их не трогает.
+    # Теги заявки в базе сохранены, но с 03.10.2026 в карточке не
+    # показываются (решение владельца). Форма значения не изменяет и не
+    # очищает: они продолжают храниться и передаваться как есть.
     tags: Mapped[list[Tag]] = relationship(secondary=shipment_tags, lazy="selectin")
 
     @property
@@ -230,15 +234,16 @@ class Shipment(Base, TimestampMixin):
 
     @property
     def route(self) -> str:
-        # Маршрут для списка собирается из городов-тегов.
+        # Маршрут в списке собираем из городов-тегов погрузки и выгрузки:
+        # отдельным полем он в базе не хранится.
         start = ", ".join(self.loading_cities)
         end = ", ".join(self.unloading_cities)
         if start and end:
             return f"{start} → {end}"
         return start or end or "—"
 
-    # --- Расчёты для списка: колонки «Маржа» и «Всего» считает сервер,
-    # чтобы фронтенд не дублировал формулу (единый источник правды). ---
+    # --- Расчёты для списка: «Маржу» и «Всего» считает сервер, чтобы
+    # формула существовала в одном месте и фронтенд её не дублировал ---
     @property
     def margin(self) -> Decimal | None:
         return visible_margin(

@@ -14,11 +14,13 @@ from app.schemas.validators import validate_inn_optional
 
 
 class ShipmentBase(BaseModel):
-    # Номер заявки — редактируемый текст; без значения сервис подставит id,
-    # а при совпадении добавит суффикс.
+    # Номер заявки — редактируемый текст. Если значение не передано,
+    # сервис подставит id, а при совпадении с занятым номером добавит
+    # суффикс.
     number: str = Field(default="", max_length=40)
 
-    # Маршрут (адреса и контакты; города — списком тегов ниже).
+    # Маршрут: адреса и контакты погрузки и выгрузки; города задаются
+    # списками тегов дальше по схеме.
     address_loading: str = Field(default="", max_length=255)
     address_unloading: str = Field(default="", max_length=255)
     contact_loading_name: str = Field(default="", max_length=255)
@@ -30,13 +32,13 @@ class ShipmentBase(BaseModel):
     cargo_volume: Decimal | None = Field(default=None, ge=0, max_digits=10, decimal_places=2)
     comment: str = ""
 
-    # Позиция заказа: цена заказчика/перевозчика, каждая со своей ставкой НДС.
+    # Позиция заказа: у цены заказчика и цены перевозчика своя ставка НДС.
     customer_price: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
     customer_tax: TaxRate = TaxRate.vat_22
     carrier_price: Decimal | None = Field(default=None, ge=0, max_digits=12, decimal_places=2)
     carrier_tax: TaxRate = TaxRate.vat_22
 
-    # Заказчик (шапка).
+    # Заказчик: шапка заявки.
     customer_address: str = ""
     customer_contact: str = Field(default="", max_length=255)
     customer_signer: str = Field(default="", max_length=255)
@@ -55,11 +57,11 @@ class ShipmentBase(BaseModel):
     unloading_time_from: str = Field(default="", max_length=40)
     unloading_time_to: str = Field(default="", max_length=40)
 
-    # Перевозчик — свободный текст прямо в заявке, а не выбор из справочника:
-    # его можно вписать любого, с любой компанией/ИНН/контактом. ИНН (если
-    # указан) проверяется контрольной суммой, но ни с какими другими
-    # записями (лидами, другими заявками) не сверяется — пересечений и
-    # дублей по перевозчику в системе больше нет.
+    # Перевозчик вписывается свободным текстом прямо в заявку, а не
+    # выбирается из справочника: допустимы любые компания, ИНН и контакт.
+    # Указанный ИНН проверяется контрольной суммой, но с другими записями
+    # (лидами, другими заявками) не сверяется: дублей по перевозчику
+    # система не отслеживает.
     carrier_name: str = Field(default="", max_length=255)
     carrier_inn: str = Field(default="", max_length=12)
     carrier_contact: str = Field(default="", max_length=255)
@@ -86,21 +88,21 @@ class ShipmentBase(BaseModel):
 
 class ShipmentCreate(ShipmentBase):
     lead_id: int
-    # Дата создания редактируема: заявку часто заводят в системе позже, чем
-    # она реально возникла (задним числом), и нужно видеть её в списке по
-    # настоящей дате, а не по дате ввода в CRM. Не передано — ставит сама БД
-    # (см. create_shipment: при None поле не попадает в INSERT).
+    # Дата создания разрешена к правке: заявку нередко заводят позже, чем
+    # она возникла (задним числом), и в списке она должна стоять по
+    # настоящей дате, а не по дате ввода в CRM. Если значение не передано,
+    # его ставит сама база (create_shipment: при None поля нет в INSERT).
     created_at: datetime | None = None
 
 
 class ShipmentUpdate(PatchModel):
-    # Обычный PATCH не меняет системный статус: для этого есть отдельная ручка,
-    # которая обязательно пишет событие в ленту. Запрет неизвестных полей
-    # (из PatchModel) не даёт полю status или опечатке тихо проигнорироваться
-    # с ложным 200.
+    # Системный статус обычным PATCH не меняется: для него есть отдельная
+    # ручка, которая обязательно пишет событие в ленту. Запрет неизвестных
+    # полей (PatchModel) не позволяет полю status или опечатке тихо
+    # проигнорироваться с ложным ответом 200.
     #
-    # Числа и даты в заявке в базе необязательные: интерфейс присылает им
-    # явный null, когда поле очистили, — это штатный способ стереть значение.
+    # Числа и даты заявки в базе необязательные: очищенное в интерфейсе
+    # поле приходит явным null, и это штатный способ стереть значение.
     nullable_fields: ClassVar[frozenset[str]] = frozenset(
         {
             "cargo_weight",
@@ -115,13 +117,13 @@ class ShipmentUpdate(PatchModel):
         }
     )
 
-    # min_length=1 — номер можно не передавать (тогда он не меняется), но
-    # если передан явно, пустым быть не должен: иначе заявка молча теряет
-    # свой единственный видимый идентификатор без возможности откатить.
+    # min_length=1: номер можно не передавать (тогда он не меняется), но
+    # явно переданный пустым быть не должен — иначе заявка молча потеряет
+    # единственный видимый идентификатор без возможности вернуть.
     number: str | None = Field(default=None, min_length=1, max_length=40)
     lead_id: int | None = None
-    # См. ShipmentCreate.created_at — здесь это просто обычное поле: раз
-    # передано явно (exclude_unset), значит его и меняем.
+    # В отличие от ShipmentCreate.created_at, здесь это обычное поле:
+    # раз оно передано явно (exclude_unset), значит, его и меняем.
     created_at: datetime | None = None
     transport_type: TransportType | None = None
     address_loading: str | None = Field(default=None, max_length=255)
@@ -259,10 +261,11 @@ class ShipmentListItem(ORMModel):
     route: str
     carrier_name: str
     created_at: datetime
-    # Колонки «Маржа» и «Всего» — расчёт на стороне сервера (models/shipment.py):
-    # формула живёт в одном месте, а не дублируется на фронтенде.
+    # Колонки «Маржа» и «Всего» присылает сервер (расчёт в
+    # models/shipment.py): формула живёт в одном месте и на фронтенде
+    # не дублируется.
     margin: Decimal | None
-    customer_total: Decimal | None  # цена заказчика как введена (с НДС)
+    customer_total: Decimal | None  # цена заказчика в том виде, как введена (с НДС)
 
 
 class ShipmentTotals(BaseModel):

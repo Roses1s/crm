@@ -36,9 +36,9 @@ class Stage(Base, TimestampMixin):
     __tablename__ = "stages"
 
     id: Mapped[int] = mapped_column(primary_key=True)
-    # Владелец доски. Этап без хозяина никуда не попадёт, поэтому поле
-    # обязательное: временная «пустота» нужна была только на время перехода
-    # с общей воронки на личные доски.
+    # Владелец доски, которой принадлежит этап. Поле обязательное: этап без
+    # хозяина не относится ни к чьей воронке. Временная допустимость пустоты
+    # требовалась лишь на период перехода с общей доски на личные.
     owner_id: Mapped[int] = mapped_column(
         ForeignKey("users.id", ondelete="CASCADE"), nullable=False, index=True
     )
@@ -54,9 +54,10 @@ class Tag(Base, TimestampMixin):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     name: Mapped[str] = mapped_column(String(64), unique=True, nullable=False)
-    # HEX, не именованный цвет (см. миграцию 20261001_1600_generic_tags и
-    # TagCreate.color в schemas/crm.py) — это чисто python-default ORM, в базе
-    # он ни на что не влияет, пока цвет передаётся явно через API.
+    # Цвет по умолчанию — значение HEX, а не имя цвета (миграция
+    # 20261001_1600_generic_tags, TagCreate.color в schemas/crm.py). Это
+    # только значение по умолчанию на стороне ORM: пока API передаёт цвет
+    # явно, в базе оно ни на что не влияет.
     color: Mapped[str] = mapped_column(String(20), default="#3B82F6", nullable=False)
 
     leads: Mapped[list[Lead]] = relationship(secondary=lead_tags, back_populates="tags")
@@ -79,7 +80,8 @@ class Lead(Base, TimestampMixin):
     """Лид — карточка потенциального клиента."""
 
     __tablename__ = "leads"
-    # Индекс под сортировку списков (updated_at DESC) — см. М-03 ревью 06.10.
+    # Индекс обеспечивает сортировку списков по убыванию updated_at без
+    # полной сортировки таблицы (ревью 06.10, М-03).
     __table_args__ = (
         CheckConstraint("priority BETWEEN 0 AND 3", name="priority_range"),
         CheckConstraint("length(inn) IN (10, 12)", name="inn_length"),
@@ -92,17 +94,18 @@ class Lead(Base, TimestampMixin):
     logist_contact: Mapped[str] = mapped_column(String(255), default="", nullable=False)
     logist_phone: Mapped[str] = mapped_column(String(32), default="", nullable=False)
     logist_email: Mapped[str | None] = mapped_column(String(255))
-    # Назначенный бухгалтер не связан с продавцом (`assigned_to_id`): это отдельный список.
+    # Бухгалтер не зависит от продавца (assigned_to_id): у него отдельный
+    # фиксированный список, и подстановка одного вместо другого недопустима.
     accountant_name: Mapped[str | None] = mapped_column(String(255), nullable=True)
 
     priority: Mapped[int] = mapped_column(Integer, default=0, nullable=False)
-    # Переосмыслено 01.10.2026: это поле означает «лид проигран» — название
-    # оставили прежним (is_archived), чтобы не переписывать всё, что на него
-    # завязано, но по смыслу теперь это «Проигрыш», а не мягкое удаление.
+    # Смысл поля изменён 01.10.2026: теперь оно означает «лид проигран», а
+    # не мягкое удаление. Имя is_archived сохранено, чтобы не переписывать
+    # весь завязанный на него код.
     is_archived: Mapped[bool] = mapped_column(Boolean, default=False, nullable=False, index=True)
-    # Причина проигрыша — заполняется только когда is_archived=True. При
-    # восстановлении лида (см. restore_lead/transfer_lead) обнуляется, но сама
-    # причина навсегда остаётся в чаттере отдельной записью.
+    # Причина заполняется только при проигранном лиде (is_archived=True).
+    # Восстановление и передача (restore_lead/transfer_lead) поле очищают,
+    # но запись о причине навсегда остаётся в ленте карточки.
     loss_reason_id: Mapped[int | None] = mapped_column(
         ForeignKey("loss_reasons.id", ondelete="SET NULL"), index=True
     )
@@ -126,11 +129,12 @@ class Lead(Base, TimestampMixin):
     timeline: Mapped[list[TimelineEntry]] = relationship(
         back_populates="lead", cascade="all, delete-orphan"
     )
-    # selectin: на списке лидов это один дополнительный запрос на всю страницу,
-    # а не по запросу на карточку.
+    # Стратегия selectin: на странице списка это один дополнительный запрос
+    # на все карточки, а не отдельный запрос под каждую карточку.
 
-    # Плоские поля для API: фронтенду удобнее получить имя этапа и
-    # ответственного строкой, чем ходить за вложенными объектами.
+    # Имена этапа и ответственного дублируются плоскими полями для API:
+    # фронтенду проще получить готовые строки, чем разбирать вложенные
+    # объекты ради двух подписей.
     @property
     def stage_name(self) -> str:
         return self.stage.name if self.stage else ""

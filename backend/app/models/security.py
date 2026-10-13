@@ -41,11 +41,12 @@ class RevokedToken(Base):
 
     id: Mapped[int] = mapped_column(primary_key=True)
     jti: Mapped[str] = mapped_column(String(64), unique=True, index=True, nullable=False)
-    # Почему токен отозван: "logout" — человек вышел сам (действует сразу),
-    # "rotation" — заменён новым при продлении сессии. Оба варианта действуют
-    # сразу: повторное использование токена отклоняется без окна replay.
+    # Причина отзыва: "logout" — пользователь вышел сам, "rotation" — токен
+    # заменён при продлении сессии. В обоих случаях отзыв действует
+    # немедленно: повторное использование отклоняется без окна для replay.
     reason: Mapped[str] = mapped_column(String(20), default="logout", nullable=False)
-    # Когда истекает сам токен: после этой даты запись бесполезна.
+    # Срок жизни самого токена: после этой даты запись об отзыве не нужна,
+    # токен и так недействителен.
     expires_at: Mapped[datetime] = mapped_column(
         DateTime(timezone=True), nullable=False, index=True
     )

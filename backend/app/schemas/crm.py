@@ -11,7 +11,7 @@ from app.schemas.common import ORMModel, PatchModel
 from app.schemas.validators import validate_inn
 
 
-# --- этапы -------------------------------------------------------------------
+# --- Этапы доски ---
 class StageRead(ORMModel):
     id: int
     name: str
@@ -45,9 +45,9 @@ class StageReorder(BaseModel):
         return value
 
 
-# --- теги --------------------------------------------------------------------
-# Цвет — HEX (#rrggbb): тег можно покрасить в любой цвет, а не только в одну
-# из заранее заготовленных палитр.
+# --- Теги ---
+# Цвет тега задаётся значением HEX (#rrggbb): доступен любой цвет, а не
+# только варианты из заранее заготовленной палитры.
 _HEX_COLOR_RE = r"^#[0-9a-fA-F]{6}$"
 
 
@@ -83,7 +83,7 @@ class TagUpdate(PatchModel):
         return _validate_hex_color(value) if value is not None else None
 
 
-# --- причины проигрыша --------------------------------------------------------
+# --- Причины проигрыша ---
 class LossReasonRead(ORMModel):
     id: int
     name: str
@@ -93,7 +93,7 @@ class LossReasonCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
 
 
-# --- лиды --------------------------------------------------------------------
+# --- Лиды ---
 AccountantName = Literal[
     "Пухова Елена Витальевна",
     "Кузьмина Виктория Павловна",
@@ -133,12 +133,12 @@ class LeadTransfer(BaseModel):
 
 
 class LeadUpdate(PatchModel):
-    # PATCH применим только к той версии карточки, которую видел пользователь.
-    # Это защищает от тихого затирания чужих изменений.
+    # Версия карточки, которую видел пользователь при открытии: PATCH
+    # применится только к ней. Так чужие правки не затираются молча.
     expected_updated_at: datetime = Field(description="Время карточки, которое прочитал клиент")
 
-    # Почта логиста и назначенный бухгалтер необязательны: их разрешено
-    # очистить, передав null.
+    # Почту логиста и бухгалтера разрешено очищать явным null: оба поля
+    # необязательные, и пустое значение для них — штатный ввод.
     nullable_fields: ClassVar[frozenset[str]] = frozenset({"logist_email", "accountant_name"})
 
     name: str | None = Field(default=None, min_length=1, max_length=255)
@@ -150,9 +150,10 @@ class LeadUpdate(PatchModel):
     priority: int | None = Field(default=None, ge=0, le=3)
     stage_id: int | None = None
     tag_ids: list[int] | None = None
-    # is_archived сюда намеренно не входит: отметить лид проигравшим можно
-    # только через POST /lose (там же обязательна причина и запись в ленту),
-    # обычным сохранением формы это не делается — как и передача продавцу.
+    # is_archived в схему сохранения намеренно не входит: проигрыш
+    # оформляется только через POST /lose, где причина обязательна и событие
+    # пишется в ленту. Обычным сохранением формы лид не проиграть — как и
+    # не передать другому продавцу.
 
     _validate_inn = field_validator("inn")(staticmethod(validate_inn))
 
@@ -185,7 +186,7 @@ class LeadRead(ORMModel):
     updated_at: datetime
 
 
-# --- клиенты (все лиды компании, с маскировкой чужих активных) ----------------
+# --- Клиенты: все лиды компании, чужие активные маскируются ---
 class CustomerRead(BaseModel):
     """Строка модуля «Клиенты».
 
@@ -211,7 +212,7 @@ class CustomerRead(BaseModel):
     updated_at: datetime
 
 
-# --- лента -------------------------------------------------------------------
+# --- Лента карточки ---
 class AttachmentRead(ORMModel):
     id: int
     name: str
@@ -226,15 +227,15 @@ class TimelineEntryRead(ORMModel):
     type: EntryType
     author_name: str
     author_initials: str
-    # Кто написал запись: по этому номеру фронтенд прячет кнопку правки
-    # у чужих примечаний (менять их может только автор — ревью, Б-11).
+    # Автор записи нужен фронтенду, чтобы прятать кнопку правки у чужих
+    # примечаний: изменять их может только автор (ревью, Б-11).
     author_id: int | None
     body: str
     field_label: str | None
     old_value: str | None
     new_value: str | None
-    # Запись о переносе карточки между этапами: её разрешено удалить,
-    # остальную системную историю — нет.
+    # Признак записи о переносе между этапами: только такие системные
+    # записи разрешено удалять, остальная история неприкосновенна.
     is_stage_change: bool
     created_at: datetime
     attachments: list[AttachmentRead] = Field(default_factory=list)
