@@ -1,23 +1,23 @@
 # =============================================================================
-#  CRM Detroid — полный стек: база, кэш, бэкенд, воркер, планировщик,
+#  CRM Detroid — полный стек: база, кеш, бэкенд, воркер, планировщик,
 #  фронтенд и nginx.
-#  На сервере лежит в /opt/crm/docker-compose.yml (каталог = клон репозитория).
+#  На сервере файл лежит в /opt/crm (каталог — клон репозитория).
 #
-#  Production: ./deploy.sh (дамп, отдельная миграция, безопасный запуск)
-#  Текущая версия production и результат последней выкладки: docs/STATUS.md.
-#  Локально: см. README.md — сначала build и `run backend alembic upgrade head`
+#  Production: ./deploy.sh (дамп, отдельная миграция, безопасный запуск).
+#  Версия production и итог последней выкладки: docs/STATUS.md.
+#  Локально: README.md — сначала build и `run backend alembic upgrade head`.
 #  Логи:     docker compose logs -f backend
 #  Остановка: docker compose down
 #
-#  Наружу торчит только nginx (80/443). Postgres, Valkey, backend и frontend
-#  доступны исключительно внутри docker-сетей — это важно, потому что Docker
-#  умеет обходить UFW, и любой опубликованный порт стал бы публичным.
+#  Наружу смотрит только nginx (80/443). Postgres, Valkey, бэкенд и фронт
+#  доступны только внутри docker-сетей. Это важно: Docker умеет обходить
+#  UFW, и любой опубликованный порт стал бы публичным.
 # =============================================================================
 
 name: crm
 
 # Ротация логов: по умолчанию Docker пишет их без ограничений и способен
-# занять весь диск (15 ГБ). Держим по 10 МБ на файл и три файла на контейнер.
+# занять весь диск (15 ГБ). Держатся по 10 МБ на файл, три файла на контейнер.
 x-logging: &default-logging
   driver: json-file
   options:
@@ -27,24 +27,24 @@ x-logging: &default-logging
 services:
   # --- база данных ----------------------------------------------------------
   postgres:
-    # Digest-ы закреплены 06.10.2026 (И-02 ревью): обновление образов —
-    # осознанная правка, а не тихий сдвиг тега. Новый digest смотреть на
-    # hub.docker.com в поле «Digest» нужного тега.
+    # Digest закреплены 06.10.2026 (И-02 ревью): обновление образов —
+    # осознанная правка, а не тихий сдвиг тега. Новый digest — на
+    # hub.docker.com, в поле «Digest» нужного тега.
     image: postgres:18-alpine@sha256:77f585114c32fbca283dc835b0596f4e52b51b4c6662d7810b2f4084f60a1873
     container_name: crm-postgres
     restart: unless-stopped
     logging: *default-logging
     # Предел памяти: контейнер перезапустится сам, а не утянет сервер.
-    # Сервер на 4 ГБ — базе выделяем 1 ГБ.
+    # Сервер на 4 ГБ: базе выделяется 1 ГБ.
     mem_limit: 1024m
     environment:
       POSTGRES_USER: ${POSTGRES_USER:-crm}
       POSTGRES_PASSWORD: ${POSTGRES_PASSWORD:?задайте POSTGRES_PASSWORD в .env}
       POSTGRES_DB: ${POSTGRES_DB:-crm}
       POSTGRES_INITDB_ARGS: "--data-checksums"
-    # Тюнинг под 1 ГБ памяти контейнера. Значения по умолчанию у Postgres
-    # рассчитаны на крошечную машину (shared_buffers всего 128 МБ) и не
-    # используют доступную память. Флаги ниже ускоряют запросы, не рискуя ООM.
+    # Тюнинг под 1 ГБ памяти контейнера. Значения Postgres по умолчанию
+    # рассчитаны на крошечную машину (shared_buffers всего 128 МБ) и
+    # доступную память не используют. Флаги ниже ускоряют запросы без риска OOM.
     command:
       - "postgres"
       - "-c"
@@ -58,13 +58,13 @@ services:
       - "-c"
       # Бюджет посчитан в backend/app/core/config.py (комментарий у
       # db_pool_size/db_max_overflow): GUNICORN_WORKERS * (pool_size +
-      # max_overflow) + запас под Celery/ручные подключения. Меняете
-      # GUNICORN_WORKERS или пул на бэкенде — пересчитайте и это число.
+      # max_overflow) плюс запас под Celery и ручные подключения. При смене
+      # GUNICORN_WORKERS или пула на бэкенде это число пересчитывается.
       - "max_connections=120"
     volumes:
       # ВАЖНО: в Postgres 18 данные лежат в /var/lib/postgresql/18/docker,
-      # а том монтируется на уровень выше — в /var/lib/postgresql.
-      # Старый путь /var/lib/postgresql/data образ 18+ не принимает и не стартует.
+      # а том монтируется уровнем выше — в /var/lib/postgresql.
+      # Старый путь /var/lib/postgresql/data образ 18+ не примет и не стартует.
       - pgdata:/var/lib/postgresql
     # 64 МБ разделяемой памяти по умолчанию мало для параллельных запросов.
     shm_size: 256mb
@@ -103,18 +103,18 @@ services:
     restart: unless-stopped
     logging: *default-logging
     # Предел памяти: контейнер перезапустится сам, а не утянет сервер.
-    # Сервер на 4 ГБ — API даём ~0,9 ГБ на 3 воркера.
+    # Сервер на 4 ГБ: API получает ~0,9 ГБ на 3 воркера.
     mem_limit: 896m
     env_file: [.env]
     environment:
       POSTGRES_HOST: postgres
       VALKEY_URL: redis://valkey:6379/0
       GUNICORN_WORKERS: ${GUNICORN_WORKERS:-3}
-      # Принимаем X-Forwarded-* только от этого точного адреса nginx.
+      # X-Forwarded-* принимаются только от этого точного адреса nginx.
       GUNICORN_FORWARDED_ALLOW_IPS: ${CRM_NGINX_PROXY_IP:-172.31.250.2}
     # Миграции запускает deploy.sh отдельным контролируемым шагом до замены
-    # контейнеров. API сам схему не меняет: иначе автоматический рестарт мог бы
-    # неожиданно применить миграцию вне окна деплоя.
+    # контейнеров. API сам схему не меняет: автоматический рестарт мог бы
+    # иначе неожиданно применить миграцию вне окна деплоя.
     command: gunicorn app.main:app -c gunicorn.conf.py
     volumes:
       - backups:/var/backups/crm
@@ -127,8 +127,8 @@ services:
         condition: service_healthy
     networks:
       internal: {}
-      # Адреса backend и nginx закреплены, чтобы порядок запуска контейнеров
-      # не позволил backend занять адрес, зарезервированный за nginx.
+      # Адреса бэкенда и nginx закреплены, чтобы порядок запуска контейнеров
+      # не позволил бэкенду занять адрес, зарезервированный за nginx.
       proxy:
         ipv4_address: ${CRM_BACKEND_PROXY_IP:-172.31.250.3}
 
@@ -149,7 +149,7 @@ services:
     # concurrency=1: на 2 ГБ памяти больше одного процесса держать незачем.
     command: celery -A app.worker.celery_app.celery worker -l info --concurrency 1
     # Свой healthcheck: из образа бэкенда унаследовался бы HTTP-запрос к :8000,
-    # которого у воркера нет, и контейнер вечно висел бы «unhealthy».
+    # которого у воркера нет, — контейнер вечно висел бы «unhealthy».
     healthcheck:
       test: ["CMD-SHELL", "celery -A app.worker.celery_app.celery inspect ping -d celery@$$HOSTNAME | grep -q pong"]
       interval: 60s
@@ -180,12 +180,12 @@ services:
       POSTGRES_HOST: postgres
       VALKEY_URL: redis://valkey:6379/0
     # --schedule в /tmp: планировщику нужно писать свою базу расписания,
-    # и он не должен зависеть от прав на рабочий каталог.
+    # и зависеть от прав на рабочий каталог он не должен.
     command: >
       celery -A app.worker.celery_app.celery beat -l info
       --schedule /tmp/celerybeat-schedule
-    # У планировщика нет порта и очереди — проверять нечего, полагаемся
-    # на restart-политику.
+    # У планировщика нет порта и очереди: проверять нечего, остаётся
+    # restart-политика.
     healthcheck:
       disable: true
     depends_on:
@@ -207,8 +207,8 @@ services:
 
   # --- публичный вход -------------------------------------------------------
   nginx:
-    # nginx 1.27 -> 1.30 (И-03): актуальная стабильная ветка. Перед выкаткой
-    # проверить конфиг: docker compose exec nginx nginx -t
+    # nginx 1.27 -> 1.30 (И-03): актуальная стабильная ветка. Перед выкладкой
+    # конфиг проверяется: docker compose exec nginx nginx -t.
     image: nginx:1.30-alpine@sha256:0985e772fb9f729e6fa0980da05fca5d9c468e870eed43071545afa9d2e27d94
     container_name: crm-nginx
     restart: unless-stopped
@@ -234,7 +234,7 @@ services:
       - frontend
     networks:
       edge:
-      # nginx закреплён на .2; backend на .3. Gunicorn доверяет только адресу nginx.
+      # nginx закреплён на .2, бэкенд на .3. Gunicorn доверяет только адресу nginx.
       proxy:
         ipv4_address: ${CRM_NGINX_PROXY_IP:-172.31.250.2}
 
@@ -247,13 +247,13 @@ volumes:
 networks:
   # internal — действительно без выхода в интернет (флаг internal): база,
   # кеш и воркеры наружу не ходят, им достаточно друг друга (И-08 ревью).
-  # Бэкенду наружу может понадобиться (например, Sentry), поэтому он также
-  # подключён к отдельной сети proxy, которая не помечена internal.
+  # Бэкенду выход наружу может понадобиться (например, Sentry), поэтому он
+  # подключён также к отдельной сети proxy без пометки internal.
   internal:
     name: crm_internal
     internal: true
-  # proxy — закрытая связка backend ↔ nginx. Никакие другие контейнеры в неё
-  # не входят; фиксированный IP nginx указан в списке доверенных Gunicorn.
+  # proxy — закрытая связка «бэкенд ↔ nginx». Другие контейнеры в неё
+  # не входят; фиксированный IP nginx указан в доверенных у Gunicorn.
   proxy:
     name: crm_proxy
     ipam:
