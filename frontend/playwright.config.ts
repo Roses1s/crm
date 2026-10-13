@@ -9,7 +9,7 @@ export default defineConfig({
   retries: isCi ? 1 : 0,
   workers: 1,
   reporter: isCi
-    ? [["line"], ["html", { outputFolder: "playwright-report", open: "never" }]]
+    ? [["github"], ["line"], ["html", { outputFolder: "playwright-report", open: "never" }]]
     : "list",
   use: {
     baseURL: process.env.PLAYWRIGHT_BASE_URL ?? "http://127.0.0.1:5173",
