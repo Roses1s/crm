@@ -6,7 +6,8 @@ import { LoginPage } from "@/features/auth/LoginPage";
 import { KanbanPage } from "@/features/crm/KanbanPage";
 import { LeadFormPage } from "@/features/crm/LeadFormPage";
 
-// Страничная загрузка: тяжёлые разделы не входят в стартовый пакет.
+// Страницы загружаются отдельно: тяжёлые разделы не входят в стартовый
+// пакет.
 const AdminLayout = lazy(() =>
   import("@/features/admin/AdminLayout").then((m) => ({
     default: m.AdminLayout,
@@ -134,7 +135,8 @@ const router = createBrowserRouter([
   { path: "*", element: <Navigate to="/" replace /> },
 ]);
 
-/** Маршрутизатор данных также позволяет формам удерживать переход до автосохранения. */
+/** Маршрутизатор данных также позволяет формам удерживать переход до
+ *  автосохранения. */
 export function AppRouter() {
   return (
     <Suspense fallback={<RouteFallback />}>

@@ -12,7 +12,7 @@ import {
 } from "../schemas";
 import { apiVoid, keys, REFERENCE_DATA } from "./shared";
 
-// --- справочники -------------------------------------------------------------
+// --- Справочники ---
 /**
  * Этапы доски. `ownerId` передаёт только администратор, когда открывает
  * доску сотрудника; свою доску запрашиваем без параметра.
@@ -29,7 +29,7 @@ export function useStages(ownerId?: number | null) {
 }
 
 /**
- * Служебные константы с сервера (ставка вычета маржи и т.п.) — единый
+ * Служебные константы с сервера (ставка вычета маржи и т.п.): единый
  * источник вместо продублированных чисел в коде фронтенда (Т-08).
  */
 export function useMeta() {
@@ -49,9 +49,9 @@ export function useTags() {
 }
 
 /**
- * Тег — свободный общий справочник: доступен любому пользователю, не только
- * админу. Создание с именем, совпадающим (без учёта регистра) с уже
- * существующим тегом, переиспользует его.
+ * Тег — свободный общий справочник: доступен любому пользователю, не
+ * только администратору. Создание с именем, совпадающим (без учёта
+ * регистра) с уже существующим тегом, переиспользует его.
  */
 export function useCreateTag() {
   const qc = useQueryClient();
@@ -70,7 +70,7 @@ export function useUpdateTag() {
       api<Tag>(`/crm/tags/${id}`, { method: "PATCH", body, schema: tagSchema }),
     onSuccess: () => {
       void qc.invalidateQueries({ queryKey: keys.tags });
-      // Название/цвет тега показаны везде, где он проставлен.
+      // Название и цвет тега показаны везде, где он проставлен.
       void qc.invalidateQueries({ queryKey: ["leads"] });
       void qc.invalidateQueries({ queryKey: ["lead"] });
       void qc.invalidateQueries({ queryKey: ["customers"] });
@@ -139,7 +139,8 @@ export function useUpdateStage() {
   });
 }
 
-/** Полный порядок этапов меняется одним запросом после горизонтального DnD. */
+/** Полный порядок этапов меняется одним запросом после горизонтального
+ *  DnD. */
 export function useReorderStages() {
   const qc = useQueryClient();
   return useMutation({

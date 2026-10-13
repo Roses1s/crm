@@ -12,7 +12,7 @@ import {
 import type { BackupsResponse, LoginAttempt } from "../schemas";
 import { apiVoid, keys } from "./shared";
 
-// --- администрирование -------------------------------------------------------
+// --- Администрирование ---
 export function useUsers() {
   return useQuery({
     queryKey: keys.users,
@@ -70,7 +70,7 @@ export function useRunBackup() {
         schema: backupTaskResponseSchema,
       }),
     onSuccess: () => {
-      // Файл появится через несколько секунд — обновим список с задержкой.
+      // Файл появится через несколько секунд — список обновим с задержкой.
       setTimeout(() => void qc.invalidateQueries({ queryKey: keys.backups }), 4000);
     },
   });

@@ -5,7 +5,7 @@ import { api, apiBlob, apiUpload } from "../client";
 import { arraySchema, attachmentSchema } from "../schemas";
 import { apiVoid, keys } from "./shared";
 
-// --- вложения ----------------------------------------------------------------
+// --- Вложения ---
 export function useLeadAttachments(id: string | number | undefined) {
   return useQuery({
     queryKey: keys.attachments(id ?? "new"),
@@ -45,7 +45,8 @@ export function useDeleteAttachment(leadId: string | number | undefined) {
   });
 }
 
-/** Вложения заявки: отдельный список, в файлы лида они намеренно не попадают. */
+/** Вложения заявки: отдельный список, в файлы лида они намеренно не
+ *  попадают. */
 export function useShipmentAttachments(id: string | number | undefined) {
   return useQuery({
     queryKey: keys.shipmentAttachments(id ?? "new"),
@@ -80,7 +81,8 @@ export function useUploadShipmentAttachment(shipmentId: string | number | undefi
 export function useDeleteShipmentAttachment(shipmentId: string | number | undefined) {
   const qc = useQueryClient();
   return useMutation({
-    // Удаление общее для всех вложений — ручка различает их по номеру файла.
+    // Удаление общее для всех вложений: ручка различает их по номеру
+    // файла.
     mutationFn: (attachmentId: number) =>
       apiVoid(`/crm/attachments/${attachmentId}`, { method: "DELETE" }),
     onSuccess: () => {
@@ -94,12 +96,13 @@ export function useDeleteShipmentAttachment(shipmentId: string | number | undefi
   });
 }
 
-/** Содержимое оригинала — для полноразмерного просмотра и скачивания. */
+/** Содержимое оригинала: для полноразмерного просмотра и скачивания. */
 export function attachmentBlob(attachmentId: number, signal?: AbortSignal): Promise<Blob> {
   return apiBlob(`/crm/attachments/${attachmentId}`, signal);
 }
 
-/** Уменьшенная копия для превью в ленте; оригинал эта ручка не скачивает. */
+/** Уменьшенная копия для превью в ленте: оригинал эта ручка не
+ *  скачивает. */
 export function attachmentThumbnailBlob(attachmentId: number, signal?: AbortSignal): Promise<Blob> {
   return apiBlob(`/crm/attachments/${attachmentId}/thumbnail`, signal);
 }

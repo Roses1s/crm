@@ -5,7 +5,8 @@ import { downloadAttachment } from "@/shared/api/hooks";
 import type { Attachment } from "@/shared/types";
 import { formatSize, previewKind, useObjectUrl } from "@/shared/ui/file-preview-utils";
 
-/** Модальное окно просмотра: картинки и PDF показываем, остальное — скачиваем. */
+/** Модальное окно просмотра: картинки и PDF показываем, остальное —
+ *  скачиваем. */
 export function FilePreview({ file, onClose }: { file: Attachment; onClose: () => void }) {
   const { url, failed } = useObjectUrl(file);
   const kind = previewKind(file);

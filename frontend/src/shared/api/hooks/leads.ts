@@ -33,7 +33,7 @@ import {
   type LeadFilters,
 } from "./shared";
 
-// --- лиды --------------------------------------------------------------------
+// --- Лиды ---
 export function useLeads(filters: LeadFilters = {}) {
   return useQuery({
     queryKey: keys.leads(filters),
@@ -72,7 +72,8 @@ export function leadPagesQueryOptions(
   return leadPagesOptions(keys.leadPages(filters, pageSize), filters, pageSize, enabled);
 }
 
-/** Каждая колонка получает собственные страницы и свой счётчик с сервера. */
+/** Каждая колонка получает собственные страницы и собственный счётчик
+ *  с сервера. */
 export function stageLeadPagesQueryOptions(
   stageId: number,
   filters: Omit<LeadFilters, "stage">,
@@ -87,12 +88,13 @@ export function stageLeadPagesQueryOptions(
   );
 }
 
-/** Серверные страницы одного этапа Kanban. */
+/** Серверные страницы одного этапа канбана. */
 export function useStageLeads(stageId: number, filters: Omit<LeadFilters, "stage">) {
   return useInfiniteQuery(stageLeadPagesQueryOptions(stageId, filters));
 }
 
-/** Лист лидов догружает следующую порцию, не теряя поиск и отбор доски. */
+/** Список лидов догружает следующую порцию, не теряя поиск и отбор
+ *  доски. */
 export function useInfiniteLeads(
   filters: LeadFilters = {},
   pageSize = LEAD_PAGE_SIZE,
@@ -105,8 +107,8 @@ export function useInfiniteLeads(
 }
 
 /**
- * «Клиенты» показывает все лиды компании. Поиск ограничен названием и ИНН,
- * чтобы не раскрывать данные чужой карточки.
+ * «Клиенты» показывает все лиды компании. Поиск ограничен названием и
+ * ИНН, чтобы не раскрывать данные чужой карточки.
  */
 export function useCustomers(search: string, archived: boolean | null = null) {
   return useInfiniteQuery({
@@ -117,7 +119,8 @@ export function useCustomers(search: string, archived: boolean | null = null) {
         page_size: String(CUSTOMER_PAGE_SIZE),
       });
       if (search) params.set("search", search);
-      // null — без фильтра (все вперемешку), как отвечает бэкенд по умолчанию.
+      // null — фильтра нет (все вперемешку), как отвечает бэкенд по
+      // умолчанию.
       if (archived !== null) params.set("archived", String(archived));
       return api<Page<Customer>>(`/crm/customers?${params.toString()}`, {
         schema: pageSchema(customerSchema),
@@ -131,9 +134,9 @@ export function useCustomers(search: string, archived: boolean | null = null) {
 
 /**
  * Предупреждение о дубле ИНН при создании лида: ищет среди вообще всех
- * лидов (не только своих), бэкенд сам маскирует чужой активный лид так же,
- * как в списке «Клиенты». `enabled` — чтобы не долбить сервер на каждый
- * символ, пока ИНН ещё не дописан до валидной длины.
+ * лидов (не только своих), бэкенд сам маскирует чужой активный лид так
+ * же, как в списке «Клиенты». `enabled` — чтобы не долбить сервер на
+ * каждый символ, пока ИНН ещё не дописан до валидной длины.
  */
 export function useCustomersByInn(inn: string, excludeId?: number) {
   return useQuery({
@@ -240,9 +243,10 @@ export function useMoveLead() {
         body: { stage_id, expected_updated_at },
         schema: leadSchema,
       }),
-    // Доска получает отдельные страницы для каждого этапа. Не переносим запись
-    // вручную между срезами: после ответа сервера перечитываем обе колонки,
-    // чтобы не показать дубль и не потерять карточку на границе страниц.
+    // Доска получает отдельные страницы для каждого этапа. Запись вручную
+    // между срезами не переносим: после ответа сервера перечитываем обе
+    // колонки, чтобы не показать дубль и не потерять карточку на границе
+    // страниц.
     onError: (error, variables) => {
       if (error instanceof ApiError && error.code === "lead_conflict") {
         invalidateLeadLists(qc);
@@ -324,7 +328,7 @@ export function useUpdateLeadPriority() {
   });
 }
 
-/** Отметить лид проигранным — причина обязательна (см. LoseLeadDialog). */
+/** Отметить лид проигранным: причина обязательна (LoseLeadDialog). */
 export function useLoseLead() {
   const qc = useQueryClient();
   return useMutation({
@@ -337,7 +341,8 @@ export function useLoseLead() {
   });
 }
 
-/** Забрать проигранный лид себе — доступно любому сотруднику, не только владельцу. */
+/** Забрать проигранный лид себе: доступно любому сотруднику, не только
+ *  владельцу. */
 export function useRestoreLead() {
   const qc = useQueryClient();
   return useMutation({
@@ -349,8 +354,8 @@ export function useRestoreLead() {
   });
 }
 
-// Безвозвратное удаление — отдельная ручка от архивации (DELETE .../{id}
-// выше её не трогает) и доступна только администратору.
+// Безвозвратное удаление — отдельная ручка, отличная от архивации
+// (DELETE .../{id} выше её не трогает), и доступна только администратору.
 export function useDeleteLead() {
   const qc = useQueryClient();
   return useMutation({
@@ -406,8 +411,8 @@ export function useDeleteTimelineEntry(id: string | undefined) {
   });
 }
 
-// --- передача лида -----------------------------------------------------------
-/** Активные сотрудники, кроме себя, — для выбора нового продавца. */
+// --- Передача лида ---
+/** Активные сотрудники, кроме себя: для выбора нового продавца. */
 export function useColleagues() {
   return useQuery({
     queryKey: keys.colleagues,
@@ -425,7 +430,8 @@ export function useTransferLead(leadId: string | number | undefined) {
         body: { user_id: userId },
       }),
     onSuccess: () => {
-      // Перенос меняет ответственного, этап и историю — обновляем все эти экраны.
+      // Перенос меняет ответственного, этап и историю — обновляем все
+      // эти экраны.
       invalidateLeadLists(qc);
       invalidateLeadDetails(qc, leadId ?? "");
       void qc.invalidateQueries({ queryKey: keys.pager(leadId ?? "") });

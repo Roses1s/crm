@@ -4,7 +4,7 @@ import { api, type Page } from "../client";
 import { voidResponseSchema } from "../schemas";
 
 /** Размер одной порции в списках и на доске. */
-export const LIST_LIMIT = 200; // Только для старых запросов, где нужен один ответ.
+export const LIST_LIMIT = 200; // только для запросов, где нужен один ответ целиком
 export const LEAD_PAGE_SIZE = 80;
 export const CUSTOMER_PAGE_SIZE = 60;
 export const KANBAN_PAGE_SIZE = 20;
@@ -15,7 +15,8 @@ type VoidApiOptions = Omit<RequestInit, "body"> & {
   auth?: boolean;
 };
 
-/** Удаления возвращают 204; общая схема проверяет, что тело действительно пустое. */
+/** Удаления возвращают 204; общая схема проверяет, что тело действительно
+ *  пустое. */
 export function apiVoid(path: string, options: VoidApiOptions = {}): Promise<void> {
   return api<undefined>(path, { ...options, schema: voidResponseSchema });
 }
@@ -23,7 +24,7 @@ export function apiVoid(path: string, options: VoidApiOptions = {}): Promise<voi
 /** Список с сервера вместе с общим количеством записей. */
 export interface ListResult<T> {
   items: T[];
-  /** Сколько записей всего подходит под запрос (а не сколько показано). */
+  /** Сколько записей всего подходит под запрос, а не сколько показано. */
   total: number;
   /** Сколько записей максимум попало в ответ. */
   limit: number;
@@ -33,7 +34,8 @@ export function toListResult<T>(page: Page<T>, limit: number): ListResult<T> {
   return { items: page.results, total: page.count, limit };
 }
 
-/** Склеивает уже полученные серверные страницы, сохраняя общее количество. */
+/** Склеивает уже полученные серверные страницы, сохраняя общее
+ *  количество. */
 export function toInfiniteListResult<T>(
   data: InfiniteData<Page<T>, number>,
   pageSize: number,
@@ -67,7 +69,8 @@ export function leadsQueryString(filters: LeadFilters, page = 1, pageSize = LIST
   return params.toString();
 }
 
-/** Все ключи кеша API — в одном месте, чтобы мутации обновляли нужные экраны. */
+/** Все ключи кеша API — в одном месте, чтобы мутации обновляли нужные
+ *  экраны. */
 export const keys = {
   me: ["me"] as const,
   apps: ["launcher"] as const,
@@ -75,8 +78,9 @@ export const keys = {
   stages: ["stages"] as const,
   tags: ["tags"] as const,
   lossReasons: ["loss-reasons"] as const,
-  // archived входит в ключ: списки «все / активные / проигранные» кешируются
-  // раздельно, а инвалидация по префиксу ["customers"] по-прежнему бьёт во все.
+  // archived входит в ключ: списки «все / активные / проигранные»
+  // кешируются раздельно, а инвалидация по префиксу ["customers"]
+  // по-прежнему бьёт во все.
   customers: (search: string, archived: boolean | null) => ["customers", search, archived] as const,
   leads: (filters: LeadFilters) => ["leads", filters] as const,
   leadPages: (filters: LeadFilters, pageSize: number) =>
@@ -99,7 +103,8 @@ export const keys = {
   loginAttempts: ["login-attempts"] as const,
 };
 
-/** Обновляет CRM, клиентов, поиск по ИНН и листалку после изменения лида. */
+/** Обновляет CRM, клиентов, поиск по ИНН и листалку после изменения
+ *  лида. */
 export function invalidateLeadLists(qc: QueryClient): void {
   void qc.invalidateQueries({ queryKey: ["leads"] });
   void qc.invalidateQueries({ queryKey: ["customers"] });
@@ -107,13 +112,15 @@ export function invalidateLeadLists(qc: QueryClient): void {
   void qc.invalidateQueries({ queryKey: ["pager"] });
 }
 
-/** Карточка и её лента меняются вместе при переносе, проигрыше и правке. */
+/** Карточка и её лента меняются вместе при переносе, проигрыше и
+ *  правке. */
 export function invalidateLeadDetails(qc: QueryClient, id: string | number): void {
   void qc.invalidateQueries({ queryKey: keys.lead(id) });
   void qc.invalidateQueries({ queryKey: keys.timeline(id) });
 }
 
-/** Справочники редко меняются; собственные правки сразу сбрасывают их кеш. */
+/** Справочники меняются редко; собственные правки сразу сбрасывают их
+ *  кеш. */
 export const REFERENCE_DATA = {
   staleTime: 15 * 60_000,
   gcTime: 30 * 60_000,

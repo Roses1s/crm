@@ -27,7 +27,8 @@ const MODES: { id: string; label: string; placeholder: string; action: string }[
   },
 ];
 
-/** Картинки крупнее этого размера не разворачиваем в ленте — только чипом. */
+/** Картинки крупнее этого размера в ленте не разворачиваем — только
+ *  чипом. */
 const INLINE_IMAGE_MAX = 5 * 1024 * 1024;
 
 const CHATTER_INSET_STYLE = { paddingInline: "var(--odoo-chatter-panel-padding)" };
@@ -92,8 +93,9 @@ interface ChatterProps {
   onSubmit?: (body: string, files: File[]) => void;
   posting?: boolean;
   /**
-   * Загрузка файла. Без `entryId` файл попадает в общий список вложений карточки,
-   * с номером записи — прикрепляется к этой записи ленты (правка примечания).
+   * Загрузка файла. Без `entryId` файл попадает в общий список вложений
+   * карточки, с номером записи — прикрепляется к этой записи ленты
+   * (правка примечания).
    */
   onUpload?: (file: File, entryId?: number) => void;
   onDelete?: (attachment: Attachment) => void;
@@ -108,7 +110,8 @@ interface ChatterProps {
    * собственных примечаний — чужие менять может только их автор (Б-11).
    */
   currentUserId?: number;
-  /** Проигранную карточку можно читать, но нельзя менять до восстановления. */
+  /** Проигранную карточку можно читать, но нельзя менять до
+   *  восстановления. */
   readOnly?: boolean;
 }
 
@@ -137,7 +140,8 @@ export function Chatter({
   const [pending, setPending] = useState<File[]>([]);
   const panelInput = useRef<HTMLInputElement | null>(null);
   const composerInput = useRef<HTMLInputElement | null>(null);
-  // Правка открыта только у одной записи, поэтому поля выбора файлов хватает одного.
+  // Правка открыта только у одной записи, поэтому поля выбора файлов
+  // хватает одного на всю ленту.
   const editInput = useRef<HTMLInputElement | null>(null);
   const composerText = useRef<HTMLTextAreaElement | null>(null);
   const files = attachments ?? [];
@@ -147,8 +151,9 @@ export function Chatter({
   useLayoutEffect(() => {
     const field = composerText.current;
     if (!field) return;
-    // Сначала снимаем прежнюю высоту: иначе scrollHeight не уменьшается после
-    // сохранения или удаления части текста и редактор остаётся слишком высоким.
+    // Сначала снимаем прежнюю высоту: иначе scrollHeight не уменьшится
+    // после сохранения или удаления части текста, и редактор останется
+    // слишком высоким.
     field.style.height = "auto";
     field.style.height = `${field.scrollHeight}px`;
   }, [text]);
@@ -352,7 +357,8 @@ export function Chatter({
               value={text}
               onChange={(e) => setText(e.target.value)}
               onPaste={(e) => {
-                // Скриншот из буфера (Ctrl+V) сразу уходит во вложения записи.
+                // Скриншот из буфера обмена (Ctrl+V) сразу уходит во
+                // вложения записи.
                 const images = Array.from(e.clipboardData.files).filter((f) =>
                   f.type.startsWith("image/"),
                 );
@@ -425,8 +431,9 @@ export function Chatter({
           <button
             type="submit"
             disabled={readOnly || posting || !onSubmit || (!text.trim() && pending.length === 0)}
-            // Ширина минимальная, а не жёсткая: длинная надпись «Сохранение…»
-            // не помещалась в кнопку шириной под слово «Лог» и вылезала за её края.
+            // Ширина минимальная, а не жёсткая: длинная надпись
+            // «Сохранение…» не помещалась в кнопку шириной под слово
+            // «Лог» и вылезала за её края.
             className="h-[var(--odoo-chatter-log-button-height)] min-w-[var(--odoo-chatter-log-button-width)] whitespace-nowrap rounded-[4px] bg-odoo-primary px-2 text-[13px] font-medium text-white transition-colors hover:bg-odoo-primary-hover disabled:opacity-50"
           >
             {posting ? "Сохранение…" : current.action}

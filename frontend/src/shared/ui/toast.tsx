@@ -11,8 +11,8 @@ interface ToastItem {
 const AUTO_DISMISS_MS = 2500;
 
 /** Глобальные уведомления об успешном сохранении — подключается один раз
- *  в корне приложения (см. `app/providers.tsx`), вызывается через `useToast()`
- *  из любой формы, и при ручном сохранении, и при автосохранении. */
+ *  в корне приложения (`app/providers.tsx`), вызывается через `useToast()`
+ *  из любой формы — и при ручном сохранении, и при автосохранении. */
 export function ToastProvider({ children }: { children: ReactNode }) {
   const [items, setItems] = useState<ToastItem[]>([]);
   const nextId = useRef(0);

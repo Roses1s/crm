@@ -1,9 +1,10 @@
 /**
  * HTTP-клиент.
  *
- * Все запросы идут на тот же origin, что и сайт: в проде nginx проксирует
- * /api/ в контейнер бэкенда, в разработке — dev-сервер Vite (см. vite.config.ts).
- * Поэтому никаких абсолютных адресов и переменных окружения с хостом не нужно.
+ * Все запросы идут на тот же origin, что и сайт: в production nginx
+ * проксирует /api/ в контейнер бэкенда, в разработке — dev-сервер Vite
+ * (vite.config.ts). Поэтому абсолютных адресов и переменных окружения с
+ * хостом не нужно.
  */
 
 import type { ZodType } from "zod";
@@ -28,7 +29,8 @@ export interface ApiResponseIssue {
   message: string;
 }
 
-/** Сервер ответил успешно, но вернул данные не того формата, которого ждёт приложение. */
+/** Сервер ответил успешно, но вернул данные не того формата, который
+ *  ждёт приложение. */
 export class ApiResponseError extends ApiError {
   constructor(
     readonly endpoint: string,
@@ -44,9 +46,10 @@ export class ApiResponseError extends ApiError {
 }
 
 /**
- * Общий "низ" для api/apiUpload/apiBlob: добавляет Authorization, а при 401
- * один раз пробует продлить сессию по refresh-куке и повторяет запрос — чтобы
- * получасовой access-токен не выгонял человека с открытой вкладки на логин.
+ * Общий «низ» для api/apiUpload/apiBlob: добавляет Authorization, а при
+ * 401 один раз пробует продлить сессию по refresh-куке и повторяет
+ * запрос — чтобы получасовой access-токен не выгонял человека с открытой
+ * вкладки на логин.
  */
 async function request(
   path: string,
@@ -58,8 +61,8 @@ async function request(
   const generationAtStart = getSessionGeneration();
 
   const response = await fetch(`${BASE}${path}`, {
-    // Браузерный кеш отключён: за актуальность данных отвечают React Query
-    // на клиенте и fastapi-cache на сервере.
+    // Браузерный кеш отключён: за актуальность данных отвечают React
+    // Query на клиенте и fastapi-cache на сервере.
     cache: "no-store",
     ...init,
     headers: {
@@ -75,14 +78,15 @@ async function request(
   }
 
   if (response.status === 401 && auth) {
-    // Не обновляем сессию и не повторяем старый запрос токеном другого пользователя.
+    // Сессию не обновляем и старый запрос токеном другого пользователя не
+    // повторяем.
     if (generationAtStart !== getSessionGeneration()) {
       throw new ApiError(401, "Запрос относится к предыдущей сессии", "session_changed");
     }
     if (retry) {
       const refreshed = await refreshSession();
-      // Проверяем поколение и при неудачном refresh: он мог завершиться уже
-      // после входа другого пользователя, чью сессию нельзя очищать.
+      // Поколение проверяем и при неудачном refresh: он мог завершиться
+      // уже после входа другого пользователя, чью сессию очищать нельзя.
       if (generationAtStart !== getSessionGeneration()) {
         throw new ApiError(401, "Запрос относится к предыдущей сессии", "session_changed");
       }
@@ -134,7 +138,8 @@ function validateResponse<T>(
   return result.data;
 }
 
-/** Успешный JSON разбирается по схеме, а не приводится к типу без проверки. */
+/** Успешный JSON разбирается по схеме, а не приводится к типу без
+ *  проверки. */
 export async function api<T>(path: string, options: Options<T>): Promise<T> {
   const { body, auth = true, headers, schema, ...rest } = options;
 
@@ -171,7 +176,8 @@ export interface Page<T> {
   results: T[];
 }
 
-/** Загрузка файла: FormData, Content-Type браузер выставит сам (с boundary). */
+/** Загрузка файла: FormData, Content-Type браузер выставит сам (с
+ *  boundary). */
 export async function apiUpload<T>(path: string, file: File, schema: ZodType<T>): Promise<T> {
   const form = new FormData();
   form.append("file", file);

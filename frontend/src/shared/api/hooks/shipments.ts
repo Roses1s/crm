@@ -11,7 +11,7 @@ import {
 } from "../schemas";
 import { apiVoid, keys, SHIPMENT_PAGE_SIZE, toInfiniteListResult } from "./shared";
 
-// --- лента заявки ------------------------------------------------------------
+// --- Лента заявки ---
 export function useShipmentTimeline(id: string | undefined) {
   return useQuery({
     queryKey: keys.shipmentTimeline(id ?? "new"),
@@ -58,7 +58,7 @@ export function useDeleteShipmentTimelineEntry(id: string | undefined) {
   });
 }
 
-// --- заявки ------------------------------------------------------------------
+// --- Заявки ---
 /** Ответ списка заявок: обычная страница плюс итоги по всему фильтру. */
 type ShipmentsPageData = Page<ShipmentListItem> & { totals: ShipmentTotals };
 
@@ -72,7 +72,8 @@ export function useShipments(status = "", search = "", assignedTo: number | null
       });
       if (status) params.set("status", status);
       if (search) params.set("search", search);
-      // Отбор «заявки сотрудника» — админский; сервер сам проверит права.
+      // Отбор «заявки сотрудника» — административный; сервер сам проверит
+      // права.
       if (assignedTo !== null) params.set("assigned_to", String(assignedTo));
       return api<ShipmentsPageData>(`/shipments?${params.toString()}`, {
         schema: shipmentsPageSchema,
@@ -112,10 +113,10 @@ export function useLeadShipments(id: number | string | undefined) {
 export interface ShipmentPayload {
   number?: string;
   lead_id: number;
-  // Дата создания — редактируема (заявку часто заводят в CRM позже, чем она
-  // реально возникла). ISO-строка с временем; null сервер не примет (колонка
-  // NOT NULL) — форма всегда отправляет либо настоящее значение, либо вообще
-  // не включает поле в тело запроса.
+  // Дата создания редактируема (заявку часто заводят в CRM позже, чем
+  // она реально возникла). ISO-строка с временем; null сервер не примет
+  // (колонка NOT NULL) — форма всегда отправляет либо настоящее значение,
+  // либо вообще не включает поле в тело запроса.
   created_at?: string;
   address_loading?: string;
   address_unloading?: string;
@@ -128,13 +129,13 @@ export interface ShipmentPayload {
   cargo_volume?: string | null;
   comment?: string;
 
-  // Позиция заказа: цена заказчика/перевозчика, у каждой своя ставка НДС.
+  // Позиция заказа: у цены заказчика и цены перевозчика своя ставка НДС.
   customer_price?: string | null;
   customer_tax?: string;
   carrier_price?: string | null;
   carrier_tax?: string;
 
-  // Заказчик (шапка).
+  // Заказчик: шапка бланка.
   customer_address?: string;
   customer_contact?: string;
   customer_signer?: string;
@@ -153,7 +154,7 @@ export interface ShipmentPayload {
   unloading_time_from?: string;
   unloading_time_to?: string;
 
-  // Перевозчик — свободный текст прямо в заявке, без справочника.
+  // Перевозчик: свободный текст прямо в заявке, без справочника.
   carrier_name?: string;
   carrier_inn?: string;
   carrier_contact?: string;
@@ -188,8 +189,9 @@ export function useSaveShipment(id: string | undefined) {
       void qc.invalidateQueries({ queryKey: ["shipments"] });
       void qc.invalidateQueries({ queryKey: keys.shipment(data.id) });
       // При переносе заявки меняются сразу списки старого и нового лида.
-      // Старый lead_id после ответа уже неизвестен, поэтому инвалидируем весь
-      // небольшой namespace вкладок заявок, а не только новую карточку.
+      // Старый lead_id после ответа уже неизвестен, поэтому инвалидируем
+      // весь небольшой namespace вкладок заявок, а не только новую
+      // карточку.
       void qc.invalidateQueries({ queryKey: ["lead-shipments"] });
     },
   });

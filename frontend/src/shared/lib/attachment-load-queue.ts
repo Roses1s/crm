@@ -69,7 +69,8 @@ function startQueuedJobs(): void {
   }
 }
 
-/** Добавляет запрос в общую очередь и объединяет загрузки одного варианта файла. */
+/** Добавляет запрос в общую очередь и объединяет загрузки одного
+ *  варианта файла. */
 export function enqueueAttachmentLoad(
   id: number,
   load: (signal: AbortSignal) => Promise<Blob>,
@@ -103,7 +104,7 @@ export function enqueueAttachmentLoad(
   return promise;
 }
 
-/** Отменяет очередь и текущие запросы на выходе из учётной записи. */
+/** Отменяет очередь и текущие запросы при выходе из учётной записи. */
 export function clearAttachmentLoadQueue(): void {
   generation += 1;
   for (const job of queue.splice(0)) settle(job, { error: CANCELLED });

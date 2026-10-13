@@ -12,13 +12,14 @@ import { useState, type InputHTMLAttributes, type ReactNode } from "react";
  * - addons/web/static/src/scss/primary_variables.scss
  */
 
-const STATUSBAR_HEIGHT = 33; // $o-statusbar-height
-const ARROW_WIDTH = 11; // $o-statusbar-arrow-width
+const STATUSBAR_HEIGHT = 33; // высота статусбара из исходника Odoo
+const ARROW_WIDTH = 11; // ширина стрелки статусбара из исходника Odoo
 
 export function FormWorkspace({ children, aside }: { children: ReactNode; aside?: ReactNode }) {
   /*
    * Рабочая область карточки: форма и боковая лента имеют собственную
-   * прокрутку. На узком экране лента переходит под форму с верхним разделителем.
+   * прокрутку. На узком экране лента переходит под форму с верхним
+   * разделителем.
    */
   return (
     <div className="flex min-h-0 w-full flex-col lg:h-[calc(100dvh-var(--odoo-record-control-panel-height))] lg:flex-row">
@@ -33,8 +34,8 @@ export function FormWorkspace({ children, aside }: { children: ReactNode; aside?
 }
 
 export function FormSheetBg({ children }: { children: ReactNode }) {
-  // Фон тянется вместе с рабочей областью: предел в пикселях оставлял пустые поля
-  // на широком экране, когда масштаб браузера был меньше 100%.
+  // Фон тянется вместе с рабочей областью: предел в пикселях оставлял
+  // пустые поля на широком экране, когда масштаб браузера был меньше 100%.
   return (
     <div className="w-full px-[var(--odoo-form-workspace-padding)] pb-[var(--odoo-form-workspace-padding)] pt-0">
       {children}
@@ -43,7 +44,8 @@ export function FormSheetBg({ children }: { children: ReactNode }) {
 }
 
 export function FormSheet({ children }: { children: ReactNode }) {
-  // .o_form_sheet: белый лист, рамка 1px и компактные тематические отступы.
+  // Белый лист карточки (.o_form_sheet): рамка 1px и компактные
+  // тематические отступы.
   return (
     <div className="rounded-[var(--odoo-form-sheet-radius)] border border-odoo-border bg-odoo-surface p-[var(--odoo-form-sheet-padding)] lg:p-[var(--odoo-form-sheet-padding-wide)]">
       {children}
@@ -252,7 +254,7 @@ export function FormStatusbar({
   );
 }
 
-/** .o_group — две внутренние группы рядом. */
+/** Две внутренние группы рядом (.o_group). */
 export function FormGroup({ children }: { children: ReactNode }) {
   return (
     <div className="grid grid-cols-1 gap-x-[var(--odoo-form-group-gap)] md:grid-cols-2">
@@ -270,7 +272,8 @@ export function FormTitle({ children }: { children: ReactNode }) {
   );
 }
 
-/** .o_inner_group — фиксированная колонка подписей; строки можно центрировать по вертикали. */
+/** Внутренняя группа (.o_inner_group): фиксированная колонка подписей;
+ *  строки можно центрировать по вертикали. */
 export function InnerGroup({
   title,
   children,
@@ -299,7 +302,8 @@ export function InnerGroup({
   );
 }
 
-/** .o_form_label + ячейка поля. Должен быть прямым потомком InnerGroup. */
+/** Подпись и ячейка поля (.o_form_label). Должен быть прямым потомком
+ *  InnerGroup. */
 export function Field({
   label,
   htmlFor,
@@ -337,7 +341,8 @@ export function Field({
   );
 }
 
-/** .o_input — рамка появляется только при наведении и фокусе. */
+/** Поле ввода (.o_input): рамка появляется только при наведении и
+ *  фокусе. */
 export function OdooInput({ className = "", ...props }: InputHTMLAttributes<HTMLInputElement>) {
   return (
     <input
@@ -371,7 +376,7 @@ export function OdooCheckbox({
   );
 }
 
-/** .o_notebook — вкладки в бутстрап-стиле, как в Odoo. */
+/** Вкладки в бутстрап-стиле, как в Odoo (.o_notebook). */
 export function Notebook({
   tabs,
   active,
@@ -411,7 +416,7 @@ export function Notebook({
 }
 
 /** .o_form_status_indicator — иконки сохранить / отменить.
- *  Форма сохраняется сама через паузу в правках (см. вызывающую страницу) —
+ *  Форма сохраняется сама через паузу в правках (вызывающая страница) —
  *  эти кнопки на случай, если хочется сохранить сейчас же или откатить. */
 export function FormStatusIndicator({
   dirty,

@@ -22,8 +22,8 @@ export function formatSize(bytes: number): string {
 
 /**
  * Загружает файл в память и отдаёт временную ссылку на него.
- * Скачанные файлы запоминаются на время сессии (`blob-cache.ts`), поэтому
- * повторное открытие карточки не тянет те же картинки заново.
+ * Скачанные файлы запоминаются на время сессии (`blob-cache.ts`),
+ * поэтому повторное открытие карточки не тянет те же картинки заново.
  */
 export function useObjectUrl(
   file: Attachment | null,
@@ -58,7 +58,7 @@ export function useObjectUrl(
       .catch(() => active && setFailed(true));
 
     return () => {
-      // Ссылку не освобождаем: ею владеет кеш и чистит граница сессии.
+      // Ссылку не освобождаем: ею владеет кеш, а чистит граница сессии.
       active = false;
     };
   }, [attachmentId, enabled, variant]);
