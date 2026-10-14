@@ -59,8 +59,9 @@ from app.core.security import hash_password
 from app.db.base import Base
 from app.db.session import get_session
 from app.main import app
-from app.models.crm import Lead, LossReason, Stage, Tag
+from app.models.crm import Accountant, Lead, LossReason, Stage, Tag
 from app.models.user import Role, User
+from app.services.accountants import DEFAULT_ACCOUNTANT_NAMES
 
 TEST_PASSWORD = "SuperSecret123"
 
@@ -162,7 +163,8 @@ async def seeded(session: AsyncSession) -> dict[str, object]:
     talks_stage = Stage(name="Переговоры", sequence=2, color="blue", owner_id=admin.id)
     tag = Tag(name="Крупный клиент", color="#1e8449")
     loss_reason = LossReason(name="Перестал возить")
-    session.add_all([new_stage, talks_stage, tag, loss_reason])
+    accountants = [Accountant(name=name) for name in DEFAULT_ACCOUNTANT_NAMES]
+    session.add_all([new_stage, talks_stage, tag, loss_reason, *accountants])
     await session.flush()
 
     lead = Lead(

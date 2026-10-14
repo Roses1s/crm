@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import type { User } from "@/shared/types";
+import type { Accountant, User } from "@/shared/types";
 import { api } from "../client";
 import {
+  accountantSchema,
   arraySchema,
   backupTaskResponseSchema,
   backupsResponseSchema,
@@ -51,6 +52,61 @@ export function useDeleteUser() {
   return useMutation({
     mutationFn: (id: number) => apiVoid(`/admin/users/${id}`, { method: "DELETE" }),
     onSuccess: () => void qc.invalidateQueries({ queryKey: keys.users }),
+  });
+}
+
+export function useAdminAccountants() {
+  return useQuery({
+    queryKey: keys.adminAccountants,
+    queryFn: () =>
+      api<Accountant[]>("/admin/accountants", { schema: arraySchema(accountantSchema) }),
+  });
+}
+
+function invalidateAccountantLists(qc: ReturnType<typeof useQueryClient>) {
+  void qc.invalidateQueries({ queryKey: keys.accountants });
+  void qc.invalidateQueries({ queryKey: keys.adminAccountants });
+}
+
+export function useCreateAccountant() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (body: { name: string }) =>
+      api<Accountant>("/admin/accountants", { method: "POST", body, schema: accountantSchema }),
+    onSuccess: () => invalidateAccountantLists(qc),
+  });
+}
+
+export function useUpdateAccountant() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: ({ id, name }: { id: number; name: string }) =>
+      api<Accountant>(`/admin/accountants/${id}`, {
+        method: "PATCH",
+        body: { name },
+        schema: accountantSchema,
+      }),
+    onSuccess: () => invalidateAccountantLists(qc),
+  });
+}
+
+export function useDeleteAccountant() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) => apiVoid(`/admin/accountants/${id}`, { method: "DELETE" }),
+    onSuccess: () => invalidateAccountantLists(qc),
+  });
+}
+
+export function useRestoreAccountant() {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: (id: number) =>
+      api<Accountant>(`/admin/accountants/${id}/restore`, {
+        method: "POST",
+        schema: accountantSchema,
+      }),
+    onSuccess: () => invalidateAccountantLists(qc),
   });
 }
 

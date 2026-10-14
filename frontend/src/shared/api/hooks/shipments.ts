@@ -186,6 +186,9 @@ export function useSaveShipment(id: string | undefined) {
         ? api<Shipment>("/shipments", { method: "POST", body, schema: shipmentSchema })
         : api<Shipment>(`/shipments/${id}`, { method: "PATCH", body, schema: shipmentSchema }),
     onSuccess: (data) => {
+      // Сразу обновляем карточку в кеше: при переходе к копии после
+      // сохранения исходника форма должна получить именно свежие поля.
+      qc.setQueryData(keys.shipment(data.id), data);
       void qc.invalidateQueries({ queryKey: ["shipments"] });
       void qc.invalidateQueries({ queryKey: keys.shipment(data.id) });
       // При переносе заявки меняются сразу списки старого и нового лида.

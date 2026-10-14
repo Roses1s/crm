@@ -18,8 +18,11 @@ from app.api.deps import AdminUser, SessionDep
 from app.core.config import settings
 from app.core.errors import NotFoundError
 from app.core.logging import get_logger
+from app.models.crm import Accountant
 from app.models.user import User
+from app.schemas.crm import AccountantCreate, AccountantRead, AccountantUpdate
 from app.schemas.user import UserCreate, UserRead, UserUpdate
+from app.services import accountants as accountant_service
 from app.services import admin as service
 
 log = get_logger(__name__)
@@ -51,6 +54,68 @@ async def update_user(user_id: int, payload: UserUpdate, session: SessionDep, _:
 async def delete_user(user_id: int, session: SessionDep, current: AdminUser) -> None:
     """Удаляет сотрудника, передавая его лиды администратору (детали — в сервисе)."""
     await service.delete_user(session, current=current, user_id=user_id)
+
+
+# --- Справочник бухгалтеров ---
+
+
+@router.get("/accountants", response_model=list[AccountantRead], summary="Все бухгалтеры")
+async def list_accountants(session: SessionDep, _: AdminUser) -> list[Accountant]:
+    return await accountant_service.list_accountants(session, active_only=False)
+
+
+@router.post(
+    "/accountants",
+    response_model=AccountantRead,
+    status_code=status.HTTP_201_CREATED,
+    summary="Добавить бухгалтера",
+)
+async def create_accountant(
+    payload: AccountantCreate, session: SessionDep, admin: AdminUser
+) -> Accountant:
+    accountant = await accountant_service.create_accountant(session, payload.name)
+    log.info("accountant.created", accountant_id=accountant.id, by=admin.id)
+    return accountant
+
+
+@router.patch(
+    "/accountants/{accountant_id}", response_model=AccountantRead, summary="Изменить ФИО бухгалтера"
+)
+async def update_accountant(
+    accountant_id: int,
+    payload: AccountantUpdate,
+    session: SessionDep,
+    admin: AdminUser,
+) -> Accountant:
+    accountant = await accountant_service.update_accountant(
+        session, accountant_id, payload.model_dump(exclude_unset=True)
+    )
+    log.info("accountant.updated", accountant_id=accountant.id, by=admin.id)
+    return accountant
+
+
+@router.delete(
+    "/accountants/{accountant_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Убрать бухгалтера из активного списка",
+)
+async def delete_accountant(accountant_id: int, session: SessionDep, admin: AdminUser) -> None:
+    # Архивируем запись: старые карточки лидов сохраняют назначенное ФИО.
+    await accountant_service.deactivate_accountant(session, accountant_id)
+    log.info("accountant.deactivated", accountant_id=accountant_id, by=admin.id)
+
+
+@router.post(
+    "/accountants/{accountant_id}/restore",
+    response_model=AccountantRead,
+    summary="Восстановить бухгалтера",
+)
+async def restore_accountant(
+    accountant_id: int, session: SessionDep, admin: AdminUser
+) -> Accountant:
+    accountant = await accountant_service.restore_accountant(session, accountant_id)
+    log.info("accountant.restored", accountant_id=accountant.id, by=admin.id)
+    return accountant
 
 
 # --- Безопасность ---

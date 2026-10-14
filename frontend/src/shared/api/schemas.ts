@@ -65,6 +65,13 @@ export type Tag = z.infer<typeof tagSchema>;
 export const lossReasonSchema = z.object({ id: idSchema, name: z.string() });
 export type LossReason = z.infer<typeof lossReasonSchema>;
 
+export const accountantSchema = z.object({
+  id: idSchema,
+  name: z.string(),
+  is_active: z.boolean(),
+});
+export type Accountant = z.infer<typeof accountantSchema>;
+
 export const leadSchema = z.object({
   id: idSchema,
   name: z.string(),

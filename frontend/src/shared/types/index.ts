@@ -4,6 +4,7 @@
  * работы используют одно описание — `shared/api/schemas.ts`.
  */
 export type {
+  Accountant,
   Attachment,
   BackupsResponse,
   Colleague,

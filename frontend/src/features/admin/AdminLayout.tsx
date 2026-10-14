@@ -4,6 +4,7 @@ import { useMe } from "@/shared/api/hooks";
 
 const LINKS = [
   { to: "/admin/users", label: "Пользователи" },
+  { to: "/admin/accountants", label: "Бухгалтеры" },
   { to: "/admin/security", label: "Безопасность" },
 ];
 

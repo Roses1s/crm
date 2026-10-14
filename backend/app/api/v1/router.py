@@ -5,6 +5,7 @@ from __future__ import annotations
 from fastapi import APIRouter
 
 from app.api.v1 import (
+    accountants,
     admin,
     attachments,
     auth,
@@ -22,6 +23,7 @@ from app.api.v1 import (
 api_router = APIRouter()
 api_router.include_router(auth.router)
 api_router.include_router(launcher.router)
+api_router.include_router(accountants.router)
 api_router.include_router(stages.router)
 api_router.include_router(tags.router)
 api_router.include_router(loss_reasons.router)

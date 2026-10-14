@@ -48,6 +48,7 @@ it("админ видит содержимое панели управления
 
   expect(await screen.findByText("Панель управления")).toBeVisible();
   expect(await screen.findByText("Страница администратора")).toBeVisible();
+  expect(await screen.findByRole("link", { name: "Бухгалтеры" })).toBeVisible();
 });
 
 it("не-админа редиректит на главную, не показывая панель управления", async () => {

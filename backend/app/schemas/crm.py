@@ -2,7 +2,7 @@ from __future__ import annotations
 
 import re
 from datetime import datetime
-from typing import ClassVar, Literal
+from typing import ClassVar
 
 from pydantic import BaseModel, EmailStr, Field, field_validator
 
@@ -93,21 +93,50 @@ class LossReasonCreate(BaseModel):
     name: str = Field(min_length=1, max_length=100)
 
 
+# --- Бухгалтеры ---
+class AccountantRead(ORMModel):
+    id: int
+    name: str
+    is_active: bool
+
+
+class AccountantCreate(BaseModel):
+    name: str = Field(min_length=1, max_length=255)
+
+    @field_validator("name")
+    @classmethod
+    def name_is_not_blank(cls, value: str) -> str:
+        normalized = " ".join(value.split())
+        if not normalized:
+            raise ValueError("Укажите ФИО бухгалтера")
+        return normalized
+
+
+class AccountantUpdate(PatchModel):
+    name: str | None = Field(default=None, min_length=1, max_length=255)
+
+    @field_validator("name")
+    @classmethod
+    def name_is_not_blank(cls, value: str | None) -> str | None:
+        if value is None:
+            return None
+        normalized = " ".join(value.split())
+        if not normalized:
+            raise ValueError("Укажите ФИО бухгалтера")
+        return normalized
+
+
+def normalize_accountant_name(value: str | None) -> str | None:
+    """Схлопывает пробелы; пустое имя не эквивалентно отсутствующему."""
+    if value is None:
+        return None
+    normalized = " ".join(value.split())
+    if not normalized:
+        raise ValueError("Выберите бухгалтера или очистите поле")
+    return normalized
+
+
 # --- Лиды ---
-AccountantName = Literal[
-    "Пухова Елена Витальевна",
-    "Кузьмина Виктория Павловна",
-    "Белякова Ольга Александровна",
-    "Терентьева Елена Александровна",
-    "Горнагина Ирина Анатольевна",
-    "Дремова Наталья Александровна",
-    "Позднякова Лилия Усманова",
-    "Рыбина Екатерина",
-    "Гуцол Катерина Евгеньевна",
-    "Колясникова Алина",
-]
-
-
 class LeadBase(BaseModel):
     name: str = Field(min_length=1, max_length=255)
     inn: str = Field(min_length=10, max_length=12)
@@ -123,7 +152,11 @@ class LeadCreate(LeadBase):
     stage_id: int
     assigned_to_id: int | None = None
     tag_ids: list[int] = Field(default_factory=list)
-    accountant_name: AccountantName | None = None
+    accountant_name: str | None = Field(default=None, min_length=1, max_length=255)
+
+    _normalize_accountant_name = field_validator("accountant_name")(
+        staticmethod(normalize_accountant_name)
+    )
 
 
 class LeadTransfer(BaseModel):
@@ -146,7 +179,7 @@ class LeadUpdate(PatchModel):
     logist_contact: str | None = Field(default=None, max_length=255)
     logist_phone: str | None = Field(default=None, max_length=32)
     logist_email: EmailStr | None = Field(default=None, max_length=255)
-    accountant_name: AccountantName | None = None
+    accountant_name: str | None = Field(default=None, min_length=1, max_length=255)
     priority: int | None = Field(default=None, ge=0, le=3)
     stage_id: int | None = None
     tag_ids: list[int] | None = None
@@ -156,6 +189,9 @@ class LeadUpdate(PatchModel):
     # не передать другому продавцу.
 
     _validate_inn = field_validator("inn")(staticmethod(validate_inn))
+    _normalize_accountant_name = field_validator("accountant_name")(
+        staticmethod(normalize_accountant_name)
+    )
 
 
 class LeadLose(BaseModel):
@@ -171,7 +207,7 @@ class LeadRead(ORMModel):
     logist_contact: str
     logist_phone: str
     logist_email: str | None
-    accountant_name: AccountantName | None
+    accountant_name: str | None
     priority: int
     is_archived: bool
     loss_reason_id: int | None

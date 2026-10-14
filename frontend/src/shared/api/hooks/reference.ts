@@ -1,8 +1,9 @@
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 
-import type { LauncherApp, LossReason, Meta, Stage, Tag } from "@/shared/types";
+import type { Accountant, LauncherApp, LossReason, Meta, Stage, Tag } from "@/shared/types";
 import { api } from "../client";
 import {
+  accountantSchema,
   arraySchema,
   launcherAppSchema,
   lossReasonSchema,
@@ -92,6 +93,15 @@ export function useDeleteTag() {
       void qc.invalidateQueries({ queryKey: ["shipments"] });
       void qc.invalidateQueries({ queryKey: ["shipment"] });
     },
+  });
+}
+
+/** Активные ФИО бухгалтеров доступны всем ролям для назначения в карточке лида. */
+export function useAccountants() {
+  return useQuery({
+    queryKey: keys.accountants,
+    queryFn: () => api<Accountant[]>("/crm/accountants", { schema: arraySchema(accountantSchema) }),
+    ...REFERENCE_DATA,
   });
 }
 

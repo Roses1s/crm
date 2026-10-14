@@ -3,7 +3,6 @@ import { useBlocker, useNavigate, useParams } from "react-router-dom";
 
 import { AppShell } from "@/app/layout/AppShell";
 import { StarRating } from "@/features/crm/board/StarRating";
-import { ACCOUNTANT_NAMES } from "@/features/crm/lead-form/accountant-options";
 import { TagsField } from "@/features/crm/lead-form/TagsField";
 import {
   empty,
@@ -14,6 +13,7 @@ import {
 } from "@/features/crm/lead-form/form-state";
 import { ApiError } from "@/shared/api/client";
 import {
+  useAccountants,
   useCreateLead,
   useCustomersByInn,
   useDeleteLead,
@@ -75,6 +75,7 @@ function LeadForm({ id }: { id?: string }) {
   const savedId = isNew ? undefined : id;
 
   const { data: currentUser } = useMe();
+  const { data: accountants = [] } = useAccountants();
   const { data: lead, isLoading, refetch: refetchLead } = useLead(id);
   const { data: stages = [] } = useStages();
   const { data: allTags = [] } = useTags();
@@ -518,11 +519,17 @@ function LeadForm({ id }: { id?: string }) {
                               className="w-full rounded-[3px] border border-transparent bg-transparent px-1 py-[2px] text-[13px] leading-[19px] text-odoo-text outline-none transition-colors hover:border-odoo-border focus:border-odoo-focus/40 disabled:cursor-not-allowed"
                             >
                               <option value="">Выбрать</option>
-                              {ACCOUNTANT_NAMES.map((name) => (
-                                <option key={name} value={name}>
+                              {accountants.map(({ id: accountantId, name }) => (
+                                <option key={accountantId} value={name}>
                                   {name}
                                 </option>
                               ))}
+                              {form.accountant_name &&
+                                !accountants.some(({ name }) => name === form.accountant_name) && (
+                                  <option value={form.accountant_name} disabled>
+                                    {form.accountant_name} (не активен)
+                                  </option>
+                                )}
                             </select>
                           </Field>
                           <Field label="Приоритет">

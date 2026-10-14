@@ -1,4 +1,4 @@
-import { FileText } from "lucide-react";
+import { Copy, FileText } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useBlocker, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
@@ -127,9 +127,10 @@ type FormState = typeof emptyForm;
 
 export function ShipmentFormPage() {
   const { id } = useParams();
-  // Ключ по id: переход между заявками полностью пересоздаёт форму,
-  // чтобы состояние одной карточки не переехало в другую.
-  return <ShipmentForm key={id ?? "new"} id={id} />;
+  const [searchParams] = useSearchParams();
+  // Ключ по id и query: копия/новая заявка с выбранным лидом — отдельные
+  // состояния формы, они не должны наследовать черновик друг друга.
+  return <ShipmentForm key={`${id ?? "new"}?${searchParams.toString()}`} id={id} />;
 }
 
 function ShipmentForm({ id }: { id?: string }) {
@@ -140,13 +141,19 @@ function ShipmentForm({ id }: { id?: string }) {
   const navigate = useNavigate();
   const toast = useToast();
   const [searchParams] = useSearchParams();
+  const copySourceId = isNew ? searchParams.get("copy") || undefined : undefined;
+  const isCopy = Boolean(copySourceId);
   const [leadSearch, setLeadSearch] = useState("");
 
   const { data: currentUser } = useMe();
   // Ставку вычета маржи берём с сервера: единственная копия живёт в
   // бэкенде (Т-08), фронтенд свою не держит.
   const { data: meta } = useMeta();
-  const { data: shipment, isLoading } = useShipment(id);
+  const {
+    data: shipment,
+    isLoading: shipmentLoading,
+    isError: shipmentLoadFailed,
+  } = useShipment(isCopy ? copySourceId : id);
   const { data: leadsPage } = useLeads(isNew ? { search: leadSearch } : {});
   const leads = leadsPage?.items ?? [];
   const { data: timeline = [] } = useShipmentTimeline(id);
@@ -193,8 +200,10 @@ function ShipmentForm({ id }: { id?: string }) {
     if (shipment && loadedId.current !== shipment.id) {
       loadedId.current = shipment.id;
       const next: FormState = {
-        number: shipment.number ?? "",
-        created_at: toDatetimeLocal(shipment.created_at),
+        number: isCopy ? "" : (shipment.number ?? ""),
+        created_at: isCopy
+          ? toDatetimeLocal(new Date().toISOString())
+          : toDatetimeLocal(shipment.created_at),
         lead_id: shipment.lead_id,
         address_loading: shipment.address_loading ?? "",
         address_unloading: shipment.address_unloading ?? "",
@@ -245,9 +254,15 @@ function ShipmentForm({ id }: { id?: string }) {
         tag_ids: shipment.tags?.map((t) => t.id) ?? [],
       };
       setForm(next);
-      setPristine(next);
+      if (isCopy) {
+        // Новая копия должна оставаться черновиком до явного сохранения,
+        // но кнопка «Сохранить» доступна сразу, даже без ручных правок.
+        setPristine({ ...emptyForm, created_at: next.created_at });
+      } else {
+        setPristine(next);
+      }
     }
-  }, [shipment]);
+  }, [isCopy, shipment]);
 
   const dirty = JSON.stringify(form) !== JSON.stringify(pristine);
   const saving = save.isPending;
@@ -417,7 +432,7 @@ function ShipmentForm({ id }: { id?: string }) {
     });
   }
 
-  const currentStageId = STAGES.find((s) => s.value === shipment?.status)?.id ?? 0;
+  const currentStageId = isNew ? 0 : (STAGES.find((s) => s.value === shipment?.status)?.id ?? 0);
 
   const selectedLead = leads.find((l) => l.id === form.lead_id) ?? selectedLeadDetails;
   const title = shipment?.lead_name || selectedLead?.name || "Новая заявка";
@@ -455,7 +470,24 @@ function ShipmentForm({ id }: { id?: string }) {
   return (
     <AppShell>
       <ControlPanel
-        crumbs={[{ label: "Заявки", to: "/shipments" }, { label: isNew ? "Новая заявка" : title }]}
+        crumbs={[
+          { label: "Заявки", to: "/shipments" },
+          { label: isCopy ? "Копия заявки" : isNew ? "Новая заявка" : title },
+        ]}
+        cog={
+          !isNew ? (
+            <button
+              type="button"
+              aria-label="Копировать заявку"
+              title="Создать новую заявку на основе этой"
+              onClick={() => navigate(`/shipments/new?copy=${encodeURIComponent(id ?? "")}`)}
+              className="inline-flex h-7 items-center gap-1 rounded-[4px] border border-odoo-border bg-odoo-surface px-2 text-[12px] text-odoo-text hover:bg-odoo-bg"
+            >
+              <Copy className="h-3.5 w-3.5" />
+              <span>Копировать</span>
+            </button>
+          ) : undefined
+        }
         status={
           <FormStatusIndicator
             dirty={dirty}
@@ -490,7 +522,9 @@ function ShipmentForm({ id }: { id?: string }) {
             {error && <FormAlert>{error}</FormAlert>}
 
             <FormSheet>
-              {isLoading && !isNew ? (
+              {isCopy && shipmentLoadFailed ? (
+                <FormAlert>Не удалось загрузить исходную заявку для копирования.</FormAlert>
+              ) : shipmentLoading && (!isNew || isCopy) ? (
                 <FormSkeleton />
               ) : (
                 <>

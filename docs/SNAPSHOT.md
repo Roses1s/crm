@@ -20,7 +20,8 @@
 
 | Файл | Адреса начинаются с | Ручек |
 |---|---|---|
-| `admin.py` | `/admin` | 8 |
+| `accountants.py` | `/crm/accountants` | 1 |
+| `admin.py` | `/admin` | 13 |
 | `attachments.py` | `/crm` | 7 |
 | `auth.py` | `/auth` | 4 |
 | `customers.py` | `/crm/customers` | 2 |
@@ -40,6 +41,7 @@
 
 | Файл | Что внутри |
 |---|---|
+| `accountants.py` | Справочник бухгалтеров и проверка назначений в карточках лидов |
 | `admin.py` | Бизнес-логика администрирования: сотрудники, бэкапы, журнал входа |
 | `attachments.py` | Бизнес-логика вложений лидов и заявок |
 | `customers.py` | Модуль «Клиенты»: все лиды компании одним списком, с маскировкой чужих |
@@ -54,6 +56,7 @@
 
 | Модель | Таблица |
 |---|---|
+| `Accountant` | `accountants` |
 | `Attachment` | `attachments` |
 | `Lead` | `leads` |
 | `LoginAttempt` | `login_attempts` |
@@ -65,7 +68,7 @@
 | `TimelineEntry` | `timeline_entries` |
 | `User` | `users` |
 
-Миграций: **27**, последняя в цепочке — `c5e93b9d1995 — Снять временные server default, оставшиеся после заполнения новых колонок`.
+Миграций: **28**, последняя в цепочке — `d8e9f0a1b2c3 — Создать редактируемый справочник бухгалтеров.`.
 
 ## Фоновые задачи (Celery beat)
 
@@ -83,7 +86,7 @@
 | Раздел | Страницы |
 |---|---|
 | `accounting` | `AccountingPage` |
-| `admin` | `SecurityPage`, `UsersPage` |
+| `admin` | `AccountantsPage`, `SecurityPage`, `UsersPage` |
 | `auth` | `LoginPage` |
 | `crm` | `KanbanPage`, `LeadFormPage` |
 | `customers` | `CustomersPage` |
@@ -92,8 +95,8 @@
 
 ## Тесты
 
-- бэкенд (pytest): **214** тест-функций
-- фронтенд (vitest): **426** тестов
+- бэкенд (pytest): **218** тест-функций
+- фронтенд (vitest): **431** тестов
 - сценарные (подменяется только сеть, остальное настоящее):
   - `frontend/src/features/auth/login-flow.test.tsx`
   - `frontend/src/features/crm/kanban-flow.test.tsx`

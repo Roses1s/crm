@@ -21,6 +21,9 @@ const SecurityPage = lazy(() =>
 const UsersPage = lazy(() =>
   import("@/features/admin/UsersPage").then((m) => ({ default: m.UsersPage })),
 );
+const AccountantsPage = lazy(() =>
+  import("@/features/admin/AccountantsPage").then((m) => ({ default: m.AccountantsPage })),
+);
 const CustomersPage = lazy(() =>
   import("@/features/customers/CustomersPage").then((m) => ({
     default: m.CustomersPage,
@@ -129,6 +132,7 @@ const router = createBrowserRouter([
     children: [
       { index: true, element: <AdminIndex /> },
       { path: "users", element: <UsersPage /> },
+      { path: "accountants", element: <AccountantsPage /> },
       { path: "security", element: <SecurityPage /> },
     ],
   },

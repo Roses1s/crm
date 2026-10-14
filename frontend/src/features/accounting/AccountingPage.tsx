@@ -5,16 +5,9 @@ import { Navbar } from "@/app/layout/Navbar";
  * Заглушка раздела «Бухгалтерия» для лаунчера.
  *
  * Рабочего модуля здесь пока нет: ни счетов, ни банка, ни кассы в базе не
- * существует. Чтобы не притворяться функциональностью, карточки ниже
- * декоративные: некликабельные (pointer-events-none, aria-hidden), без
- * кнопок и без цифр. Сверху — честная подпись вне эффекта растворения,
- * чтобы полупрозрачность не выглядела дефектом.
- *
- * Эффект «тизера» даёт маска-градиент: у верха блока карточки едва
- * проступают, а ниже полностью растворяются в тёмном фоне (как в
- * референсе). Фон фиксированно тёмный и не зависит от переключателя
- * «Тёмный режим» в шапке: тот же фирменный токен, что у экрана входа
- * (--color-odoo-dark / --color-odoo-dark-light).
+ * существует. Карточки ниже декоративные и некликабельные; внешний вид
+ * использует семантические токены CRM, чтобы корректно переключаться между
+ * светлой и тёмной темами.
  */
 
 const TEASER_CARDS: { title: string; icon: typeof Landmark; bars: number[] }[] = [
@@ -27,17 +20,17 @@ const TEASER_CARDS: { title: string; icon: typeof Landmark; bars: number[] }[] =
 
 export function AccountingPage() {
   return (
-    <div className="min-h-screen bg-odoo-dark">
+    <div className="min-h-screen bg-odoo-bg text-odoo-text">
       <Navbar />
       <div className="px-4 pb-16 pt-6 sm:px-8">
         <div className="mx-auto max-w-5xl">
           <div className="mb-8 flex items-center gap-3">
-            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[6px] bg-odoo-dark-light text-white/80">
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-[6px] bg-odoo-primary text-white">
               <Landmark className="h-5 w-5" strokeWidth={1.75} />
             </div>
             <div>
-              <h1 className="text-[15px] font-semibold text-white">Бухгалтерия</h1>
-              <p className="text-[12px] text-white/50">
+              <h1 className="text-[15px] font-semibold text-odoo-text">Бухгалтерия</h1>
+              <p className="text-[12px] text-odoo-text-muted">
                 Раздел в разработке — скоро здесь появятся счета, банк и кассовые операции
               </p>
             </div>
@@ -54,19 +47,19 @@ export function AccountingPage() {
             {TEASER_CARDS.map(({ title, icon: Icon, bars }) => (
               <div
                 key={title}
-                className="rounded-[6px] border border-white/10 bg-odoo-dark-light p-4"
+                className="rounded-[6px] border border-odoo-border-light bg-odoo-surface p-4"
               >
-                <div className="mb-3 flex items-center gap-2 text-white/70">
+                <div className="mb-3 flex items-center gap-2 text-odoo-text-soft">
                   <Icon className="h-4 w-4" strokeWidth={1.75} />
                   <span className="text-[13px] font-medium">{title}</span>
                 </div>
-                <div className="h-2 w-2/3 rounded-full bg-white/10" />
-                <div className="mt-2 h-2 w-1/2 rounded-full bg-white/10" />
+                <div className="h-2 w-2/3 rounded-full bg-odoo-skeleton" />
+                <div className="mt-2 h-2 w-1/2 rounded-full bg-odoo-skeleton" />
                 <div className="mt-4 flex h-10 items-end gap-1">
                   {bars.map((h, i) => (
                     <span
                       key={i}
-                      className="w-full rounded-sm bg-white/10"
+                      className="w-full rounded-sm bg-odoo-primary/20"
                       style={{ height: `${h}%` }}
                     />
                   ))}

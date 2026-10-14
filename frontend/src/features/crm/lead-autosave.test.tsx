@@ -16,7 +16,6 @@ import { Route, Routes } from "react-router-dom";
 import { afterEach, beforeEach, expect, it, vi } from "vitest";
 
 import { LeadFormPage } from "./LeadFormPage";
-import { ACCOUNTANT_NAMES } from "@/features/crm/lead-form/accountant-options";
 import { clearTokens, setAccessToken } from "@/shared/api/auth";
 import { startFakeApi, type FakeServer } from "@/test/fake-api";
 import { ToastProvider } from "@/shared/ui/toast";
@@ -54,6 +53,18 @@ const LEAD = {
 };
 
 const STAGES = [{ id: 1, name: "Новый", sequence: 1, color: "" }];
+const ACCOUNTANTS = [
+  "Пухова Елена Витальевна",
+  "Кузьмина Виктория Павловна",
+  "Белякова Ольга Александровна",
+  "Терентьева Елена Александровна",
+  "Горнагина Ирина Анатольевна",
+  "Дремова Наталья Александровна",
+  "Позднякова Лилия Усманова",
+  "Рыбина Екатерина",
+  "Гуцол Катерина Евгеньевна",
+  "Колясникова Алина",
+].map((name, index) => ({ id: index + 1, name, is_active: true }));
 
 function routes(leadResponse: unknown = LEAD) {
   return [
@@ -66,6 +77,7 @@ function routes(leadResponse: unknown = LEAD) {
     { path: "/crm/leads/10/attachments", response: [] },
     { path: "/crm/leads/10", response: leadResponse },
     { path: "/crm/stages", response: STAGES },
+    { path: "/crm/accountants", response: ACCOUNTANTS },
     { path: "/crm/tags", response: [] },
     { path: "/crm/customers/by-inn", response: [] },
     { path: "/leads/10/shipments", response: [] },
@@ -287,7 +299,7 @@ it("правка руками снова включает автосохране
   await waitFor(() => expect(attempt).toBe(2));
 });
 
-it("бухгалтера выбирают из фиксированного списка, сохраняют и могут очистить", async () => {
+it("бухгалтера выбирают из серверного справочника, сохраняют и могут очистить", async () => {
   setAccessToken("токен");
   let current = { ...LEAD };
   server = startFakeApi([
@@ -328,7 +340,7 @@ it("бухгалтера выбирают из фиксированного сп
     within(accountant)
       .getAllByRole("option")
       .map((option) => option.textContent),
-  ).toEqual(["Выбрать", ...ACCOUNTANT_NAMES]);
+  ).toEqual(["Выбрать", ...ACCOUNTANTS.map((accountant) => accountant.name)]);
 
   await user.selectOptions(accountant, "Кузьмина Виктория Павловна");
   await act(async () => {

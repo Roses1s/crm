@@ -90,13 +90,13 @@ afterEach(() => {
   clearTokens();
 });
 
-function commonRoutes() {
+function commonRoutes(shipment: unknown = SHIPMENT) {
   return [
     { path: "/auth/me", response: ME },
     { path: "/meta", response: { margin_deduction_rate: "0.25" } },
     { path: "/shipments/101/attachments", response: [] },
     { path: "/shipments/101/timeline", response: [] },
-    { path: "/shipments/101", response: SHIPMENT },
+    { path: "/shipments/101", response: shipment },
     { path: "/crm/leads", response: page([]) },
     { path: "/crm/tags", response: [] },
   ];
@@ -616,4 +616,56 @@ it("пустой номер у существующей заявки не ухо
 
   expect(await screen.findByText("Номер заявки не может быть пустым")).toBeVisible();
   expect(writeCalls()).toEqual([]);
+});
+
+it("копирует заявку в новый черновик без номера, статуса и старой даты", async () => {
+  setAccessToken("токен");
+  const copySource = {
+    ...SHIPMENT,
+    comment: "Комментарий исходной заявки",
+    carrier_name: "ООО Перевозчик",
+    loading_cities: ["Москва"] as string[],
+  };
+  server = startFakeApi([
+    ...commonRoutes(copySource),
+    {
+      method: "POST",
+      path: "/shipments",
+      status: 201,
+      response: (body: unknown) => ({ ...SHIPMENT, id: 102, number: "102", ...(body as object) }),
+    },
+    { path: "/shipments/102/attachments", response: [] },
+    { path: "/shipments/102/timeline", response: [] },
+    { path: "/shipments/102", response: { ...SHIPMENT, id: 102, number: "102" } },
+  ]);
+
+  const user = userEvent.setup();
+  renderShipment();
+
+  await screen.findByLabelText("Номер заявки");
+  await user.click(screen.getByRole("button", { name: "Копировать заявку" }));
+
+  expect(await screen.findByText("Копия заявки")).toBeVisible();
+  const number = (await screen.findByLabelText("Номер заявки")) as HTMLInputElement;
+  const createdAt = (await screen.findByLabelText("Дата создания")) as HTMLInputElement;
+  await waitFor(() => expect(number.value).toBe(""));
+  expect(createdAt.value).not.toBe("2026-01-15T09:30");
+
+  await user.click(screen.getByRole("button", { name: "Сохранить" }));
+  await waitFor(() => expect(server?.called("POST", "/shipments")).toBe(true));
+
+  const post = server.calls.find(
+    (call) => call.method === "POST" && call.url.startsWith("/api/v1/shipments"),
+  );
+  const body = post?.body as Record<string, unknown>;
+  expect(body).toMatchObject({
+    number: "",
+    lead_id: 10,
+    comment: copySource.comment,
+    carrier_name: copySource.carrier_name,
+    loading_cities: copySource.loading_cities,
+  });
+  expect(body.created_at).not.toBe(SHIPMENT.created_at);
+  expect(body).not.toHaveProperty("status");
+  expect(body).not.toHaveProperty("attachments");
 });

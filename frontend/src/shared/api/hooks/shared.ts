@@ -98,6 +98,8 @@ export const keys = {
   shipmentAttachments: (id: string | number) => ["shipment-attachments", String(id)] as const,
   shipmentTimeline: (id: string | number) => ["shipment-timeline", String(id)] as const,
   users: ["users"] as const,
+  accountants: ["accountants"] as const,
+  adminAccountants: ["admin-accountants"] as const,
   backups: ["backups"] as const,
   colleagues: ["colleagues"] as const,
   loginAttempts: ["login-attempts"] as const,

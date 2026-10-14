@@ -24,6 +24,7 @@ from app.models.crm import Lead, LossReason, Stage, lead_tags
 from app.models.timeline import LEAD_STAGE_LABEL, Attachment, EntryType, TimelineEntry
 from app.models.user import Role, User
 from app.schemas.crm import LeadCreate, LeadLose, LeadTransfer, LeadUpdate, NoteCreate, NoteUpdate
+from app.services.accountants import validate_lead_accountant
 from app.services.lead_versions import advance_lead_version, next_lead_updated_at
 from app.services.search import LIKE_ESCAPE, like_pattern
 from app.services.stages import board_stage_for, stage_on_board
@@ -171,6 +172,7 @@ async def list_leads(
 
 async def create_lead(session: AsyncSession, user: User, payload: LeadCreate) -> Lead:
     data = payload.model_dump(exclude={"tag_ids"})
+    data["accountant_name"] = await validate_lead_accountant(session, payload.accountant_name)
     # Владельца определяем до проверки этапа: этап обязан принадлежать его
     # доске. Когда проверка жила только в PATCH, создание через POST могло
     # спрятать новый лид на чужой канбан (ревью 06.10, Б-10).
@@ -195,6 +197,10 @@ async def update_lead(session: AsyncSession, user: User, lead_id: int, payload: 
     expected_updated_at = payload.expected_updated_at
     data = payload.model_dump(exclude_unset=True, exclude={"expected_updated_at"})
     tag_ids = data.pop("tag_ids", None)
+    if "accountant_name" in data:
+        data["accountant_name"] = await validate_lead_accountant(
+            session, data["accountant_name"], current_name=lead.accountant_name
+        )
 
     # Смена этапа записывается в ленту: в чаттере видна история движения
     # карточки по воронке.
