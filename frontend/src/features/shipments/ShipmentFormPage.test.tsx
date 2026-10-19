@@ -28,6 +28,8 @@ const ME = {
   is_active: true,
 };
 
+const ADMIN = { ...ME, email: "admin@crmdetroid.ru", role: "admin" as const };
+
 const SHIPMENT = {
   id: 101,
   number: "101",
@@ -90,9 +92,9 @@ afterEach(() => {
   clearTokens();
 });
 
-function commonRoutes(shipment: unknown = SHIPMENT) {
+function commonRoutes(shipment: unknown = SHIPMENT, currentUser: unknown = ME) {
   return [
-    { path: "/auth/me", response: ME },
+    { path: "/auth/me", response: currentUser },
     { path: "/meta", response: { margin_deduction_rate: "0.25" } },
     { path: "/shipments/101/attachments", response: [] },
     { path: "/shipments/101/timeline", response: [] },
@@ -668,4 +670,40 @@ it("копирует заявку в новый черновик без номе
   expect(body.created_at).not.toBe(SHIPMENT.created_at);
   expect(body).not.toHaveProperty("status");
   expect(body).not.toHaveProperty("attachments");
+});
+
+it("менеджер не видит действие безвозвратного удаления заявки", async () => {
+  setAccessToken("токен");
+  server = startFakeApi(commonRoutes());
+
+  renderShipment();
+
+  await screen.findByLabelText("Номер заявки");
+  expect(screen.queryByRole("button", { name: "Удалить заявку" })).not.toBeInTheDocument();
+});
+
+it("администратор удаляет заявку только после подтверждения и возвращается к списку", async () => {
+  setAccessToken("токен");
+  server = startFakeApi([
+    ...commonRoutes(SHIPMENT, ADMIN),
+    { method: "DELETE", path: "/shipments/101", response: null },
+  ]);
+
+  const user = userEvent.setup();
+  renderShipment();
+
+  await user.click(await screen.findByRole("button", { name: "Удалить заявку" }));
+  const dialog = await screen.findByRole("dialog", { name: "Удаление заявки" });
+  expect(dialog).toHaveTextContent("Заявка №101");
+  expect(dialog).toHaveTextContent("Связанный лид и остальные его заявки останутся.");
+
+  await user.click(screen.getByRole("button", { name: "Отмена" }));
+  expect(server.called("DELETE", "/shipments/101")).toBe(false);
+  expect(screen.queryByRole("dialog", { name: "Удаление заявки" })).not.toBeInTheDocument();
+
+  await user.click(screen.getByRole("button", { name: "Удалить заявку" }));
+  await user.click(screen.getByRole("button", { name: "Удалить навсегда" }));
+
+  await waitFor(() => expect(server?.called("DELETE", "/shipments/101")).toBe(true));
+  expect(await screen.findByText("Список заявок")).toBeVisible();
 });

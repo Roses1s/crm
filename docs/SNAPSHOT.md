@@ -30,7 +30,7 @@
 | `leads.py` | `/crm/leads` | 13 |
 | `loss_reasons.py` | `/crm/loss-reasons` | 3 |
 | `meta.py` | `/meta` | 1 |
-| `shipments.py` | `—` | 10 |
+| `shipments.py` | `—` | 11 |
 | `stages.py` | `/crm/stages` | 5 |
 | `tags.py` | `/crm/tags` | 4 |
 | `users.py` | `/users` | 1 |
@@ -95,8 +95,8 @@
 
 ## Тесты
 
-- бэкенд (pytest): **218** тест-функций
-- фронтенд (vitest): **431** тестов
+- бэкенд (pytest): **221** тест-функций
+- фронтенд (vitest): **433** тестов
 - сценарные (подменяется только сеть, остальное настоящее):
   - `frontend/src/features/auth/login-flow.test.tsx`
   - `frontend/src/features/crm/kanban-flow.test.tsx`

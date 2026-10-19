@@ -1,4 +1,4 @@
-import { Copy, FileText } from "lucide-react";
+import { Copy, FileText, Trash2 } from "lucide-react";
 import { useCallback, useEffect, useRef, useState } from "react";
 import { Link, useBlocker, useNavigate, useParams, useSearchParams } from "react-router-dom";
 
@@ -6,6 +6,7 @@ import { AppShell, ControlPanel } from "@/app/layout/AppShell";
 import { ApiError } from "@/shared/api/client";
 import {
   useAddShipmentNote,
+  useDeleteShipment,
   useDeleteShipmentAttachment,
   useDeleteShipmentTimelineEntry,
   useEditShipmentNote,
@@ -47,6 +48,7 @@ import { OrderLinesTab } from "./shipment-form/OrderLinesTab";
 import { ShipmentHeaderGroup } from "./shipment-form/ShipmentHeaderGroup";
 import { UnloadingGroup } from "./shipment-form/UnloadingGroup";
 import { STextarea } from "./shipment-form/fields";
+import { DeleteShipmentDialog } from "./DeleteShipmentDialog";
 
 // Этапы заявки образуют единую воронку (Новая → … → Машина выгрузилась).
 // Статусбар обращается к этапам по числовым id, поэтому рядом со значением
@@ -160,6 +162,7 @@ function ShipmentForm({ id }: { id?: string }) {
   const { data: attachments = [] } = useShipmentAttachments(savedId);
 
   const save = useSaveShipment(id);
+  const deleteShipment = useDeleteShipment(id);
   const setStatus = useSetShipmentStatus(id);
   const addNote = useAddShipmentNote(id);
   const editNote = useEditShipmentNote(id);
@@ -179,6 +182,7 @@ function ShipmentForm({ id }: { id?: string }) {
     isNew && form.lead_id ? String(form.lead_id) : undefined,
   );
   const [error, setError] = useState("");
+  const [deleteOpen, setDeleteOpen] = useState(false);
   const [preview, setPreview] = useState<Attachment | null>(null);
   const [tab, setTab] = useState("lines");
   const loadedId = useRef<number | null>(null);
@@ -315,6 +319,31 @@ function ShipmentForm({ id }: { id?: string }) {
     navigate(to, options);
   }
 
+  function openDeleteDialog(): void {
+    if (!shipment || isNew || saving || deleteShipment.isPending) return;
+    deleteShipment.reset();
+    autoSaveBlocked.current = true;
+    setDeleteOpen(true);
+  }
+
+  function closeDeleteDialog(): void {
+    if (deleteShipment.isPending) return;
+    autoSaveBlocked.current = false;
+    setDeleteOpen(false);
+    deleteShipment.reset();
+  }
+
+  function deleteForever(): void {
+    if (!shipment || isNew || saving || deleteShipment.isPending) return;
+    deleteShipment.mutate(undefined, {
+      onSuccess: () => {
+        setDeleteOpen(false);
+        toast.show(`Заявка №${shipment.number} удалена`);
+        navigateWithoutPrompt("/shipments");
+      },
+    });
+  }
+
   const stayOnPage = useCallback(() => {
     proceedAfterSave.current = false;
     transitionProceeded.current = false;
@@ -415,11 +444,19 @@ function ShipmentForm({ id }: { id?: string }) {
   // дожидаясь таймера. Ещё не созданную заявку автосохранение не трогает:
   // её создаёт только пользователь явным сохранением.
   useEffect(() => {
-    if (isNew || !dirty || saving || autoSaveBlocked.current) return;
+    if (
+      isNew ||
+      !dirty ||
+      saving ||
+      deleteOpen ||
+      deleteShipment.isPending ||
+      autoSaveBlocked.current
+    )
+      return;
     const timer = setTimeout(() => submit(), 3000);
     return () => clearTimeout(timer);
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [isNew, dirty, saving, form]);
+  }, [isNew, dirty, saving, deleteOpen, deleteShipment.isPending, form]);
 
   // Смена этапа у сохранённой заявки уходит на сервер сразу, без кнопки
   // сохранения, — как в Odoo.
@@ -476,16 +513,31 @@ function ShipmentForm({ id }: { id?: string }) {
         ]}
         cog={
           !isNew ? (
-            <button
-              type="button"
-              aria-label="Копировать заявку"
-              title="Создать новую заявку на основе этой"
-              onClick={() => navigate(`/shipments/new?copy=${encodeURIComponent(id ?? "")}`)}
-              className="inline-flex h-7 items-center gap-1 rounded-[4px] border border-odoo-border bg-odoo-surface px-2 text-[12px] text-odoo-text hover:bg-odoo-bg"
-            >
-              <Copy className="h-3.5 w-3.5" />
-              <span>Копировать</span>
-            </button>
+            <>
+              <button
+                type="button"
+                aria-label="Копировать заявку"
+                title="Создать новую заявку на основе этой"
+                onClick={() => navigate(`/shipments/new?copy=${encodeURIComponent(id ?? "")}`)}
+                className="inline-flex h-7 items-center gap-1 rounded-[4px] border border-odoo-border bg-odoo-surface px-2 text-[12px] text-odoo-text hover:bg-odoo-bg"
+              >
+                <Copy className="h-3.5 w-3.5" />
+                <span>Копировать</span>
+              </button>
+              {currentUser?.role === "admin" && shipment && (
+                <button
+                  type="button"
+                  aria-label="Удалить заявку"
+                  title="Безвозвратно удалить заявку"
+                  disabled={saving || deleteShipment.isPending}
+                  onClick={openDeleteDialog}
+                  className="inline-flex h-7 items-center gap-1 rounded-[4px] border border-odoo-danger/30 bg-odoo-surface px-2 text-[12px] text-odoo-danger hover:bg-odoo-danger/10 disabled:cursor-not-allowed disabled:opacity-60"
+                >
+                  <Trash2 className="h-3.5 w-3.5" />
+                  <span>Удалить</span>
+                </button>
+              )}
+            </>
           ) : undefined
         }
         status={
@@ -689,6 +741,19 @@ function ShipmentForm({ id }: { id?: string }) {
           onSaveAndLeave={saveAndLeave}
           onLeaveWithoutSaving={leaveWithoutSaving}
           onStay={stayOnPage}
+        />
+      )}
+      {deleteOpen && shipment && (
+        <DeleteShipmentDialog
+          shipmentNumber={shipment.number}
+          pending={deleteShipment.isPending}
+          error={
+            deleteShipment.isError
+              ? describe(deleteShipment.error, "Не удалось удалить заявку")
+              : ""
+          }
+          onCancel={closeDeleteDialog}
+          onConfirm={deleteForever}
         />
       )}
       {preview && <FilePreview file={preview} onClose={() => setPreview(null)} />}

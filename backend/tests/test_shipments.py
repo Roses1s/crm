@@ -661,6 +661,175 @@ async def test_deleting_shipment_note_removes_its_attachment_files(
     assert all(not path.exists() for path in new_files)
 
 
+async def test_manager_cannot_delete_shipment(auth_client: AsyncClient, seeded: dict) -> None:
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    shipment = (await auth_client.post("/api/v1/shipments", json={"lead_id": lead_id})).json()
+
+    denied = await auth_client.delete(
+        f"/api/v1/shipments/{shipment['id']}", headers=await manager_headers(auth_client)
+    )
+
+    assert denied.status_code == 403
+    assert (await auth_client.get(f"/api/v1/shipments/{shipment['id']}")).status_code == 200
+
+
+async def test_admin_deletes_shipment_and_its_data_but_keeps_lead_and_sibling(
+    auth_client: AsyncClient, seeded: dict, session, monkeypatch: pytest.MonkeyPatch
+) -> None:
+    """Удаляется только заявка: её история, теги и файлы, включая миниатюры.
+
+    Сам лид, его чаттер и вложения, тег как справочник и соседняя заявка
+    остаются на месте. Тест проходит и на SQLite, где FK-контроль выключен.
+    """
+    from io import BytesIO
+    from unittest.mock import Mock
+
+    from PIL import Image
+    from sqlalchemy import func, select
+
+    from app.models.crm import Tag
+    from app.models.shipment import shipment_tags
+    from app.models.timeline import Attachment, TimelineEntry
+    from app.services import shipments as shipment_service
+
+    lead_id = seeded["lead"].id  # type: ignore[attr-defined]
+    tag_id = seeded["tag"].id  # type: ignore[attr-defined]
+    target = (
+        await auth_client.post(
+            "/api/v1/shipments",
+            json={"lead_id": lead_id, "number": "SHIP-DELETE", "tag_ids": [tag_id]},
+        )
+    ).json()
+    sibling = (
+        await auth_client.post(
+            "/api/v1/shipments", json={"lead_id": lead_id, "number": "SHIP-KEEP"}
+        )
+    ).json()
+    shipment_id = target["id"]
+    assert (
+        await session.scalar(
+            select(func.count())
+            .select_from(shipment_tags)
+            .where(shipment_tags.c.shipment_id == shipment_id)
+        )
+        == 1
+    )
+
+    status_change = await auth_client.patch(
+        f"/api/v1/shipments/{shipment_id}/status", json={"status": "unloaded"}
+    )
+    assert status_change.status_code == 200, status_change.text
+
+    shipment_note = await auth_client.post(
+        f"/api/v1/shipments/{shipment_id}/notes", json={"body": "История заявки"}
+    )
+    assert shipment_note.status_code == 201, shipment_note.text
+
+    image_bytes = BytesIO()
+    Image.new("RGB", (12, 8), color=(30, 90, 160)).save(image_bytes, format="PNG")
+    image_bytes.seek(0)
+    shipment_image = await auth_client.post(
+        f"/api/v1/shipments/{shipment_id}/attachments?entry_id={shipment_note.json()['id']}",
+        files={"file": ("shipment.png", image_bytes.getvalue(), "image/png")},
+    )
+    assert shipment_image.status_code == 201, shipment_image.text
+    thumbnail = await auth_client.get(
+        f"/api/v1/crm/attachments/{shipment_image.json()['id']}/thumbnail"
+    )
+    assert thumbnail.status_code == 200, thumbnail.text
+
+    direct_file = await auth_client.post(
+        f"/api/v1/shipments/{shipment_id}/attachments",
+        files={"file": ("waybill.pdf", b"%PDF-1.4 shipment", "application/pdf")},
+    )
+    sibling_file = await auth_client.post(
+        f"/api/v1/shipments/{sibling['id']}/attachments",
+        files={"file": ("sibling.pdf", b"%PDF-1.4 sibling", "application/pdf")},
+    )
+    lead_note = await auth_client.post(
+        f"/api/v1/crm/leads/{lead_id}/notes", json={"body": "История лида остаётся"}
+    )
+    lead_file = await auth_client.post(
+        f"/api/v1/crm/leads/{lead_id}/attachments",
+        files={"file": ("lead.pdf", b"%PDF-1.4 lead", "application/pdf")},
+    )
+    assert direct_file.status_code == sibling_file.status_code == lead_file.status_code == 201
+    assert lead_note.status_code == 201, lead_note.text
+
+    root = Path(settings.attachments_dir)
+    shipment_dir = root / "shipments" / str(shipment_id)
+    shipment_files = [path for path in shipment_dir.rglob("*") if path.is_file()]
+    thumbnail_files = list(shipment_dir.glob("*.thumbnail.webp"))
+    assert len(shipment_files) == 3  # PDF, PNG и её созданная миниатюра
+    assert len(thumbnail_files) == 1 and thumbnail_files[0] in shipment_files
+    sibling_path = next((root / "shipments" / str(sibling["id"])).glob("*"))
+    lead_path = next((root / str(lead_id)).glob("*"))
+    assert sibling_path.is_file() and lead_path.is_file()
+
+    reason_id = seeded["loss_reason"].id  # type: ignore[attr-defined]
+    lost = await auth_client.post(
+        f"/api/v1/crm/leads/{lead_id}/lose", json={"reason_id": reason_id}
+    )
+    assert lost.status_code == 204
+
+    shipment_logger = Mock()
+    monkeypatch.setattr(shipment_service, "log", shipment_logger)
+    deleted = await auth_client.delete(f"/api/v1/shipments/{shipment_id}")
+    assert deleted.status_code == 204, deleted.text
+    assert shipment_logger.info.call_count == 1
+    assert shipment_logger.info.call_args.args == ("shipment.deleted",)
+    assert shipment_logger.info.call_args.kwargs == {
+        "shipment_id": shipment_id,
+        "number": "SHIP-DELETE",
+        "by": seeded["admin"].id,
+    }
+    assert (await auth_client.get(f"/api/v1/shipments/{shipment_id}")).status_code == 404
+    assert (await auth_client.get(f"/api/v1/crm/leads/{lead_id}")).status_code == 200
+    remaining = await auth_client.get(f"/api/v1/leads/{lead_id}/shipments")
+    assert [item["id"] for item in remaining.json()] == [sibling["id"]]
+    assert (await auth_client.get(f"/api/v1/shipments/{sibling['id']}")).status_code == 200
+
+    lead_history = await auth_client.get(f"/api/v1/crm/leads/{lead_id}/timeline")
+    assert any(item["body"] == "История лида остаётся" for item in lead_history.json())
+    lead_attachments = await auth_client.get(f"/api/v1/crm/leads/{lead_id}/attachments")
+    assert [item["id"] for item in lead_attachments.json()] == [lead_file.json()["id"]]
+    sibling_attachments = await auth_client.get(f"/api/v1/shipments/{sibling['id']}/attachments")
+    assert [item["id"] for item in sibling_attachments.json()] == [sibling_file.json()["id"]]
+
+    assert all(not path.exists() for path in shipment_files)
+    assert sibling_path.is_file() and lead_path.is_file()
+    assert (
+        await session.scalar(
+            select(func.count())
+            .select_from(TimelineEntry)
+            .where(TimelineEntry.shipment_id == shipment_id)
+        )
+        == 0
+    )
+    assert (
+        await session.scalar(
+            select(func.count())
+            .select_from(Attachment)
+            .where(Attachment.shipment_id == shipment_id)
+        )
+        == 0
+    )
+    assert (
+        await session.scalar(
+            select(func.count())
+            .select_from(shipment_tags)
+            .where(shipment_tags.c.shipment_id == shipment_id)
+        )
+        == 0
+    )
+    assert await session.get(Tag, tag_id) is not None
+
+
+async def test_delete_missing_shipment_is_404(auth_client: AsyncClient) -> None:
+    response = await auth_client.delete("/api/v1/shipments/999")
+    assert response.status_code == 404
+
+
 async def test_launcher_apps_depend_on_role(auth_client: AsyncClient) -> None:
     apps = await auth_client.get("/api/v1/launcher/apps")
     slugs = [a["slug"] for a in apps.json()]

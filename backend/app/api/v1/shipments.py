@@ -9,7 +9,7 @@ from typing import Annotated, Any
 
 from fastapi import APIRouter, Depends, Query, status
 
-from app.api.deps import CurrentUser, SessionDep
+from app.api.deps import AdminUser, CurrentUser, SessionDep
 from app.core.pagination import PageParams, page_params
 from app.models.shipment import Shipment, ShipmentStatus
 from app.models.timeline import TimelineEntry
@@ -66,6 +66,15 @@ async def create_shipment(
 @router.get("/shipments/{shipment_id}", response_model=ShipmentRead, summary="Карточка заявки")
 async def get_shipment(shipment_id: int, session: SessionDep, user: CurrentUser) -> Shipment:
     return await service.get_shipment_or_404(session, shipment_id, user, allow_lost=True)
+
+
+@router.delete(
+    "/shipments/{shipment_id}",
+    status_code=status.HTTP_204_NO_CONTENT,
+    summary="Безвозвратно удалить заявку (только администратор)",
+)
+async def delete_shipment(shipment_id: int, session: SessionDep, user: AdminUser) -> None:
+    await service.delete_shipment_permanently(session, user, shipment_id)
 
 
 @router.patch("/shipments/{shipment_id}", response_model=ShipmentRead, summary="Изменить заявку")

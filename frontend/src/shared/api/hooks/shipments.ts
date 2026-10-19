@@ -200,6 +200,20 @@ export function useSaveShipment(id: string | undefined) {
   });
 }
 
+export function useDeleteShipment(id: string | undefined) {
+  const qc = useQueryClient();
+  return useMutation({
+    mutationFn: () => apiVoid(`/shipments/${id}`, { method: "DELETE" }),
+    onSuccess: () => {
+      void qc.invalidateQueries({ queryKey: ["shipments"] });
+      void qc.invalidateQueries({ queryKey: ["lead-shipments"] });
+      qc.removeQueries({ queryKey: keys.shipment(id ?? ""), exact: true });
+      qc.removeQueries({ queryKey: keys.shipmentTimeline(id ?? ""), exact: true });
+      qc.removeQueries({ queryKey: keys.shipmentAttachments(id ?? ""), exact: true });
+    },
+  });
+}
+
 export function useSetShipmentStatus(id: string | undefined) {
   const qc = useQueryClient();
   return useMutation({

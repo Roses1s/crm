@@ -7,7 +7,7 @@ from pathlib import Path
 from typing import Any
 from uuid import uuid4
 
-from sqlalchemy import Numeric, case, func, literal, or_, select, update
+from sqlalchemy import Numeric, case, delete, func, literal, or_, select, update
 from sqlalchemy.ext.asyncio import AsyncSession
 from sqlalchemy.orm import joinedload, load_only, raiseload, selectinload
 from starlette.concurrency import run_in_threadpool
@@ -23,6 +23,7 @@ from app.models.shipment import (
     ShipmentStatus,
     TaxRate,
     net_divisor,
+    shipment_tags,
 )
 from app.models.timeline import SHIPMENT_STAGE_LABEL, Attachment, EntryType, TimelineEntry
 from app.models.user import Role, User
@@ -112,6 +113,111 @@ async def get_shipment_or_404(
         if user is not None and user.role != Role.admin:
             await get_lead_or_404(session, shipment.lead_id, user, allow_lost=allow_lost)
     return shipment
+
+
+async def delete_shipment_permanently(session: AsyncSession, user: User, shipment_id: int) -> None:
+    """Безвозвратно удаляет заявку, её ленту, теги и вложения, но не лид.
+
+    Удалять может только администратор, в том числе заявку любого статуса
+    или заявку проигранного лида. Строки дочерних таблиц удаляем в той же
+    транзакции явно: это сохраняет одинаковое поведение на PostgreSQL и в
+    SQLite-тестах, где внешние ключи по умолчанию выключены. Файлы находятся
+    вне базы, поэтому их пути собираются до коммита, а сами файлы удаляются
+    только после успешного коммита.
+    """
+    if user.role != Role.admin:
+        raise PermissionDeniedError("Безвозвратно удалить заявку может только администратор")
+
+    # Соблюдаем общий порядок блокировок изменений заявки: сначала лид,
+    # затем сама заявка. Так удаление не пересекается с переносом заявки и
+    # каскадным удалением лида. Статус лида намеренно не проверяем: удаление
+    # заявки разрешено и после проигрыша лида.
+    initial_lead_id = await session.scalar(
+        select(Shipment.lead_id).where(Shipment.id == shipment_id)
+    )
+    if initial_lead_id is None:
+        raise NotFoundError(f"Заявка {shipment_id} не найдена")
+
+    locked_lead_id = await session.scalar(
+        select(Lead.id).where(Lead.id == initial_lead_id).with_for_update(of=Lead)
+    )
+    if locked_lead_id is None:
+        raise NotFoundError(f"Заявка {shipment_id} не найдена")
+
+    locked = (
+        await session.execute(
+            select(Shipment.id, Shipment.lead_id, Shipment.number)
+            .where(Shipment.id == shipment_id)
+            .with_for_update(of=Shipment)
+        )
+    ).one_or_none()
+    if locked is None:
+        raise NotFoundError(f"Заявка {shipment_id} не найдена")
+    if locked.lead_id != initial_lead_id:
+        raise AppError(
+            "Заявка одновременно изменена другим пользователем. Обновите страницу",
+            code="shipment_conflict",
+            status_code=409,
+        )
+
+    attachment_paths = list(
+        (
+            await session.execute(
+                select(Attachment.storage_path).where(Attachment.shipment_id == shipment_id)
+            )
+        ).scalars()
+    )
+    paths = {
+        path
+        for stored_path in attachment_paths
+        if stored_path
+        for path in (Path(stored_path), thumbnail_path(Path(stored_path)))
+    }
+
+    # Убираем только связи и дочерние строки этой заявки. Лид, его лента,
+    # его собственные вложения и остальные заявки не затрагиваются. Внешние
+    # ключи также настроены на каскад — явные удаления делают операцию
+    # предсказуемой даже в тестовой SQLite без включённого FK-контроля.
+    await session.execute(
+        delete(Attachment)
+        .where(Attachment.shipment_id == shipment_id)
+        .execution_options(synchronize_session=False)
+    )
+    await session.execute(
+        delete(TimelineEntry)
+        .where(TimelineEntry.shipment_id == shipment_id)
+        .execution_options(synchronize_session=False)
+    )
+    await session.execute(delete(shipment_tags).where(shipment_tags.c.shipment_id == shipment_id))
+    await session.execute(
+        delete(Shipment)
+        .where(Shipment.id == shipment_id)
+        .execution_options(synchronize_session=False)
+    )
+    await session.commit()
+
+    # Минимальный аудит хранит только факт удаления, номер заявки и автора;
+    # содержимое заявки и документов в журнал не копируется.
+    log.info(
+        "shipment.deleted",
+        shipment_id=shipment_id,
+        number=locked.number,
+        by=user.id,
+    )
+
+    # Ошибка диска не должна превращать уже завершённое удаление из БД в
+    # ложный ответ 500. Задача cleanup_orphan_files удалит оставшийся файл
+    # при следующем проходе.
+    for path in paths:
+        try:
+            await run_in_threadpool(path.unlink, missing_ok=True)
+        except OSError as exc:
+            log.warning(
+                "shipment.file_cleanup_failed",
+                shipment_id=shipment_id,
+                path=str(path),
+                error=str(exc),
+            )
 
 
 async def _reload_shipment(session: AsyncSession, shipment_id: int) -> Shipment:
