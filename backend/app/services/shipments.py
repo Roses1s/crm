@@ -539,10 +539,12 @@ async def update_entry(
 async def delete_entry(session: AsyncSession, user: User, shipment_id: int, entry_id: int) -> None:
     await get_shipment_or_404(session, shipment_id, user, for_update=True, for_write=True)
     entry = await _get_entry_or_404(session, shipment_id, entry_id)
-    # Системная история — аудит изменений заявки. Разрешить её удаление
-    # через ту же ручку — значит дать переписать поля без проверяемого
-    # следа. Единственное исключение — запись о переносе между этапами:
-    # её по решению владельца (05.10.2026) может убрать любой сотрудник.
+    # Системная история — аудит изменений заявки: отдельной ручкой записи
+    # её удалять нельзя, иначе можно переписать поля без следа. Администратор
+    # может убрать её только вместе со всей заявкой через DELETE /shipments/{id};
+    # это действие оставляет отдельное событие shipment.deleted. Исключение
+    # для этой ручки — запись о переносе между этапами, которую по решению
+    # владельца (05.10.2026) может удалить любой сотрудник.
     if entry.type is not EntryType.note and not entry.is_stage_change:
         raise AppError(
             "Удалить можно только примечание или запись о смене этапа",

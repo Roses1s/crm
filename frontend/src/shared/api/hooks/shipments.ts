@@ -200,6 +200,7 @@ export function useSaveShipment(id: string | undefined) {
   });
 }
 
+/** Удаляет детали заявки из кеша и обновляет списки, не затрагивая кеш самого лида. */
 export function useDeleteShipment(id: string | undefined) {
   const qc = useQueryClient();
   return useMutation({

@@ -71,9 +71,12 @@ async def get_shipment(shipment_id: int, session: SessionDep, user: CurrentUser)
 @router.delete(
     "/shipments/{shipment_id}",
     status_code=status.HTTP_204_NO_CONTENT,
-    summary="Безвозвратно удалить заявку (только администратор)",
+    summary="Безвозвратно удалить заявку любого статуса (только администратор)",
 )
 async def delete_shipment(shipment_id: int, session: SessionDep, user: AdminUser) -> None:
+    """Администратор может удалить заявку любого статуса, включая заявку
+    проигранного лида.
+    """
     await service.delete_shipment_permanently(session, user, shipment_id)
 
 
