@@ -133,9 +133,9 @@ def _free_disk_mb(path: Path) -> int:
 async def _ensure_disk_space(target: Path) -> None:
     """Не даёт загрузкой файлов добить диск до нуля.
 
-    На сервере база, резервные копии и вложения живут на одном разделе в
-    15 ГБ. Переполнение диска останавливает PostgreSQL — это худшее, что
-    может случиться, поэтому последний гигабайт не отдаём под загрузки.
+    На production база, резервные копии и вложения живут на одном разделе.
+    Переполнение диска останавливает PostgreSQL — это худшее, что может
+    случиться, поэтому последний гигабайт не отдаём под загрузки.
     """
     free_mb = await run_in_threadpool(_free_disk_mb, target.parent)
     required = settings.min_free_disk_mb + settings.max_upload_mb * _UPLOAD_WORKERS
