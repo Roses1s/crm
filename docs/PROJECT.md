@@ -469,8 +469,9 @@ request — сначала спросить владельца.
 а в dev lock также `filelock` и `virtualenv`; во frontend — Vitest вместе с
 coverage adapter, `undici`, Vite и Zod. `pip-audit` по обоим backend locks и
 `npm audit --audit-level=high` локально показывают 0 известных уязвимостей;
-полные локальные тесты backend/frontend, линт, типы и сборки прошли. Новый CI
-для lock-файлов следует дождаться после push; live PostgreSQL/Valkey и Docker
+полные локальные тесты backend/frontend, линт, типы и сборки прошли. После
+push коммита `8917543` GitHub Actions `40636325892` прошёл все шесть заданий,
+включая аудит, Docker, PostgreSQL/Valkey и browser E2E. Live Docker-службы
 локально недоступны.
 
 ### Состояние по ревью (02.10–08.10.2026)
