@@ -162,11 +162,34 @@ def test_export_scripts_have_valid_shell_syntax() -> None:
         assert result.returncode == 0, result.stderr
 
 
-def test_local_export_normalizes_crlf_before_streaming_remote_script() -> None:
+def test_local_export_normalizes_and_spools_remote_script_input() -> None:
     local = LOCAL_EXPORT.read_text(encoding="utf-8")
-    expected_pipeline = "sed 's/\\r$//' \"$REMOTE_STAGE_SCRIPT\" | ssh -T \"$REMOTE\" 'bash -s'"
+    expected_pipeline = (
+        'sed \'s/\\r$//\' "$REMOTE_STAGE_SCRIPT" | ssh -T "$REMOTE" "$REMOTE_STAGE_COMMAND"'
+    )
     assert expected_pipeline in local
     assert "chmod sed; do" in local
+
+    assignment = next(
+        line for line in local.splitlines() if line.startswith("REMOTE_STAGE_COMMAND=")
+    )
+    command_result = subprocess.run(
+        ["bash", "-c", f'{assignment}\nprintf "%s" "$REMOTE_STAGE_COMMAND"'],
+        capture_output=True,
+        check=False,
+    )
+    assert command_result.returncode == 0, command_result.stderr
+    remote_command = command_result.stdout.decode()
+
+    # This simulates a Compose command that reads stdin. It must not consume
+    # any of the streamed recovery helper before Bash executes it.
+    helper = b'cat >/dev/null\nprintf "HELPER_RAN\\n"\n'
+    staged = subprocess.run(
+        ["bash", "-c", remote_command], input=helper, capture_output=True, check=False
+    )
+    assert staged.returncode == 0, staged.stderr
+    assert staged.stdout == b"HELPER_RAN\n"
+
     for script in (LOCAL_EXPORT, REMOTE_STAGE):
         relative_script = script.relative_to(ROOT).as_posix()
         attributes = subprocess.run(

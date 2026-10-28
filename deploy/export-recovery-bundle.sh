@@ -6,6 +6,9 @@ umask 077
 
 ROOT="$(cd "$(dirname "${BASH_SOURCE[0]}")/.." && pwd)"
 REMOTE_STAGE_SCRIPT="$ROOT/deploy/create-recovery-stage.sh"
+# Сначала складываем stdin в файл на сервере: команды Docker Compose не должны
+# случайно прочитать остаток передаваемого Bash-скрипта из stdin.
+REMOTE_STAGE_COMMAND='umask 077; tmp=$(mktemp /tmp/crm-stage-input-XXXXXXXXXX) || exit; trap "rm -f -- \"\$tmp\"" EXIT; cat > "$tmp" || exit; chmod 600 "$tmp" || exit; bash "$tmp"'
 
 usage() {
     cat >&2 <<'USAGE'
@@ -80,7 +83,7 @@ IFS= read -r confirmation < /dev/tty
 [[ "$confirmation" == "SNAPSHOT" ]] || fail "Отменено; production-сервер не менялся"
 
 printf '[crm-recovery] Готовлю согласованный снимок на сервере %s\n' "$REMOTE" >&2
-REMOTE_STAGE="$(sed 's/\r$//' "$REMOTE_STAGE_SCRIPT" | ssh -T "$REMOTE" 'bash -s')"
+REMOTE_STAGE="$(sed 's/\r$//' "$REMOTE_STAGE_SCRIPT" | ssh -T "$REMOTE" "$REMOTE_STAGE_COMMAND")"
 [[ "$REMOTE_STAGE" =~ ^/tmp/crm-recovery-[A-Za-z0-9]+$ ]] \
     || fail "Сервер вернул неожиданный путь временной копии; ничего не удаляю"
 
