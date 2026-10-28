@@ -22,10 +22,10 @@ const menuItems = [
 
 export function Crm2Page() {
   return (
-    <div className="flex min-h-screen bg-white">
+    <div className="flex h-dvh overflow-hidden bg-white">
       <aside
         aria-label="Боковая панель — пример"
-        className="flex min-h-screen w-[290px] max-w-full shrink-0 flex-col bg-[#101114] px-5 pb-5 text-white"
+        className="flex h-full min-h-0 w-[290px] max-w-full shrink-0 flex-col overflow-y-auto bg-[#101114] px-5 pb-4 text-white"
       >
         <div className="flex items-center gap-[15px] pl-[5px] pt-[21px]">
           <div className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-[15px] bg-[#7164f5] shadow-[0_8px_28px_rgba(102,89,255,0.28)]">
@@ -41,7 +41,7 @@ export function Crm2Page() {
           </div>
         </div>
 
-        <nav aria-label="Меню — пример" className="mt-[45px]">
+        <nav aria-label="Меню — пример" className="mt-[30px]">
           <div className="mb-3 pl-[15px] text-[11px] font-bold tracking-[0.18em] text-[#66676f]">
             МЕНЮ
           </div>
@@ -79,7 +79,7 @@ export function Crm2Page() {
 
         <div className="flex-1" />
 
-        <div className="mt-10 rounded-[20px] border border-[#292a30] bg-[#17181c] px-5 pt-[19px] pb-[21px]">
+        <div className="mt-6 rounded-[20px] border border-[#292a30] bg-[#17181c] px-5 pt-[19px] pb-[21px]">
           <div className="flex items-center justify-between gap-2 text-[13px] font-bold">
             <span className="text-[#777880]">ЗДОРОВЬЕ ВОРОНКИ</span>
             <span className="text-[#c4f45d]">86%</span>
@@ -95,12 +95,12 @@ export function Crm2Page() {
           </p>
         </div>
 
-        <div className="mt-5 flex h-[55px] items-center gap-[15px] rounded-[15px] border border-[#292a30] px-[15px] text-[16px] font-semibold text-[#96979e]">
+        <div className="mt-4 flex h-[55px] items-center gap-[15px] rounded-[15px] border border-[#292a30] px-[15px] text-[16px] font-semibold text-[#96979e]">
           <Moon aria-hidden="true" size={21} />
           <span>Тёмная тема</span>
         </div>
 
-        <div className="mt-[18px] flex items-center gap-[14px] px-[13px]">
+        <div className="mt-[14px] flex items-center gap-[14px] px-[13px]">
           <div className="relative flex h-[45px] w-[45px] shrink-0 items-center justify-center rounded-full bg-[#bd22f3] text-[12px] font-bold">
             АК
             <span className="absolute right-[-2px] bottom-[-2px] h-3 w-3 rounded-full border-2 border-[#101114] bg-[#a7e74d]" />
