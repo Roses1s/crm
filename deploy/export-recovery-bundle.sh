@@ -110,7 +110,7 @@ printf '[crm-recovery] Шифрую архив паролем-фразой age. 
 chmod 600 "$OUTPUT.partial"
 
 printf '[crm-recovery] Проверяю, что архив расшифровывается и содержит все части\n' >&2
-age -d -p "$OUTPUT.partial" | tar -tf - > "$LOCAL_STAGE/package-files.txt"
+age -d "$OUTPUT.partial" | tar -tf - > "$LOCAL_STAGE/package-files.txt"
 for file in MANIFEST.txt SHA256SUMS database.dump attachments.tar.gz source.tar.gz .env; do
     grep -Fxq "$file" "$LOCAL_STAGE/package-files.txt" || fail "В зашифрованном архиве не найден $file"
 done

@@ -276,8 +276,9 @@ def test_export_scripts_do_not_remove_docker_data_or_skip_encryption() -> None:
     assert "docker compose down" not in remote
     assert "docker volume prune" not in remote
     assert "docker system prune" not in remote
-    assert "age -p -o" in local
-    assert "age -d -p" in local
+    assert 'age -p -o "$OUTPUT.partial"' in local
+    assert 'age -d "$OUTPUT.partial" | tar -tf -' in local
+    assert 'age -d -p "$OUTPUT.partial"' not in local
     assert "SNAPSHOT" in local
     assert "docker compose down" not in local
     assert "docker volume prune" not in local
