@@ -54,10 +54,15 @@ README теперь описывают подтверждённый архив �
 ограничивают обычным обновлением уже работающего production-стека. Исправлены
 устаревшие комментарии `backend/app/api/v1/admin.py` и
 `frontend/src/shared/ui/list-limit-notice.tsx`. `docs/SNAPSHOT.md` пересобран;
-его сгенерированное содержимое не изменилось. `git diff --check`,
-`python scripts/snapshot.py --check` и `py_compile` прошли; frontend/backend test-
-dependencies в локальном checkout не установлены, поэтому полный прогон будет в CI
-после push. Production не затрагивался.
+его сгенерированное содержимое не изменилось. Первоначальный push коммита
+`19e49a0` запустил CI `40733577877`: пять из шести заданий прошли (включая
+backend, PostgreSQL/Valkey, Playwright, Docker и Nginx); frontend job остановился
+на Prettier для изменённой таблицы маршрутов. `npm ci` выполнен, README
+отформатирован. Затем локально прошли lint, `npm run format:check`, `npx tsc -b`,
+Vitest с покрытием (439 тестов) и production-сборка. Также прошли
+`git diff --check`, `python scripts/snapshot.py --check` и `py_compile`.
+Локальные Python test-dependencies отсутствуют; backend CI зелёный. Следующий
+push повторно запустит полный CI. Production не затрагивался.
 
 ## Сессия 19.10.2026: безвозвратное удаление заявок — CI зелёный
 
