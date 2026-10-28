@@ -75,6 +75,14 @@ const router = createBrowserRouter([
     ),
   },
   {
+    path: "/crm2",
+    element: (
+      <RequireAuth>
+        <main aria-label="Новая CRM" className="min-h-screen bg-white" />
+      </RequireAuth>
+    ),
+  },
+  {
     path: "/crm",
     element: (
       <RequireAuth>

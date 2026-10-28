@@ -86,3 +86,41 @@ it("неизвестный адрес ведёт в лаунчер, а /admin �
   expect(window.location.pathname).toBe("/admin/users");
   expect(server?.called("GET", "/admin/users")).toBe(true);
 }, 15_000);
+
+it("новая CRM — пустая белая страница без запросов к данным", async () => {
+  window.history.replaceState({}, "", "/crm2");
+  server = startFakeApi([]);
+  const app = await loadModules();
+  app.auth.setAccessToken("тестовый-токен");
+  app.render(
+    <app.Providers>
+      <app.AppRouter />
+    </app.Providers>,
+  );
+
+  const page = app.screen.getByRole("main", { name: "Новая CRM" });
+  expect(page).toBeEmptyDOMElement();
+  expect(page).toHaveClass("min-h-screen", "bg-white");
+  expect(window.location.pathname).toBe("/crm2");
+  expect(server.calls).toEqual([]);
+});
+
+it("новая CRM без входа перенаправляет на существующий экран авторизации", async () => {
+  window.history.replaceState({}, "", "/crm2");
+  server = startFakeApi([{ method: "POST", path: "/auth/refresh", response: {}, status: 401 }]);
+  const app = await loadModules();
+  app.render(
+    <app.Providers>
+      <app.AppRouter />
+    </app.Providers>,
+  );
+
+  expect(
+    await app.screen.findByRole("heading", { name: "CRM Детроид" }, { timeout: 3000 }),
+  ).toBeVisible();
+  expect(window.location.pathname).toBe("/login");
+  expect(app.screen.queryByRole("main", { name: "Новая CRM" })).not.toBeInTheDocument();
+  expect(
+    server.calls.every((call) => call.method === "POST" && call.url === "/api/v1/auth/refresh"),
+  ).toBe(true);
+});
