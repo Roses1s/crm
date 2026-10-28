@@ -89,6 +89,7 @@
 | `admin` | `AccountantsPage`, `SecurityPage`, `UsersPage` |
 | `auth` | `LoginPage` |
 | `crm` | `KanbanPage`, `LeadFormPage` |
+| `crm2` | `Crm2Page` |
 | `customers` | `CustomersPage` |
 | `launcher` | `LauncherPage` |
 | `shipments` | `ShipmentFormPage`, `ShipmentsPage` |
@@ -96,7 +97,7 @@
 ## Тесты
 
 - бэкенд (pytest): **227** тест-функций
-- фронтенд (vitest): **435** тестов
+- фронтенд (vitest): **436** тестов
 - сценарные (подменяется только сеть, остальное настоящее):
   - `frontend/src/features/auth/login-flow.test.tsx`
   - `frontend/src/features/crm/kanban-flow.test.tsx`

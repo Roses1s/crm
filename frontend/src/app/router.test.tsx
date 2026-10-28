@@ -87,7 +87,7 @@ it("неизвестный адрес ведёт в лаунчер, а /admin �
   expect(server?.called("GET", "/admin/users")).toBe(true);
 }, 15_000);
 
-it("новая CRM — пустая белая страница без запросов к данным", async () => {
+it("новая CRM показывает макет панели без запросов к данным", async () => {
   window.history.replaceState({}, "", "/crm2");
   server = startFakeApi([]);
   const app = await loadModules();
@@ -100,9 +100,48 @@ it("новая CRM — пустая белая страница без запр�
 
   const page = app.screen.getByRole("main", { name: "Новая CRM" });
   expect(page).toBeEmptyDOMElement();
-  expect(page).toHaveClass("min-h-screen", "bg-white");
+  expect(app.screen.getByRole("complementary", { name: "Боковая панель — пример" })).toBeVisible();
+  expect(app.screen.getByText("CRM Детроид")).toBeVisible();
+  expect(app.screen.getByText("Доска лидов")).toBeVisible();
+  expect(app.screen.getByText("Клиенты")).toBeVisible();
+  expect(app.screen.getByText("Аналитика")).toBeVisible();
+  expect(app.screen.getByText("Сделки")).toBeVisible();
+  expect(app.screen.getByText("Календарь")).toBeVisible();
+  expect(app.screen.getByText("Настройки")).toBeVisible();
+  expect(app.screen.getAllByText("17")).toHaveLength(2);
+  expect(app.screen.getAllByText("СКОРО")).toHaveLength(4);
+  expect(app.screen.getByText("86%")).toBeVisible();
+  expect(app.screen.getByText("Тёмная тема")).toBeVisible();
+  expect(app.screen.getByText("Анна Ким")).toBeVisible();
+  expect(app.screen.queryByRole("button")).not.toBeInTheDocument();
+  expect(app.screen.queryByRole("link")).not.toBeInTheDocument();
+  const user = userEvent.setup();
+  await user.click(app.screen.getByText("Клиенты"));
+  await user.click(app.screen.getByText("Тёмная тема"));
   expect(window.location.pathname).toBe("/crm2");
   expect(server.calls).toEqual([]);
+});
+
+it("после обновления новая CRM восстанавливает вход, но данные не запрашивает", async () => {
+  window.history.replaceState({}, "", "/crm2");
+  server = startFakeApi([
+    {
+      method: "POST",
+      path: "/auth/refresh",
+      response: { access_token: "тестовый-токен", token_type: "bearer", expires_in: 1800 },
+    },
+  ]);
+  const app = await loadModules();
+  app.render(
+    <app.Providers>
+      <app.AppRouter />
+    </app.Providers>,
+  );
+
+  expect(await app.screen.findByText("CRM Детроид")).toBeVisible();
+  expect(server.calls.map(({ method, url }) => ({ method, url }))).toEqual([
+    { method: "POST", url: "/api/v1/auth/refresh" },
+  ]);
 });
 
 it("новая CRM без входа перенаправляет на существующий экран авторизации", async () => {

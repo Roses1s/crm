@@ -5,6 +5,7 @@ import { RequireAuth } from "@/app/RequireAuth";
 import { LoginPage } from "@/features/auth/LoginPage";
 import { KanbanPage } from "@/features/crm/KanbanPage";
 import { LeadFormPage } from "@/features/crm/LeadFormPage";
+import { Crm2Page } from "@/features/crm2/Crm2Page";
 
 // Страницы загружаются отдельно: тяжёлые разделы не входят в стартовый
 // пакет.
@@ -78,7 +79,7 @@ const router = createBrowserRouter([
     path: "/crm2",
     element: (
       <RequireAuth>
-        <main aria-label="Новая CRM" className="min-h-screen bg-white" />
+        <Crm2Page />
       </RequireAuth>
     ),
   },
