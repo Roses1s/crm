@@ -22,7 +22,7 @@
 
 ### Подготовить компьютер владельца
 
-Нужен компьютер с `bash`, `ssh`, `tar`, `sha256sum` и программой [`age`](https://age-encryption.org/). В Ubuntu/WSL:
+Нужен компьютер с `bash`, `ssh`, `tar`, `sha256sum`, `sed` и программой [`age`](https://age-encryption.org/). В Ubuntu/WSL:
 
 ```bash
 sudo apt update && sudo apt install -y age
@@ -35,7 +35,7 @@ brew install age coreutils
 export PATH="$(brew --prefix coreutils)/libexec/gnubin:$PATH"
 ```
 
-В Windows используйте WSL с Ubuntu или Git Bash с установленным `age`. SSH-алиас `crm` должен подключать пользователя `deploy` к текущему серверу; это тот же алиас, которым выполняется `ssh crm`.
+В Windows используйте WSL с Ubuntu или Git Bash с установленным `age`. SSH-алиас `crm` должен подключать пользователя `deploy` к текущему серверу; это тот же алиас, которым выполняется `ssh crm`. Вспомогательный скрипт перед передачей на Linux автоматически приводится к окончаниям строк LF; это важно для старых клонов Git Bash, в которых shell-файлы уже сохранены с Windows-окончаниями CRLF.
 
 ### Запустить экспорт
 

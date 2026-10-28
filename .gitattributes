@@ -1,0 +1,2 @@
+# Shell scripts execute with Bash on Linux, including scripts streamed over SSH.
+*.sh text eol=lf

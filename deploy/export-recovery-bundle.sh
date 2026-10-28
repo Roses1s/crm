@@ -29,7 +29,7 @@ OUTPUT="${1:-$DEFAULT_DIR/$DEFAULT_NAME}"
 
 fail() { printf '[crm-recovery] ОСТАНОВКА: %s\n' "$*" >&2; exit 1; }
 
-for command_name in ssh age tar sha256sum grep mktemp chmod; do
+for command_name in ssh age tar sha256sum grep mktemp chmod sed; do
     command -v "$command_name" >/dev/null 2>&1 || fail "На компьютере не найдена команда: $command_name"
 done
 [[ -r "$REMOTE_STAGE_SCRIPT" ]] || fail "Не найден файл $REMOTE_STAGE_SCRIPT"
@@ -80,7 +80,7 @@ IFS= read -r confirmation < /dev/tty
 [[ "$confirmation" == "SNAPSHOT" ]] || fail "Отменено; production-сервер не менялся"
 
 printf '[crm-recovery] Готовлю согласованный снимок на сервере %s\n' "$REMOTE" >&2
-REMOTE_STAGE="$(ssh -T "$REMOTE" 'bash -s' < "$REMOTE_STAGE_SCRIPT")"
+REMOTE_STAGE="$(sed 's/\r$//' "$REMOTE_STAGE_SCRIPT" | ssh -T "$REMOTE" 'bash -s')"
 [[ "$REMOTE_STAGE" =~ ^/tmp/crm-recovery-[A-Za-z0-9]+$ ]] \
     || fail "Сервер вернул неожиданный путь временной копии; ничего не удаляю"
 

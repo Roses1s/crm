@@ -162,6 +162,35 @@ def test_export_scripts_have_valid_shell_syntax() -> None:
         assert result.returncode == 0, result.stderr
 
 
+def test_local_export_normalizes_crlf_before_streaming_remote_script() -> None:
+    local = LOCAL_EXPORT.read_text(encoding="utf-8")
+    expected_pipeline = "sed 's/\\r$//' \"$REMOTE_STAGE_SCRIPT\" | ssh -T \"$REMOTE\" 'bash -s'"
+    assert expected_pipeline in local
+    assert "chmod sed; do" in local
+    for script in (LOCAL_EXPORT, REMOTE_STAGE):
+        relative_script = script.relative_to(ROOT).as_posix()
+        attributes = subprocess.run(
+            ["git", "check-attr", "eol", "--", relative_script],
+            cwd=ROOT,
+            text=True,
+            capture_output=True,
+            check=True,
+        )
+        assert f"{relative_script}: eol: lf" in attributes.stdout
+
+    crlf_source = REMOTE_STAGE.read_bytes().replace(b"\n", b"\r\n")
+    normalized = subprocess.run(
+        ["sed", r"s/\r$//"], input=crlf_source, capture_output=True, check=False
+    )
+    assert normalized.returncode == 0, normalized.stderr
+    assert b"\r" not in normalized.stdout
+
+    syntax = subprocess.run(
+        ["bash", "-n"], input=normalized.stdout, capture_output=True, check=False
+    )
+    assert syntax.returncode == 0, syntax.stderr
+
+
 def test_remote_stage_creates_verified_payload_and_restarts_services(tmp_path: Path) -> None:
     result, stage_root, log_file = _run_remote_stage(tmp_path)
 
