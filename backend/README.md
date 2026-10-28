@@ -83,18 +83,18 @@ backend/
 │   │   ├── errors.py      единый формат ошибок {detail, code, request_id}
 │   │   └── pagination.py  {count, next, previous, results}
 │   ├── db/                Base, async engine, сессия-зависимость, advisory-блокировки PostgreSQL
-│   ├── models/            User · Stage · Tag · Lead · LossReason · Shipment · TimelineEntry ·
+│   ├── models/            User · Stage · Tag · Accountant · Lead · LossReason · Shipment · TimelineEntry ·
 │   │                      Attachment · LoginAttempt · RevokedToken
 │   ├── schemas/           Pydantic v2: запросы и ответы
 │   ├── api/
 │   │   ├── deps.py        сессия, текущий пользователь, проверка ролей
 │   │   └── v1/            ТОЛЬКО HTTP: маршруты, параметры, коды ответов
-│   │                      auth · launcher · stages · tags · loss_reasons · leads ·
-│   │                      customers · attachments · shipments · users · admin · health
-│   ├── services/          бизнес-логика, отделённая от HTTP: leads · shipments ·
+│   │                      auth · launcher · accountants · stages · tags · loss_reasons ·
+│   │                      leads · customers · attachments · shipments · users · admin · health
+│   ├── services/          бизнес-логика, отделённая от HTTP: accountants · leads · shipments ·
 │   │                      attachments · customers · stages · tags · search
 │   └── worker/            Celery: приложение и задачи (бэкапы, уборка)
-├── alembic/               миграции: 27 шт., первая создаёт всю схему
+├── alembic/               28 миграций; первая создаёт исходную схему
 ├── tests/                 pytest + httpx ASGITransport
 ├── requirements.lock      версии для production-образа (с хешами)
 ├── requirements-dev.lock  те же плюс инструменты разработки (для CI)
@@ -111,6 +111,7 @@ backend/
 | POST | `/api/v1/auth/logout` | все (стирает куку и отзывает обновляющий токен) |
 | GET | `/api/v1/auth/me` | авторизованные |
 | GET | `/api/v1/launcher/apps` | авторизованные (фильтр по роли) |
+| GET | `/api/v1/crm/accountants` | авторизованные: активный справочник ФИО для карточек лидов |
 | GET/POST/PATCH/DELETE | `/api/v1/crm/stages` | своя доска; `?owner_id=` — доска сотрудника (админ) |
 | POST | `/api/v1/crm/stages/reorder` | новый порядок этапов целиком, одной транзакцией |
 | GET/POST/PATCH/DELETE | `/api/v1/crm/tags` | все авторизованные (теги — рабочий инструмент, не настройка) |
@@ -135,10 +136,14 @@ backend/
 | GET/POST | `/api/v1/shipments/{id}/attachments` | документы заявки |
 | GET/POST | `/api/v1/shipments` | авторизованные; `?search=` по номеру, клиенту и перевозчику |
 | GET/PATCH | `/api/v1/shipments/{id}` | авторизованные; поле `status` через общий PATCH не меняется |
+| DELETE | `/api/v1/shipments/{id}` | только admin: безвозвратно удаляет заявку, историю, теги и файлы, не удаляя лид |
 | PATCH | `/api/v1/shipments/{id}/status` | единственный способ сменить статус — пишет запись в историю |
 | GET | `/api/v1/shipments/{id}/timeline` · POST `/notes` | лента и примечания заявки |
 | PATCH/DELETE | `/api/v1/shipments/{id}/timeline/{entry_id}` | только свои примечания |
 | GET | `/api/v1/leads/{id}/shipments` | заявки лида (вкладка в карточке) |
+| GET/POST | `/api/v1/admin/accountants` | admin: список бухгалтеров и добавление |
+| PATCH/DELETE | `/api/v1/admin/accountants/{id}` | admin: изменение ФИО и архивация |
+| POST | `/api/v1/admin/accountants/{id}/restore` | admin: восстановление архивной записи |
 | GET | `/api/v1/admin/backups` · POST `/api/v1/admin/backup` | admin |
 | GET | `/api/v1/admin/login-attempts` | admin |
 | GET/POST/PATCH/DELETE | `/api/v1/admin/users` | admin |
@@ -278,9 +283,9 @@ celery -A app.worker.celery_app.celery beat   -l info
 ```
 
 Первая миграция (`initial schema`) создаёт базовую схему, остальные двадцать
-шесть меняют её по ходу работы. Сейчас в базе десять таблиц: `users`, `stages`,
-`tags`, `leads`, `loss_reasons`, `shipments`, `timeline_entries`,
-`attachments`, `login_attempts`, `revoked_tokens`.
+семь меняют её по ходу работы. Сейчас в базе одиннадцать таблиц: `users`,
+`stages`, `tags`, `accountants`, `leads`, `loss_reasons`, `shipments`,
+`timeline_entries`, `attachments`, `login_attempts`, `revoked_tokens`.
 
 Контейнер `backend` миграции при старте **не** применяет — схему обновляет
 только `deploy.sh` отдельным шагом (см. корневой `README.md`). Это сделано,
