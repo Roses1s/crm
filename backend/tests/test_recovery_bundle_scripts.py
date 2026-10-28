@@ -9,6 +9,7 @@ from pathlib import Path
 ROOT = Path(__file__).resolve().parents[2]
 REMOTE_STAGE = ROOT / "deploy" / "create-recovery-stage.sh"
 LOCAL_EXPORT = ROOT / "deploy" / "export-recovery-bundle.sh"
+RESTORE_GUIDE = ROOT / "docs" / "deploy" / "03-backup-and-restore.md"
 
 
 FAKE_DOCKER = r"""#!/usr/bin/env bash
@@ -279,6 +280,11 @@ def test_export_scripts_do_not_remove_docker_data_or_skip_encryption() -> None:
     assert 'age -p -o "$OUTPUT.partial"' in local
     assert 'age -d "$OUTPUT.partial" | tar -tf -' in local
     assert 'age -d -p "$OUTPUT.partial"' not in local
+
+    restore_guide = RESTORE_GUIDE.read_text(encoding="utf-8")
+    assert 'age -d "$BUNDLE"' in restore_guide
+    assert 'age -d -p "$BUNDLE"' not in restore_guide
+
     assert "SNAPSHOT" in local
     assert "docker compose down" not in local
     assert "docker volume prune" not in local
