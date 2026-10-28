@@ -17,15 +17,30 @@ VPS и подробный runbook восстановления на чистой
 `docs/STATUS.md`, `docs/deploy/01-server-setup.md`, `docs/deploy/02-deploy.md`;
 `docs/SNAPSHOT.md` пересобран.
 
-**Локально:** Bash syntax обоих скриптов, Ruff и формат нового тестового файла,
-`snapshot.py --check` и 5 mocked-тестов экспортных скриптов прошли. Полный
-backend pytest в песочнице не запускался из-за отсутствующих FastAPI-зависимостей;
-Docker/PostgreSQL/Valkey недоступны.
+Первый push — коммит `ffa27fc`. В CI `40634006005` тесты backend/frontend,
+PostgreSQL/Valkey-интеграции, Playwright, Docker-сборки и nginx прошли; упали
+только два блокирующих шага аудита зависимостей. Поскольку locks не менялись в
+коммите с бэкапом, по согласованию с владельцем обновлены известные уязвимые
+версии: backend `certifi 2026.10.23`, `dnspython 2.9.0`,
+`opentelemetry-api 1.45.1`, `Pillow 13.0.0`, а в dev lock также `filelock 4.2.4`
+и `virtualenv 21.15.1`; frontend `Vitest/@vitest/coverage-v8 4.1.12`,
+`undici 8.12.3`, `Vite 6.4.5`, `Zod 4.6.7`. Локальные аудиты обоих Python-locks
+и `npm audit` после обновления показывают 0 известных уязвимостей.
+
+**Локально после обновлений:** backend lock установлен с `--require-hashes`;
+Ruff, формат, mypy, полный pytest (`226 passed, 8 skipped`, coverage 71%),
+SQLite `alembic upgrade head` и `alembic check` прошли. Frontend `npm ci`,
+lint, Prettier, `tsc -b`, тесты с покрытием, production build и аудит прошли.
+Также прошли Bash syntax обоих экспортных скриптов, `bash -n` 23 runbook-блоков,
+5 mock-тестов и `snapshot.py --check`. Новые lock-файлы ожидают отдельного
+коммита и CI после push; локально Docker/PostgreSQL/Valkey недоступны.
+
 **Production не проверялся и не менялся:** фактический архив, снимок VPS,
 переустановка и полноценная репетиция восстановления не выполнялись. Следующий
-шаг владельца — запустить `./deploy/export-recovery-bundle.sh` со своего
-компьютера, сохранить проверенный `.tar.age` минимум в двух местах вне VPS,
-парольную фразу хранить отдельно; до этого подтверждённой off-site копии нет.
+шаг после зелёного CI — владелец запускает `./deploy/export-recovery-bundle.sh`
+со своего компьютера, сохраняет проверенный `.tar.age` минимум в двух местах
+вне VPS и отдельно сохраняет парольную фразу. До этого подтверждённой off-site
+копии нет.
 
 ## Сессия 19.10.2026: безвозвратное удаление заявок — CI зелёный
 
