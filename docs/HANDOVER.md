@@ -61,8 +61,9 @@ backend, PostgreSQL/Valkey, Playwright, Docker и Nginx); frontend job оста�
 отформатирован. Затем локально прошли lint, `npm run format:check`, `npx tsc -b`,
 Vitest с покрытием (439 тестов) и production-сборка. Также прошли
 `git diff --check`, `python scripts/snapshot.py --check` и `py_compile`.
-Локальные Python test-dependencies отсутствуют; backend CI зелёный. Следующий
-push повторно запустит полный CI. Production не затрагивался.
+Локальные Python test-dependencies отсутствуют; backend suite проверен в CI.
+Таблица отформатирована в коммите `88c6241`, повторный CI `40735554948` прошёл
+все шесть заданий. Production не затрагивался.
 
 ## Сессия 19.10.2026: безвозвратное удаление заявок — CI зелёный
 
