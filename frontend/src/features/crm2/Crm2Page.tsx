@@ -62,14 +62,15 @@ export function Crm2Page() {
         }`}
       >
         <div className={`mb-9 flex items-center gap-3 px-1 ${collapsed ? "justify-center" : ""}`}>
-          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-gradient-to-br from-[#5a54e8] to-[#7f78f6] shadow-[0_8px_24px_-6px_rgba(90,84,232,0.7)]">
-            {/* Фирменный знак владельца — тот же файл, что фавикон (/logo.svg);
-                исходник чёрный, на фирменной фиолетовой плитке делаем его белым. */}
+          <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-[#101114]">
+            {/* Фирменный знак владельца: фон плитки в цвет панели (#101114),
+                чёрный исходник (/logo.svg) показываем белым — как задумывал
+                владелец для левой панели. */}
             <img
               src="/logo.svg"
               alt=""
               aria-hidden="true"
-              className="h-8 w-8 object-contain brightness-0 invert"
+              className="h-full w-full object-contain brightness-0 invert"
             />
           </div>
           {!collapsed && (
