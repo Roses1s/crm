@@ -11,6 +11,8 @@ import {
   UsersRound,
 } from "lucide-react";
 
+import { LeadBoard } from "./LeadBoard";
+
 // Это только образец: пункты и показатели не связаны с настоящими данными CRM.
 const menuItems = [
   { label: "Доска лидов", icon: LayoutGrid, badge: "17", active: true },
@@ -203,7 +205,9 @@ export function Crm2Page() {
           </button>
         )}
       </aside>
-      <main aria-label="Новая CRM" className="min-w-0 flex-1" />
+      <main aria-label="Новая CRM" className="min-w-0 flex-1 bg-[#15161b]">
+        <LeadBoard />
+      </main>
     </div>
   );
 }

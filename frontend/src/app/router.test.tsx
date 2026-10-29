@@ -87,7 +87,7 @@ it("неизвестный адрес ведёт в лаунчер, а /admin �
   expect(server?.called("GET", "/admin/users")).toBe(true);
 }, 15_000);
 
-it("новая CRM показывает макет панели без запросов к данным", async () => {
+it("новая CRM показывает макет панели и доски без запросов к данным", async () => {
   window.history.replaceState({}, "", "/crm2");
   window.localStorage.removeItem("crm2.sidebar.collapsed");
   server = startFakeApi([]);
@@ -100,7 +100,14 @@ it("новая CRM показывает макет панели без запр�
   );
 
   const page = app.screen.getByRole("main", { name: "Новая CRM" });
-  expect(page).toBeEmptyDOMElement();
+  // Основная область — канбан-доска с этапами владельца, данные вымышленные.
+  expect(
+    app
+      .within(page)
+      .getAllByRole("heading", { level: 2 })
+      .map((heading) => heading.textContent),
+  ).toEqual(["Новый", "Перезвонить", "Вышел на ЛПР", "Потенциальный", "Уехали", "Ждем заявку"]);
+  expect(app.screen.getByText("Игорь Мальцев")).toBeVisible();
   expect(app.screen.getByRole("complementary", { name: "Боковая панель — пример" })).toBeVisible();
   expect(app.screen.getByText("CRM Детроид")).toBeVisible();
   expect(app.screen.getByText("Доска лидов")).toBeVisible();
@@ -154,7 +161,9 @@ it("панель новой CRM сворачивается до иконок и 
   expect(app.screen.queryByText("Анна Ким")).not.toBeInTheDocument();
   expect(app.screen.queryByRole("button", { name: "Свернуть меню" })).not.toBeInTheDocument();
   expect(app.screen.getByRole("complementary", { name: "Боковая панель — пример" })).toBeVisible();
-  expect(app.screen.getByRole("main", { name: "Новая CRM" })).toBeEmptyDOMElement();
+  // Доска в основной области от сворачивания панели не зависит.
+  expect(app.screen.getByRole("heading", { name: "Ждем заявку" })).toBeVisible();
+  expect(app.screen.getByText("Алексей Тарасов")).toBeVisible();
 
   const expand = app.screen.getByRole("button", { name: "Развернуть меню" });
   expect(expand).toBeVisible();
