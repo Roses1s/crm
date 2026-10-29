@@ -1,8 +1,10 @@
+import { useState } from "react";
 import {
   BarChart3,
   BriefcaseBusiness,
   CalendarDays,
   ChevronsLeft,
+  ChevronsRight,
   LayoutGrid,
   Moon,
   Settings,
@@ -21,37 +23,50 @@ const menuItems = [
 ];
 
 export function Crm2Page() {
+  // Макет: свёрнутое состояние показывает только иконки, данные не участвуют.
+  const [collapsed, setCollapsed] = useState(false);
+
   return (
     <div className="flex h-dvh overflow-hidden bg-white">
       <aside
         aria-label="Боковая панель — пример"
-        className="flex h-full min-h-0 w-[290px] max-w-full shrink-0 flex-col overflow-y-auto bg-[#101114] px-5 pb-3 text-white"
+        className={`flex h-full min-h-0 max-w-full shrink-0 flex-col overflow-y-auto bg-[#101114] text-white transition-[width] duration-200 ease-out ${
+          collapsed ? "w-[88px] px-4" : "w-[290px] px-5"
+        } pb-3`}
       >
-        <div className="flex items-center gap-[15px] pl-[5px] pt-4 [@media(max-height:740px)]:pt-2">
+        <div
+          className={`flex items-center pt-4 [@media(max-height:740px)]:pt-2 ${
+            collapsed ? "justify-center gap-0" : "gap-[15px] pl-[5px]"
+          }`}
+        >
           <div className="flex h-[50px] w-[50px] shrink-0 items-center justify-center rounded-[15px] bg-[#7164f5] shadow-[0_8px_28px_rgba(102,89,255,0.28)]">
             <Zap aria-hidden="true" size={22} fill="white" strokeWidth={2.5} />
           </div>
-          <div className="min-w-0">
-            <div className="whitespace-nowrap text-[19px] leading-[21px] font-extrabold tracking-[-0.03em]">
-              CRM Детроид
+          {!collapsed && (
+            <div className="min-w-0">
+              <div className="whitespace-nowrap text-[19px] leading-[21px] font-extrabold tracking-[-0.03em]">
+                CRM Детроид
+              </div>
+              <div className="mt-0.5 text-[12px] leading-[14px] font-bold tracking-[0.16em] text-[#777880]">
+                CRM · ПРОДАЖИ
+              </div>
             </div>
-            <div className="mt-0.5 text-[12px] leading-[14px] font-bold tracking-[0.16em] text-[#777880]">
-              CRM · ПРОДАЖИ
-            </div>
-          </div>
+          )}
         </div>
 
         <nav aria-label="Меню — пример" className="mt-5 [@media(max-height:740px)]:mt-3">
-          <div className="mb-3 pl-[15px] text-[11px] font-bold tracking-[0.18em] text-[#66676f]">
-            МЕНЮ
-          </div>
+          {!collapsed && (
+            <div className="mb-3 pl-[15px] text-[11px] font-bold tracking-[0.18em] text-[#66676f]">
+              МЕНЮ
+            </div>
+          )}
           <ul className="space-y-2">
             {menuItems.map(({ label, icon: Icon, badge, active }, index) => (
               <li
                 key={label}
-                className={`relative flex h-[52px] [@media(max-height:740px)]:h-[46px] items-center gap-[15px] rounded-[15px] px-[15px] ${
+                className={`relative flex h-[52px] [@media(max-height:740px)]:h-[46px] items-center rounded-[15px] ${
                   active ? "bg-[#222327] font-bold text-white" : "font-semibold text-[#888991]"
-                }`}
+                } ${collapsed ? "justify-center px-0" : "gap-[15px] px-[15px]"}`}
               >
                 {active && (
                   <span
@@ -60,18 +75,22 @@ export function Crm2Page() {
                   />
                 )}
                 <Icon aria-hidden="true" size={22} strokeWidth={active ? 2.4 : 1.9} />
-                <span className="min-w-0 flex-1 whitespace-nowrap text-[16px]">{label}</span>
-                <span
-                  className={
-                    index === 0
-                      ? "rounded-full bg-[#c4f45d] px-[9px] py-[3px] text-[12px] font-bold text-[#151613]"
-                      : index === 1
-                        ? "rounded-full bg-[#675af2] px-[9px] py-[3px] text-[12px] font-bold text-white"
-                        : "rounded-full border border-[#34353a] px-[8px] py-[3px] text-[10px] leading-[14px] font-bold text-[#696a73]"
-                  }
-                >
-                  {badge}
-                </span>
+                {!collapsed && (
+                  <>
+                    <span className="min-w-0 flex-1 whitespace-nowrap text-[16px]">{label}</span>
+                    <span
+                      className={
+                        index === 0
+                          ? "rounded-full bg-[#c4f45d] px-[9px] py-[3px] text-[12px] font-bold text-[#151613]"
+                          : index === 1
+                            ? "rounded-full bg-[#675af2] px-[9px] py-[3px] text-[12px] font-bold text-white"
+                            : "rounded-full border border-[#34353a] px-[8px] py-[3px] text-[10px] leading-[14px] font-bold text-[#696a73]"
+                      }
+                    >
+                      {badge}
+                    </span>
+                  </>
+                )}
               </li>
             ))}
           </ul>
@@ -79,38 +98,72 @@ export function Crm2Page() {
 
         <div className="flex-1" />
 
-        <div className="mt-5 [@media(max-height:740px)]:mt-3 rounded-[20px] border border-[#292a30] bg-[#17181c] px-5 pt-4 pb-4">
-          <div className="flex items-center justify-between gap-2 text-[13px] font-bold">
-            <span className="text-[#777880]">ЗДОРОВЬЕ ВОРОНКИ</span>
-            <span className="text-[#c4f45d]">86%</span>
+        {!collapsed && (
+          <div className="mt-5 [@media(max-height:740px)]:mt-3 rounded-[20px] border border-[#292a30] bg-[#17181c] px-5 pt-4 pb-4">
+            <div className="flex items-center justify-between gap-2 text-[13px] font-bold">
+              <span className="text-[#777880]">ЗДОРОВЬЕ ВОРОНКИ</span>
+              <span className="text-[#c4f45d]">86%</span>
+            </div>
+            <div
+              aria-hidden="true"
+              className="mt-[13px] h-2 overflow-hidden rounded-full bg-[#303136]"
+            >
+              <div className="h-full w-[86%] rounded-full bg-linear-to-r from-[#776bff] via-[#a7b9b4] to-[#bdf05a]" />
+            </div>
+            <p className="mt-[12px] text-[13px] leading-[20px] text-[#7c7d84]">
+              Все этапы в норме, перегруза нет
+            </p>
           </div>
-          <div
-            aria-hidden="true"
-            className="mt-[13px] h-2 overflow-hidden rounded-full bg-[#303136]"
-          >
-            <div className="h-full w-[86%] rounded-full bg-linear-to-r from-[#776bff] via-[#a7b9b4] to-[#bdf05a]" />
-          </div>
-          <p className="mt-[12px] text-[13px] leading-[20px] text-[#7c7d84]">
-            Все этапы в норме, перегруза нет
-          </p>
-        </div>
+        )}
 
-        <div className="mt-3 [@media(max-height:740px)]:mt-2 flex h-[52px] items-center gap-[15px] rounded-[15px] border border-[#292a30] px-[15px] text-[16px] font-semibold text-[#96979e]">
+        <div
+          className={`mt-3 flex h-[52px] items-center rounded-[15px] border border-[#292a30] text-[16px] font-semibold text-[#96979e] ${
+            collapsed ? "justify-center px-0" : "gap-[15px] px-[15px]"
+          }`}
+        >
           <Moon aria-hidden="true" size={21} />
-          <span>Тёмная тема</span>
+          {!collapsed && <span>Тёмная тема</span>}
         </div>
 
-        <div className="mt-3 [@media(max-height:740px)]:mt-2 flex items-center gap-[14px] px-[13px]">
+        <div
+          className={`mt-3 flex items-center ${
+            collapsed ? "justify-center" : "gap-[14px] px-[13px]"
+          } [@media(max-height:740px)]:mt-2`}
+        >
           <div className="relative flex h-[45px] w-[45px] shrink-0 items-center justify-center rounded-full bg-[#bd22f3] text-[12px] font-bold">
             АК
             <span className="absolute right-[-2px] bottom-[-2px] h-3 w-3 rounded-full border-2 border-[#101114] bg-[#a7e74d]" />
           </div>
-          <div className="min-w-0 flex-1">
-            <div className="text-[15px] leading-[20px] font-bold">Анна Ким</div>
-            <div className="text-[13px] leading-[18px] text-[#82838b]">Руководитель ОП</div>
-          </div>
-          <ChevronsLeft aria-hidden="true" size={18} className="text-[#67686f]" />
+          {!collapsed && (
+            <>
+              <div className="min-w-0 flex-1">
+                <div className="text-[15px] leading-[20px] font-bold">Анна Ким</div>
+                <div className="text-[13px] leading-[18px] text-[#82838b]">Руководитель ОП</div>
+              </div>
+              <button
+                type="button"
+                aria-label="Свернуть меню"
+                aria-expanded={!collapsed}
+                onClick={() => setCollapsed(true)}
+                className="shrink-0 rounded-md p-1 text-[#67686f] transition-colors hover:text-white focus-visible:ring-2 focus-visible:ring-[#c1f25c] focus-visible:outline-none"
+              >
+                <ChevronsLeft aria-hidden="true" size={18} />
+              </button>
+            </>
+          )}
         </div>
+
+        {collapsed && (
+          <button
+            type="button"
+            aria-label="Развернуть меню"
+            aria-expanded={false}
+            onClick={() => setCollapsed(false)}
+            className="mx-auto mt-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border border-[#292a30] text-[#96979e] transition-colors hover:text-white focus-visible:ring-2 focus-visible:ring-[#c1f25c] focus-visible:outline-none [@media(max-height:740px)]:mt-2"
+          >
+            <ChevronsRight aria-hidden="true" size={18} />
+          </button>
+        )}
       </aside>
       <main aria-label="Новая CRM" className="min-w-0 flex-1" />
     </div>

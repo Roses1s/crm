@@ -113,12 +113,57 @@ it("новая CRM показывает макет панели без запр�
   expect(app.screen.getByText("86%")).toBeVisible();
   expect(app.screen.getByText("Тёмная тема")).toBeVisible();
   expect(app.screen.getByText("Анна Ким")).toBeVisible();
-  expect(app.screen.queryByRole("button")).not.toBeInTheDocument();
+  expect(app.screen.getAllByRole("button")).toHaveLength(1);
+  expect(app.screen.getByRole("button", { name: "Свернуть меню" })).toBeVisible();
   expect(app.screen.queryByRole("link")).not.toBeInTheDocument();
   const user = userEvent.setup();
   await user.click(app.screen.getByText("Клиенты"));
   await user.click(app.screen.getByText("Тёмная тема"));
   expect(window.location.pathname).toBe("/crm2");
+  expect(server.calls).toEqual([]);
+});
+
+it("панель новой CRM сворачивается до иконок и разворачивается обратно без запросов", async () => {
+  window.history.replaceState({}, "", "/crm2");
+  server = startFakeApi([]);
+  const app = await loadModules();
+  app.auth.setAccessToken("тестовый-токен");
+  app.render(
+    <app.Providers>
+      <app.AppRouter />
+    </app.Providers>,
+  );
+
+  await app.screen.findByText("CRM Детроид");
+  const user = userEvent.setup();
+  await user.click(app.screen.getByRole("button", { name: "Свернуть меню" }));
+
+  // Свёрнутая панель: все тексты и значки скрыты, видна только иконка-область.
+  expect(app.screen.queryByText("CRM Детроид")).not.toBeInTheDocument();
+  expect(app.screen.queryByText("CRM · ПРОДАЖИ")).not.toBeInTheDocument();
+  expect(app.screen.queryByText("МЕНЮ")).not.toBeInTheDocument();
+  expect(app.screen.queryByText("Доска лидов")).not.toBeInTheDocument();
+  expect(app.screen.queryByText("Клиенты")).not.toBeInTheDocument();
+  expect(app.screen.queryByText("Настройки")).not.toBeInTheDocument();
+  expect(app.screen.queryByText("17")).not.toBeInTheDocument();
+  expect(app.screen.queryByText("СКОРО")).not.toBeInTheDocument();
+  expect(app.screen.queryByText("86%")).not.toBeInTheDocument();
+  expect(app.screen.queryByText("Тёмная тема")).not.toBeInTheDocument();
+  expect(app.screen.queryByText("Анна Ким")).not.toBeInTheDocument();
+  expect(app.screen.queryByRole("button", { name: "Свернуть меню" })).not.toBeInTheDocument();
+  expect(app.screen.getByRole("complementary", { name: "Боковая панель — пример" })).toBeVisible();
+  expect(app.screen.getByRole("main", { name: "Новая CRM" })).toBeEmptyDOMElement();
+
+  const expand = app.screen.getByRole("button", { name: "Развернуть меню" });
+  expect(expand).toBeVisible();
+  await user.click(expand);
+
+  expect(app.screen.getByText("CRM Детроид")).toBeVisible();
+  expect(app.screen.getByText("Доска лидов")).toBeVisible();
+  expect(app.screen.getByText("86%")).toBeVisible();
+  expect(app.screen.getByText("Анна Ким")).toBeVisible();
+  expect(app.screen.getByRole("button", { name: "Свернуть меню" })).toBeVisible();
+  expect(app.screen.queryByRole("button", { name: "Развернуть меню" })).not.toBeInTheDocument();
   expect(server.calls).toEqual([]);
 });
 
