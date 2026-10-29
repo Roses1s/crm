@@ -89,6 +89,7 @@ it("неизвестный адрес ведёт в лаунчер, а /admin �
 
 it("новая CRM показывает макет панели без запросов к данным", async () => {
   window.history.replaceState({}, "", "/crm2");
+  window.localStorage.removeItem("crm2.sidebar.collapsed");
   server = startFakeApi([]);
   const app = await loadModules();
   app.auth.setAccessToken("тестовый-токен");
@@ -125,6 +126,7 @@ it("новая CRM показывает макет панели без запр�
 
 it("панель новой CRM сворачивается до иконок и разворачивается обратно без запросов", async () => {
   window.history.replaceState({}, "", "/crm2");
+  window.localStorage.removeItem("crm2.sidebar.collapsed");
   server = startFakeApi([]);
   const app = await loadModules();
   app.auth.setAccessToken("тестовый-токен");
@@ -167,8 +169,48 @@ it("панель новой CRM сворачивается до иконок и 
   expect(server.calls).toEqual([]);
 });
 
+it("панель новой CRM запоминает свёрнутое состояние после обновления страницы", async () => {
+  window.history.replaceState({}, "", "/crm2");
+  window.localStorage.removeItem("crm2.sidebar.collapsed");
+  server = startFakeApi([]);
+  const user = userEvent.setup();
+
+  // Первый заход: сворачиваем — выбор сохраняется в браузере.
+  let app = await loadModules();
+  app.auth.setAccessToken("тестовый-токен");
+  app.render(
+    <app.Providers>
+      <app.AppRouter />
+    </app.Providers>,
+  );
+  await app.screen.findByText("CRM Детроид");
+  await user.click(app.screen.getByRole("button", { name: "Свернуть меню" }));
+  expect(app.screen.queryByText("Доска лидов")).not.toBeInTheDocument();
+  expect(window.localStorage.getItem("crm2.sidebar.collapsed")).toBe("1");
+
+  // «Обновление страницы»: модули и страница создаются заново — панель сразу свёрнута.
+  app.cleanup();
+  app = await loadModules();
+  app.auth.setAccessToken("тестовый-токен");
+  app.render(
+    <app.Providers>
+      <app.AppRouter />
+    </app.Providers>,
+  );
+  expect(await app.screen.findByRole("button", { name: "Развернуть меню" })).toBeVisible();
+  expect(app.screen.queryByText("CRM Детроид")).not.toBeInTheDocument();
+  expect(app.screen.queryByText("Доска лидов")).not.toBeInTheDocument();
+
+  // Разворачиваем — сохраняется уже развёрнутый вид.
+  await user.click(app.screen.getByRole("button", { name: "Развернуть меню" }));
+  expect(app.screen.getByText("Доска лидов")).toBeVisible();
+  expect(window.localStorage.getItem("crm2.sidebar.collapsed")).toBeNull();
+  expect(server.calls).toEqual([]);
+}, 15_000);
+
 it("после обновления новая CRM восстанавливает вход, но данные не запрашивает", async () => {
   window.history.replaceState({}, "", "/crm2");
+  window.localStorage.removeItem("crm2.sidebar.collapsed");
   server = startFakeApi([
     {
       method: "POST",

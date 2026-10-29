@@ -22,9 +22,35 @@ const menuItems = [
   { label: "Настройки", icon: Settings, badge: "СКОРО" },
 ];
 
+// Выбор «свёрнута/развёрнута» запоминаем в браузере, чтобы после
+// обновления страницы панель открывалась так, как её оставил человек.
+const SIDEBAR_COLLAPSED_KEY = "crm2.sidebar.collapsed";
+
+function loadCollapsed(): boolean {
+  try {
+    return window.localStorage.getItem(SIDEBAR_COLLAPSED_KEY) === "1";
+  } catch {
+    return false;
+  }
+}
+
+function saveCollapsed(collapsed: boolean): void {
+  try {
+    if (collapsed) window.localStorage.setItem(SIDEBAR_COLLAPSED_KEY, "1");
+    else window.localStorage.removeItem(SIDEBAR_COLLAPSED_KEY);
+  } catch {
+    // Хранилище недоступно — просто работаем без запоминания.
+  }
+}
+
 export function Crm2Page() {
   // Макет: свёрнутое состояние показывает только иконки, данные не участвуют.
-  const [collapsed, setCollapsed] = useState(false);
+  const [collapsed, setCollapsed] = useState(loadCollapsed);
+
+  function applyCollapsed(next: boolean): void {
+    setCollapsed(next);
+    saveCollapsed(next);
+  }
 
   return (
     <div className="flex h-dvh overflow-hidden bg-white">
@@ -144,7 +170,7 @@ export function Crm2Page() {
                 type="button"
                 aria-label="Свернуть меню"
                 aria-expanded={!collapsed}
-                onClick={() => setCollapsed(true)}
+                onClick={() => applyCollapsed(true)}
                 className="shrink-0 rounded-md p-1 text-[#67686f] transition-colors hover:text-white focus-visible:ring-2 focus-visible:ring-[#c1f25c] focus-visible:outline-none"
               >
                 <ChevronsLeft aria-hidden="true" size={18} />
@@ -158,7 +184,7 @@ export function Crm2Page() {
             type="button"
             aria-label="Развернуть меню"
             aria-expanded={false}
-            onClick={() => setCollapsed(false)}
+            onClick={() => applyCollapsed(false)}
             className="mx-auto mt-3 flex h-9 w-9 shrink-0 items-center justify-center rounded-[10px] border border-[#292a30] text-[#96979e] transition-colors hover:text-white focus-visible:ring-2 focus-visible:ring-[#c1f25c] focus-visible:outline-none [@media(max-height:740px)]:mt-2"
           >
             <ChevronsRight aria-hidden="true" size={18} />
