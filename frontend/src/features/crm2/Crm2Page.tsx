@@ -205,7 +205,8 @@ export function Crm2Page() {
           </button>
         )}
       </aside>
-      <main aria-label="Новая CRM" className="min-w-0 flex-1 bg-[#15161b]">
+      <main aria-label="Новая CRM" className="min-w-0 flex-1">
+        {/* Фон и тему основной области задаёт сама доска (LeadBoard). */}
         <LeadBoard />
       </main>
     </div>

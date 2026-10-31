@@ -121,8 +121,12 @@ it("новая CRM показывает макет панели и доски б
   expect(app.screen.getByText("86%")).toBeVisible();
   expect(app.screen.getByText("Тёмная тема")).toBeVisible();
   expect(app.screen.getByText("Анна Ким")).toBeVisible();
-  expect(app.screen.getAllByRole("button")).toHaveLength(1);
+  // Кнопки на экране: свернуть меню плюс переключатель темы доски.
+  expect(app.screen.getAllByRole("button")).toHaveLength(3);
   expect(app.screen.getByRole("button", { name: "Свернуть меню" })).toBeVisible();
+  expect(app.screen.getByRole("group", { name: "Тема оформления" })).toBeVisible();
+  expect(app.screen.getByRole("button", { name: "Светлая" })).toBeVisible();
+  expect(app.screen.getByRole("button", { name: "Тёмная" })).toBeVisible();
   expect(app.screen.queryByRole("link")).not.toBeInTheDocument();
   const user = userEvent.setup();
   await user.click(app.screen.getByText("Клиенты"));

@@ -91,3 +91,26 @@ it("повторный перенос той же карточки работа�
   expect(within(column("Уехали")).getAllByText("Анна Смирнова")).toHaveLength(1);
   expect(within(column("Уехали")).getAllByRole("listitem")).toHaveLength(3);
 });
+
+it("по умолчанию светлая тема; переключатель ставит тёмную и запоминает выбор", () => {
+  window.localStorage.removeItem("crm2.theme");
+  render(<LeadBoard />);
+
+  const root = document.querySelector("[data-theme]");
+  expect(root).not.toBeNull();
+  expect(root?.getAttribute("data-theme")).toBe("light");
+
+  const lightButton = screen.getByRole("button", { name: "Светлая" });
+  const darkButton = screen.getByRole("button", { name: "Тёмная" });
+  expect(lightButton).toHaveAttribute("aria-pressed", "true");
+  expect(darkButton).toHaveAttribute("aria-pressed", "false");
+
+  fireEvent.click(darkButton);
+  expect(root?.getAttribute("data-theme")).toBe("dark");
+  expect(darkButton).toHaveAttribute("aria-pressed", "true");
+  expect(lightButton).toHaveAttribute("aria-pressed", "false");
+  expect(window.localStorage.getItem("crm2.theme")).toBe("dark");
+
+  // Убираем выбор за собой, чтобы не влиять на другие тесты.
+  window.localStorage.removeItem("crm2.theme");
+});
