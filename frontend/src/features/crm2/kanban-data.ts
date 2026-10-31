@@ -7,19 +7,61 @@ export type StageId = "new" | "callback" | "lp" | "potential" | "left" | "waitin
 export interface Stage {
   id: StageId;
   name: string;
-  /** Цветная точка в шапке колонки (приглушённая палитра панели). */
+  /** Яркий основной цвет этапа: точка, заголовок, сумма, полоска карточки. */
   dot: string;
+  /** Мягкая заливка колонки в светлой теме. */
+  tint: string;
+  /** Заставка колонки в тёмной теме — тот же цвет полупрозрачностью. */
+  dark: string;
 }
 
 // Порядок и названия колонок — ровно как задал владелец.
+// Палитра — красочная: у каждого этапа свой яркий цвет.
 export const STAGES: Stage[] = [
-  { id: "new", name: "Новый", dot: "#5a54e8" },
-  { id: "callback", name: "Перезвонить", dot: "#f5a524" },
-  { id: "lp", name: "Вышел на ЛПР", dot: "#38bdf8" },
-  { id: "potential", name: "Потенциальный", dot: "#2dd4bf" },
-  { id: "left", name: "Уехали", dot: "#f87171" },
-  { id: "waiting", name: "Ждем заявку", dot: "#c4f45d" },
+  { id: "new", name: "Новый", dot: "#7c5cff", tint: "#ede9ff", dark: "rgba(124,92,255,0.13)" },
+  {
+    id: "callback",
+    name: "Перезвонить",
+    dot: "#f59e0b",
+    tint: "#fff2dc",
+    dark: "rgba(245,158,11,0.13)",
+  },
+  {
+    id: "lp",
+    name: "Вышел на ЛПР",
+    dot: "#0ea5e9",
+    tint: "#e0f3fe",
+    dark: "rgba(14,165,233,0.13)",
+  },
+  {
+    id: "potential",
+    name: "Потенциальный",
+    dot: "#14b8a6",
+    tint: "#dcf7f3",
+    dark: "rgba(20,184,166,0.13)",
+  },
+  { id: "left", name: "Уехали", dot: "#f43f5e", tint: "#ffe4e8", dark: "rgba(244,63,94,0.13)" },
+  {
+    id: "waiting",
+    name: "Ждем заявку",
+    dot: "#84cc16",
+    tint: "#edfbd6",
+    dark: "rgba(132,204,22,0.13)",
+  },
 ];
+
+/** У источника тоже свой цвет — метка на карточке окрашивается по нему. */
+export interface SourceStyle {
+  color: string;
+  tint: string;
+}
+
+export const SOURCE_STYLES: Record<string, SourceStyle> = {
+  Сайт: { color: "#2563eb", tint: "#eaf1ff" },
+  Звонок: { color: "#ea580c", tint: "#ffeee2" },
+  Рекомендация: { color: "#059669", tint: "#e5f8f0" },
+  Мессенджер: { color: "#db2777", tint: "#fdeaf3" },
+};
 
 export interface BoardLead {
   id: string;
